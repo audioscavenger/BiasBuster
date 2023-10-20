@@ -1,3 +1,15 @@
+# ---> BiasBuster
+*
+!.gitattributes
+!LICENSE
+!README.md
+!*.md
+!*.py
+!*.sh
+!*.db
+!*.xlsx
+!*.cmd
+
 # ---> Windows
 # Windows thumbnail cache files
 Thumbs.db
