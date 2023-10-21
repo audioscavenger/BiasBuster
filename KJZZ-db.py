@@ -17,7 +17,7 @@
 # python KJZZ-db.py -i -f 41
 # python KJZZ-db.py -i -f 42
 # python KJZZ-db.py -q chunks10 -p
-# python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v -wordCloud
+# python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v --wordCloud
 # python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
 # python KJZZ-db.py -g title="All Things Considered" -v --wordCloud --mergeRecords
 # python KJZZ-db.py -g title="All Things Considered" -v --wordCloud --mergeRecords
@@ -37,6 +37,7 @@
 # egrep -i "diversity|equity|inclusion" *text
 
 import getopt, sys, os, re, regex, io, time, datetime
+from dateutil import parser
 from pathlib import Path
 import json, urllib, random, sqlite3
 # https://github.com/Textualize/rich
@@ -192,7 +193,7 @@ class Chunk:
 
 def usage(RC=99):
   print (("usage: python %s --help") % (sys.argv[0]))
-  print ("       --import [ --text file.text | --folder folder]")
+  print ("       --import [ --text \"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text\" | --folder folder]")
   print ("       --db *db.sqlite")
   print ("       --model *small medium..")
   print ("       --query [ last last10 byDay byTitle chunks10 ] (show chunks) or simply \"SELECT xyz from schedule\"")
@@ -381,7 +382,7 @@ try:
       gettext = currentValue
       if not gettext:
         print("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"")
-        print("example: chunk=\"KJZZ_2023-10-13_41_1700-1730_All Things Considered\" (mutually exclusive to the others)")
+        print("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\" (mutually exclusive to the others)")
         usage(1)
       if gettext.find("chunk=") > -1:
         chunkName = re.split(r"[=]",gettext)[1]
@@ -400,7 +401,7 @@ try:
           else:
             print(("[red]error: %s is invalid in %s[/]") %(key,condition))
             print("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"")
-            print("example: chunk=\"KJZZ_2023-10-13_41_1700-1730_All Things Considered\"")
+            print("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"")
             usage(1)
     elif currentArgument in ("-w", "--wordCloud"):
       if verbose: print (("[bright_black]wordCloud:[/]     %s") % (True))
@@ -534,6 +535,7 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
   wordsList = text.split()
   numWords = len(wordsList)
   title = "%s words=%s max=%s scale=%s" % (title, numWords, wordCloudDict["max_words"], wordCloudDict["relative_scaling"])
+  fileName = title.replace(": ", "=").replace(":", "")
   
   if not noStopwords:
     for i in range(level + 1): stopWords += stopwords[i]
@@ -600,8 +602,8 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
   # )
   # plt.tight_layout(pad=1)
   plt.imshow(wordcloud, interpolation='bilinear')
-  plt.savefig(title.replace(": ", "=")  + ".png", bbox_inches='tight')
-  print("    genWordCloud: file = \"%s.png\"" % (title.replace(": ", "=")))
+  plt.savefig(fileName  + ".png", bbox_inches='tight')
+  print("    genWordCloud: file = \"%s.png\"" % (fileName))
 
 
   # # image 2: lower max_font_size
@@ -621,8 +623,12 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
 if gettext:
   sqlGettext = "SELECT text from schedule where 1=1"
   title = "KJZZ"
+  
   for key in condDict.keys():
     sqlGettext += (" and %s = '%s'" % (key,condDict[key]))
+    # reformat start time for the filename:
+    if key == "start":
+      condDict[key] = parser.parse(chunk.start).strftime("%Y-%m-%d %H:%M")
     title += " %s=%s" % (key,condDict[key])
   if verbose: print("  gettext: %s" %(sqlGettext))
   records = cursor(localSqlDb, conn, sqlGettext)

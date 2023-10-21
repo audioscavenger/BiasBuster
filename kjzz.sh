@@ -112,7 +112,7 @@ kjzzDownloader() {
   return $RETURN
 }
 
-export ROOT=/docker/kjzz
+export ROOT=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 export PIDFILE=${ROOT}/kjzz.pid
 export LOG=${ROOT}/kjzz.out
 export FLAG=${ROOT}/kjzz.start

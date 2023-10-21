@@ -3,12 +3,14 @@
 !.gitattributes
 !LICENSE
 !README.md
-!*.md
-!*.py
-!*.sh
-!*.db
-!*.xlsx
-!*.cmd
+!.md
+!.py
+!.sh
+!.db
+!.xlsx
+.cmd
+!KJZZ-schedule.json
+!assets/
 
 # ---> Windows
 # Windows thumbnail cache files
