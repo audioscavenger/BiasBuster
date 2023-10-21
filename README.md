@@ -228,7 +228,7 @@ localSqlDb kjzz.db passed
 ```
 
 wordCloud generated:
-!["KJZZ start=2023-10-19 1500 words=4952 max=4000 scale=0.png"](URL "assets/KJZZ start=2023-10-19 1500 words=4952 max=4000 scale=0.png")
+!["KJZZ start=2023-10-19 1500 words=4952 max=4000 scale=0.png"]("assets/KJZZ start=2023-10-19 1500 words=4952 max=4000 scale=0.png?raw=true" "KJZZ start=2023-10-19 1500 words=4952 max=4000 scale=0.png")
 
 
 # Roadmap
