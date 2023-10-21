@@ -228,8 +228,7 @@ localSqlDb kjzz.db passed
 ```
 
 wordCloud generated:
-![KJZZ start=2023-10-19 1500 words=4952 max=4000 scale=0.png](assets/KJZZ start=2023-10-19 1500 words=4952 max=4000 scale=0.png?raw=true)
-
+![KJZZ start=2023-10-19 1500 words=4952 max=4000 scale=0](assets/wordCloud_example1.png)
 
 # Roadmap
 - [ ] 0.9.7   TODO separate KJZZ into its own table to add other broadcasters
