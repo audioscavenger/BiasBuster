@@ -81,7 +81,6 @@ This Python script does the following:
   - [x] query statistics on what is stored
   - [x] query words based on schedule
   - [x] generate word cloud
-  - [x] generate word cloud
   - [ ] generate gender bias analysis
   - [ ] generate misinformation heatmap
   - [ ] what else?
@@ -241,15 +240,25 @@ wordCloud generated:
 - [x] 0.9.0   automated mp3 process with whisper-faster from https://github.com/Purfview/whisper-standalone-win
 
 ## Requirements
-- getopt, sys, os, re, regex, io, time, datetime, pathlib
-- json, urllib, random, sqlite3, collections, matplotlib
-- rich
-- wordcloud
+
+### Linux
+
+- none
+
+### Windows
+
+- Python 3.x:
+  - getopt, sys, os, re, regex, io, time, datetime, pathlib
+  - json, urllib, random, sqlite3, collections, matplotlib
+  - rich
+  - wordcloud
+- whisper-faster from https://github.com/Purfview/whisper-standalone-win
+
 
 ## Acknowledgements
-- rich:       https://github.com/Textualize/rich
-- wordcloud:  https://github.com/amueller/word_cloud
-- https://github.com/auroracramer/language-model-bias
-- https://github.com/PDXBek/Misinformation
-- https://github.com/Purfview/whisper-standalone-win
+- rich:           https://github.com/Textualize/rich
+- wordcloud:      https://github.com/amueller/word_cloud
+- gender bias:    https://github.com/auroracramer/language-model-bias
+- Misinformation: https://github.com/PDXBek/Misinformation
+- IA transcribe:  https://github.com/Purfview/whisper-standalone-win
 

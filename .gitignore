@@ -11,6 +11,9 @@
 .cmd
 !KJZZ-schedule.json
 !assets/
+!kjkk/kjkk.sh
+!kjkk/KJZZ-schedule.json
+!kjkk/KJZZ-schedule.xlsx
 
 # ---> Windows
 # Windows thumbnail cache files

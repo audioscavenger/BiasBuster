@@ -124,5 +124,5 @@ kjzzDownloader $*
 # vi /etc/cron.d/kjzzDownloader
 # SHELL=/usr/bin/bash
 # PATH=/exploit/bin:/exploit/PATH/was:/exploit/PATH/profile:/exploit/PATH/PLI:/exploit/PATH/Linux:/exploit/PATH/common:/exploit/PATH/aws:/exploit/PATH/apache:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/sbin:/usr/local/bin:/snap/bin
-# 0,1,30,31 * * * *   root /docker/kjzz/kjzz.sh start
+# 0,1,30,31 * * * *   root /docker/BiasBuster/kjzz/kjzz.sh start
 
