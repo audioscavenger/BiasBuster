@@ -8,7 +8,8 @@
 !.sh
 !.db
 !.xlsx
-.cmd
+!.cmd
+!stopWords.ranks.nl.uniq.txt
 !KJZZ-schedule.json
 !assets/
 !kjkk/kjkk.sh

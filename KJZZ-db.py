@@ -77,13 +77,20 @@ mergedText = ""
 noStopwords = False
 showPicture = False
 font_path = "fonts\\Quicksand-Bold.ttf"
+inputStopWordsFile = ""
+inputStopWords = []
+
+# busybox sed -E "s/^.{,3}$//g" stopWords.ranks.nl.txt | busybox sort | busybox uniq >stopWords.ranks.nl.uniq.txt 
+# https://www.ranks.nl/stopwords
 stopwords = {
-  0: ['what','who','is','as','at','he','the','an','to','in','for','of','or','by','with','on','this','that','be','and','it','its'],
-  1: ["NPR",'KJZZ','org',"gift","make","support","sustaining","member","doubled","thank","you","call","news","month","help","give","donation","contribution","please","drive"],
-  2: ['say','says',"said",'new','one','re','not','but','are','from','become','still','way','went'],
-  3: ["now",'know','will','going','well',"yeah","really","right","think","today","time","thing","things","kind","lot","part","year","show","morning","see","much","want","made","sort","come","day","need","got"],
-  4: ["even",'never','always'],
+  0: ["what", "who", "is", "as", "at", "he", "the", "an", "to", "in", "for", "of", "or", "by", "with", "on", "this", "that", "be", "and", "it", "its"],
+  1: ["NPR", "KJZZ", "org", "gift", "make", "support", "sustaining", "member", "doubled", "thank", "you", "call", "news", "month", "help", "give", "donation", "contribution", "please", "drive"],
+  2: ["say", "says", "said", "new", "one", "re", "not", "but", "are", "from", "become", "still", "way", "went"],
+  3: ["now", "know", "will", "going", "well", "yeah", "okay", "really", "actually", "right", "think", "today", "time", "thing", "things", "kind", "lot", "part", "year", "show", "morning", "see", "much", "want", "made", "sort", "come", "came", "comes", "day", "need", "got"],
+  4: ["even", "never", "always", "next", "case", "another", "coming", "number", "many", "two", "something", "look", "talk", "little", "first", "last", "people", "good", "mean", "back", "around", "almost", "called", "trying", "point", "week", "take"],
+  5: ["Israel", "Israeli", "Gaza", "Hamas", "Phoenix"],
 }
+
 stopLevel = 0
 # after merging 1+2 to what WordCloud has in its own set, we get this:
 # stopwords = {
@@ -99,6 +106,7 @@ wordCloudDict = {
   "relative_scaling": 0,
   "normalize_plurals": True,
   "min_word_length ": 3,
+  "inputStopWords": [],
 }
 
 sqlLast10 = """ SELECT * from schedule LIMIT 10 """
@@ -203,6 +211,7 @@ def usage(RC=99):
   print ("       --gettext chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\" (run %s -q last10 first, to get some values)" % (sys.argv[0]))
   print ("         --wordCloud [--mergeRecords] [--show] (generate word cloud for gettext output)")
   print ("         --stopLevel *0 1 2 (add various levels of stopwords)")
+  print ("         --stopFile  stopWordsFile.txt (add words from file on top of other levels)")
   print ("         --max_words *4000")
   print ("         --font_path *\"fonts\\Quicksand-Bold.ttf\"")
   # print ("       --misinformation week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\" (misinformation heatmap)")
@@ -321,7 +330,7 @@ argumentList = sys.argv[1:]
 # define short Options
 options = "hvd:it:f:m:q:pg:wM"
 # define Long options
-long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "mergeRecords", "noStopwords", "stopLevel=", "font_path=", "show", "max_words="]
+long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "mergeRecords", "noStopwords", "stopLevel=", "font_path=", "show", "max_words=", "stopFile="]
 try:
   # Parsing argument
   arguments, values = getopt.getopt(argumentList, options, long_options)
@@ -414,6 +423,13 @@ try:
     elif currentArgument in ("--max_words"):
       if verbose: print (("[bright_black]max_words:[/]     %s") % (currentValue))
       wordCloudDict["max_words"] = int(currentValue)
+    elif currentArgument in ("--stopFile"):
+      if verbose: print (("[bright_black]inputTextFile:[/] %s") % (currentValue))
+      inputStopWordsFile = Path(currentValue)
+      with open(inputStopWordsFile, 'r') as fd:
+        for line in fd:
+          wordCloudDict["inputStopWords"].append(line.strip())
+      # print(inputStopWords)
 except getopt.error as err:
   # output error, and return with an error code
   print(("[red]%s[/]") % (err), file=sys.stderr)
@@ -544,6 +560,7 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
   
   if not noStopwords:
     for i in range(level + 1): stopWords += stopwords[i]
+    stopWords += wordCloudDict["inputStopWords"]
     # print(len(STOPWORDS))
     STOPWORDS.update(stopWords)
     # print(len(STOPWORDS))
