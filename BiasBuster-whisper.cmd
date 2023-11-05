@@ -17,10 +17,12 @@ pushd %~sdp0
 ::         DO NOT add double quotes there             ::
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 set WhisperFasterPath=E:\GPT\Whisper-Faster
+:: optional: use this batch to also load Python command line
+set stableROOT=E:\GPT\stable-diffusion-webui\venv\Scripts
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 :init
-set PATH=%WhisperFasterPath%;%PATH%
+set PATH=%WhisperFasterPath%;%stableROOT%;%PATH%
 set existingModels=tiny tiny.en base base.en small small.en medium medium.en large-v1 large-v2
 
 :defaults
@@ -30,6 +32,31 @@ set delete=y
 set reprocess=n
 
 :prechecks
+IF "%~1"=="" (
+  call %stableROOT%\activate
+  echo   python KJZZ-db.py -i -f kjzz\43
+  echo   python KJZZ-db.py -q title
+  echo   python KJZZ-db.py -q chunks10 -p
+  echo   python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v --wordCloud
+  echo   python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
+  echo   python KJZZ-db.py -g title="All Things Considered" -v --wordCloud --mergeRecords
+  echo   python KJZZ-db.py -g title="All Things Considered" -v --wordCloud --mergeRecords
+  echo   python KJZZ-db.py -g title="BBC Newshour" -v --wordCloud --mergeRecords
+  echo   python KJZZ-db.py -g title="BBC World Business Report" -v --wordCloud --mergeRecords
+  echo   python KJZZ-db.py -g title="BBC World Service" -v --wordCloud --mergeRecords
+  echo   python KJZZ-db.py -g title="Fresh Air" -v --wordCloud --mergeRecords
+  echo   python KJZZ-db.py -g title="Here and Now" -v --wordCloud --mergeRecords
+  echo   python KJZZ-db.py -g title="Marketplace" -v --wordCloud --mergeRecords
+  echo   python KJZZ-db.py -g title="Morning Edition" -v --wordCloud --mergeRecords
+  echo   python KJZZ-db.py -g title="The Show" -v --wordCloud --mergeRecords
+  echo   python KJZZ-db.py -g week=42+Day=Mon+title="The Show" -v --wordCloud --mergeRecords --stopLevel 2
+  echo   python KJZZ-db.py -g week=42+Day=Mon+title="All Things Considered" --wordCloud --mergeRecords --stopLevel 3 --show
+  echo   python KJZZ-db.py -g week=42 --wordCloud --mergeRecords --stopLevel 3 --show --max_words=10000
+  
+  cmd /k
+  exit
+)
+
 set models=
 for /f %%a in ('dir /b /od "%WhisperFasterPath%\_models\faster-whisper-*"') DO (
   for /f "tokens=3 delims=-" %%A in ("%%a") DO call set "models=%%models%% %%A"
@@ -44,6 +71,7 @@ IF NOT DEFINED models (
 
 :main
 title BiasBuster: transcribe sounds to text with Whisper-Faster
+
 echo existingModels:      %existingModels%
 
 IF NOT "%~1"=="" (
@@ -58,7 +86,17 @@ IF EXIST "%~1\*" (
   REM :: first, address reprocess by deleting processed files
   IF /I %reprocess%==n (
     for %%a in ("%~1\*.mp3") DO (
-      IF EXIST "%%~dpna.text" IF %%~za GTR 0 del /f /q "%%~a"
+      IF EXIST "%%~dpna.text" (
+        IF /I %delete%==y (
+          IF %%~za GTR 0 del /f /q "%%~a"
+        ) ELSE (
+          echo ERROR: conflict: you don't want to reprocess %%a but also don't want to delete processed files.
+          echo make up your mind.
+          echo:
+          pause
+          exit /b 1
+        )
+      )
     )
   )
 

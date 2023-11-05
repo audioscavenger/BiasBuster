@@ -12,10 +12,8 @@
 
 # https://kjzz.org/kjzz-print-schedule
 
+# python KJZZ-db.py -i -f kjzz\43
 # python KJZZ-db.py -q title
-# python KJZZ-db.py -i -f 40
-# python KJZZ-db.py -i -f 41
-# python KJZZ-db.py -i -f 42
 # python KJZZ-db.py -q chunks10 -p
 # python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v --wordCloud
 # python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
@@ -31,6 +29,8 @@
 # python KJZZ-db.py -g title="The Show" -v --wordCloud --mergeRecords
 # python KJZZ-db.py -g week=42+Day=Mon+title="The Show" -v --wordCloud --mergeRecords --stopLevel 2
 # python KJZZ-db.py -g week=42+Day=Mon+title="All Things Considered" --wordCloud --mergeRecords --stopLevel 3 --show
+# python KJZZ-db.py -g week=42 --wordCloud --mergeRecords --stopLevel 3 --show --max_words=10000
+# python KJZZ-db.py -g week=43 --wordCloud --mergeRecords --stopLevel 4 --show --max_words=10000
 
 # egrep -i "trans[gsv]" *text
 # egrep -i "\bgay\b|lesb|bisex,transg|queer|gender" *text
@@ -78,10 +78,11 @@ noStopwords = False
 showPicture = False
 font_path = "fonts\\Quicksand-Bold.ttf"
 stopwords = {
-  0: ['what','who','is','a','as','at','he','the','an','to','in','for','of','or','by','with','on','this','that','be','and','it','its'],
-  1: ['say','says','new','s','one','u','re','not','but','are','from','become','still','way','went'],
-  2: ["NPR",'KJZZ','org',"now",'know','will','going','well',"yeah","really","right","think","today","time","thing","kind","lot","part","year","show","morning"],
-  3: ["gift","make","support","sustaining","member","doubled","thank","you","call","news","month","help","give","donation","contribution","please","drive"],
+  0: ['what','who','is','as','at','he','the','an','to','in','for','of','or','by','with','on','this','that','be','and','it','its'],
+  1: ["NPR",'KJZZ','org',"gift","make","support","sustaining","member","doubled","thank","you","call","news","month","help","give","donation","contribution","please","drive"],
+  2: ['say','says',"said",'new','one','re','not','but','are','from','become','still','way','went'],
+  3: ["now",'know','will','going','well',"yeah","really","right","think","today","time","thing","things","kind","lot","part","year","show","morning","see","much","want","made","sort","come","day","need","got"],
+  4: ["even",'never','always'],
 }
 stopLevel = 0
 # after merging 1+2 to what WordCloud has in its own set, we get this:
@@ -97,7 +98,7 @@ wordCloudDict = {
   "background_color": "white",
   "relative_scaling": 0,
   "normalize_plurals": True,
-  "min_word_length ": 2,
+  "min_word_length ": 3,
 }
 
 sqlLast10 = """ SELECT * from schedule LIMIT 10 """
@@ -202,6 +203,7 @@ def usage(RC=99):
   print ("       --gettext chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\" (run %s -q last10 first, to get some values)" % (sys.argv[0]))
   print ("         --wordCloud [--mergeRecords] [--show] (generate word cloud for gettext output)")
   print ("         --stopLevel *0 1 2 (add various levels of stopwords)")
+  print ("         --max_words *4000")
   print ("         --font_path *\"fonts\\Quicksand-Bold.ttf\"")
   # print ("       --misinformation week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\" (misinformation heatmap)")
   exit(RC)
@@ -319,7 +321,7 @@ argumentList = sys.argv[1:]
 # define short Options
 options = "hvd:it:f:m:q:pg:wM"
 # define Long options
-long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "mergeRecords", "noStopwords", "stopLevel=", "font_path=", "show"]
+long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "mergeRecords", "noStopwords", "stopLevel=", "font_path=", "show", "max_words="]
 try:
   # Parsing argument
   arguments, values = getopt.getopt(argumentList, options, long_options)
@@ -409,6 +411,9 @@ try:
     elif currentArgument in ("--font_path"):
       if verbose: print (("[bright_black]font_path:[/]     %s") % (True))
       font_path = Path(currentValue)
+    elif currentArgument in ("--max_words"):
+      if verbose: print (("[bright_black]max_words:[/]     %s") % (currentValue))
+      wordCloudDict["max_words"] = int(currentValue)
 except getopt.error as err:
   # output error, and return with an error code
   print(("[red]%s[/]") % (err), file=sys.stderr)
@@ -563,7 +568,7 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
                         relative_scaling=wordCloudDict["relative_scaling"], 
                         normalize_plurals=wordCloudDict["normalize_plurals"], 
                         min_word_length=3,
-                        min_font_size=8,
+                        min_font_size=4,
                         font_path=font_path,
                         scale=2,
                         ).generate(text)
