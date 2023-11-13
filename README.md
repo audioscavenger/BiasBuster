@@ -285,17 +285,17 @@ wordCloud generated:
 
 ### Generate a cloud a an episode of "Freakonomics" on week 42
 `python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt`
-![KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto](assets/KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto.png)
+![KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto]("assets/KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto.png")
 
 ### Generate a cloud a an episode of "Freakonomics" on week 42 with smaller max font size
 `python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt`
 Notice how more smaller words are stacked and make the cloud illegigle:
-![KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=200 scale=1 relscale=auto](assets/KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=200 scale=1 relscale=auto.png)
+![KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=200 scale=1 relscale=auto]("assets/KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=200 scale=1 relscale=auto.png")
 
 ### Generate a cloud a an episode of "Freakonomics" on week 42 without stopWords
 No stopWords: adjectives are now prominents and the cloud has no meaning anymore:
 `python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 0 --show --max_words=1000`
-![KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto noStopWords](assets/KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto noStopWords.png)
+![KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto noStopWords]("assets/KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto noStopWords.png")
 
 
 # Roadmap
