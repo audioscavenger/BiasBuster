@@ -1,6 +1,6 @@
 # author:  AudioscavengeR
 # license: GPLv2
-# version: 0.9.3
+# version: 0.9.4
 
 # Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast. BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
 # Will produce:
@@ -12,26 +12,35 @@
 
 # https://kjzz.org/kjzz-print-schedule
 
-# python KJZZ-db.py -i -f kjzz\43
+# python KJZZ-db.py -i -f kjzz\44
+# python KJZZ-db.py -i -f kjzz\45
 # python KJZZ-db.py -q title
 # python KJZZ-db.py -q chunks10 -p
 # python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v --wordCloud
 # python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
-# python KJZZ-db.py -g title="All Things Considered" -v --wordCloud --mergeRecords
-# python KJZZ-db.py -g title="All Things Considered" -v --wordCloud --mergeRecords
-# python KJZZ-db.py -g title="BBC Newshour" -v --wordCloud --mergeRecords
-# python KJZZ-db.py -g title="BBC World Business Report" -v --wordCloud --mergeRecords
-# python KJZZ-db.py -g title="BBC World Service" -v --wordCloud --mergeRecords
-# python KJZZ-db.py -g title="Fresh Air" -v --wordCloud --mergeRecords
-# python KJZZ-db.py -g title="Here and Now" -v --wordCloud --mergeRecords
-# python KJZZ-db.py -g title="Marketplace" -v --wordCloud --mergeRecords
-# python KJZZ-db.py -g title="Morning Edition" -v --wordCloud --mergeRecords
-# python KJZZ-db.py -g title="The Show" -v --wordCloud --mergeRecords
-# python KJZZ-db.py -g week=42+Day=Mon+title="The Show" -v --wordCloud --mergeRecords --stopLevel 2
-# python KJZZ-db.py -g week=42+Day=Mon+title="All Things Considered" --wordCloud --mergeRecords --stopLevel 3 --show
-# python KJZZ-db.py -g week=42 --wordCloud --mergeRecords --stopLevel 3 --show --max_words=10000
-# python KJZZ-db.py -g week=43 --wordCloud --mergeRecords --stopLevel 4 --show --max_words=10000
+# python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
+# python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
+# python KJZZ-db.py -g title="BBC Newshour" -v --wordCloud
+# python KJZZ-db.py -g title="BBC World Business Report" -v --wordCloud
+# python KJZZ-db.py -g title="BBC World Service" -v --wordCloud
+# python KJZZ-db.py -g title="Fresh Air" -v --wordCloud
+# python KJZZ-db.py -g title="Here and Now" -v --wordCloud
+# python KJZZ-db.py -g title="Marketplace" -v --wordCloud
+# python KJZZ-db.py -g title="Morning Edition" -v --wordCloud
+# python KJZZ-db.py -g title="The Show" -v --wordCloud
+# python KJZZ-db.py -g week=42+Day=Mon+title="The Show" -v --wordCloud --stopLevel 2
+# python KJZZ-db.py -g week=42+Day=Mon+title="All Things Considered" --wordCloud --stopLevel 3 --show
+# python KJZZ-db.py -g week=42 --wordCloud --stopLevel 3 --show --max_words=10000
+# python KJZZ-db.py -g week=43 --wordCloud --stopLevel 4 --show --max_words=10000
+# python KJZZ-db.py -g week=44 --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles  stopWords.Wordlist-Adjectives-All.txt
+# python KJZZ-db.py -g week=43+title="TED Radio Hour" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt
+# week=42+title="Freakonomics" is about men/women
+# python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 5 --show --max_words=10000 --inputStopWordsFiles  stopWords.Wordlist-Adjectives-All.txt
+# for /l %a in (40,1,45) DO python KJZZ-db.py -g week=%a+title="TED Radio Hour" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles  stopWords.Wordlist-Adjectives-All.txt
 
+
+# TODO: explore stopWords from https://github.com/taikuukaits/SimpleWordlists/tree/master
+# TODO: analyse bias
 # egrep -i "trans[gsv]" *text
 # egrep -i "\bgay\b|lesb|bisex,transg|queer|gender" *text
 # egrep -i "diversity|equity|inclusion" *text
@@ -65,29 +74,30 @@ conn = None
 
 model = "small"
 sqlQuery = None
-verbose = False
-debug = False
+verbose = 0
 pretty = False
 wordCloud = False
 gettext = None
 validKeys = ["date", "datetime", "week", "Day", "time", "title", "chunk"]
 condDict = {}
-mergeRecords = False
+mergeRecords = True
 mergedText = ""
 noStopwords = False
 showPicture = False
-font_path = "fonts\\Quicksand-Bold.ttf"
-inputStopWordsFile = ""
 inputStopWords = []
 
 # busybox sed -E "s/^.{,3}$//g" stopWords.ranks.nl.txt | busybox sort | busybox uniq >stopWords.ranks.nl.uniq.txt 
 # https://www.ranks.nl/stopwords
+# https://gist.github.com/sebleier/554280
+# https://github.com/taikuukaits/SimpleWordlists/blob/master/Wordlist-Adjectives-All.txt
+# wget https://raw.githubusercontent.com/taikuukaits/SimpleWordlists/master/Wordlist-Adjectives-All.txt -OstopWords.Wordlist-Adjectives-All.txt
+
 stopwords = {
-  0: ["what", "who", "is", "as", "at", "he", "the", "an", "to", "in", "for", "of", "or", "by", "with", "on", "this", "that", "be", "and", "it", "its"],
-  1: ["NPR", "KJZZ", "org", "gift", "make", "support", "sustaining", "member", "doubled", "thank", "you", "call", "news", "month", "help", "give", "donation", "contribution", "please", "drive"],
+  0: ["what", "who", "is", "as", "at", "he", "the", "an", "to", "in", "for", "of", "or", "by", "with", "on", "this", "that", "be", "and", "it", "its", "no", "yes"],
+  1: ["NPR", "KJZZ", "org", "BBC", "gift", "make", "support", "sustaining", "member", "doubled", "thank", "you", "call", "news", "month", "help", "give", "donation", "contribution", "please", "drive"],
   2: ["say", "says", "said", "new", "one", "re", "not", "but", "are", "from", "become", "still", "way", "went"],
-  3: ["now", "know", "will", "going", "well", "yeah", "okay", "really", "actually", "right", "think", "today", "time", "thing", "things", "kind", "lot", "part", "year", "show", "morning", "see", "much", "want", "made", "sort", "come", "came", "comes", "day", "need", "got"],
-  4: ["even", "never", "always", "next", "case", "another", "coming", "number", "many", "two", "something", "look", "talk", "little", "first", "last", "people", "good", "mean", "back", "around", "almost", "called", "trying", "point", "week", "take"],
+  3: ["now", "know", "will", "going", "well", "yeah", "okay", "really", "actually", "right", "think", "today", "time", "thing", "things", "kind", "lot", "part", "year", "years", "show", "morning", "see", "much", "want", "made", "sort", "come", "came", "comes", "day", "need", "got"],
+  4: ["even", "never", "always", "next", "case", "another", "coming", "number", "many", "two", "something", "look", "talk", "little", "first", "last", "people", "good", "mean", "back", "around", "almost", "called", "trying", "point", "week", "take", "work", "hour", "live", "edition", "report"],
   5: ["Israel", "Israeli", "Gaza", "Hamas", "Phoenix"],
 }
 
@@ -99,22 +109,100 @@ stopLevel = 0
 
 # https://github.com/amueller/word_cloud/blob/master/wordcloud/wordcloud.py
 wordCloudDict = {
-  "max_words": 4000,
-  "width": 1000,
-  "height": 500,
-  "background_color": "white",
-  "relative_scaling": 0,
-  "normalize_plurals": True,
-  "min_word_length ": 3,
-  "inputStopWords": [],
+  "max_words": {
+    "input": True, 
+    "default": 200, 
+    "value": 1000, 
+    "info": "int (default=200)\n               The maximum number of words in the Cloud.", 
+  },
+  "width": {
+    "input": True, 
+    "default": 400, 
+    "value": 2000, 
+    "info": "int (default=400)\n               Width of the canvas.", 
+  },
+  "height": {
+    "input": True, 
+    "default": 200, 
+    "value": 1000, 
+    "info": "int (default=400)\n               Height of the canvas.", 
+  },
+  "min_word_length": {
+    "input": True, 
+    "default": 0, 
+    "value": 3, 
+    "info": "int, default=0\n               Minimum number of letters a word must have to be included.", 
+  },
+  "min_font_size": {
+    "input": True, 
+    "default": 4, 
+    "value": 4, 
+    "info": "int (default=4)\n               Smallest font size to use. Will stop when there is no more room in this size.", 
+  },
+  "max_font_size": {
+    "input": True, 
+    "default": 0, 
+    "value": 400, 
+    "info": " int or None (default=None)\n               Maximum font size for the largest word. If None, height of the image is used.", 
+  },
+  "scale": {
+    "input": True, 
+    "default": 1.0, 
+    "value": 1.0, 
+    "info": "float (default=1)\n               Scaling between computation and drawing. For large word-cloud images,\n               using scale instead of larger canvas size is significantly faster, but\n               might lead to a coarser fit for the words.", 
+  },
+  "relative_scaling": {
+    "input": True, 
+    "default": 0.0, 
+    "value": 'auto', 
+    "info": "float (default='auto')\n               Importance of relative word frequencies for font-size.  With\n               relative_scaling=0, only word-ranks are considered.  With\n               relative_scaling=1, a word that is twice as frequent will have twice\n               the size.  If you want to consider the word frequencies and not only\n               their rank, relative_scaling around .5 often looks good.\n               If 'auto' it will be set to 0.5 unless repeat is true, in which\n               case it will be set to 0.", 
+  },
+  "background_color": {
+    "input": True, 
+    "default": 'black', 
+    "value": 'white', 
+    "info": "color value (default='black')\n               Background color for the word cloud image.", 
+  },
+  "normalize_plurals": {
+    "input": True, 
+    "default": True, 
+    "value": True, 
+    "info": "bool, default=True\n               Whether to remove trailing 's' from words. If True and a word\n               appears with and without a trailing 's', the one with trailing 's'\n               is removed and its counts are added to the version without\n               trailing 's' -- unless the word ends with 'ss'. Ignored if using\n               generate_from_frequencies.", 
+  },
+  "inputStopWordsFiles": {
+    "input": True, 
+    "default": [], 
+    "value": [], 
+    "info": "file, default=None\n               Text file containing one stopWord per line, can be repeated.", 
+  },
+  "inputStopWords": {
+    "input": False, 
+    "default": [], 
+    "value": [], 
+    "info": "list, default=[]\n               Consolidated list of stopWords from inputStopWordsFiles.", 
+  },
+  "font_path": {
+    "input": True, 
+    "default": None, 
+    "value": "fonts\\Quicksand-Bold.ttf", 
+    "info": "str, default=None\n               Font path to the font that will be used (OTF or TTF).", 
+  },
+  "collocation_threshold": {
+    "input": True, 
+    "default": 30, 
+    "value": 30, 
+    "info": "int, default=30\n               Bigrams must have a Dunning likelihood collocation score greater than this\n               parameter to be counted as bigrams. Default of 30 is arbitrary.\n               See Manning, C.D., Manning, C.D. and Schütze, H., 1999. Foundations of\n               Statistical Natural Language Processing. MIT press, p. 162\n               https://nlp.stanford.edu/fsnlp/promo/colloc.pdf#page=22", 
+  },
 }
 
 sqlLast10 = """ SELECT * from schedule LIMIT 10 """
 sqlLast1  = """ SELECT * from schedule LIMIT 1 """
+
+# BUG: what we want is order by iso week day = %u but only %w (Sunday first) works
 sqlCountsByDay = """ SELECT Day, title, count(start)
           from schedule 
           GROUP BY Day, title
-          ORDER BY Day
+          ORDER BY strftime('%w',start)
           """
 # [
   # ('Fri', 'All Things Considered', 5),
@@ -125,10 +213,10 @@ sqlCountsByDay = """ SELECT Day, title, count(start)
   # ('Fri', 'Science Friday', 2),
   # ('Fri', 'The Show', 2),
 
-sqlCountsByTile = """ SELECT title, Day, count(start)
+sqlCountsByTile = """ SELECT title, Day, count(title)
           from schedule 
           GROUP BY title, Day
-          ORDER BY title
+          ORDER BY title, strftime('%w',start)
           """
 # [
   # ('All Things Considered', 'Fri', 5),
@@ -199,24 +287,6 @@ class Chunk:
         # print(text)
 #
 
-
-def usage(RC=99):
-  print (("usage: python %s --help") % (sys.argv[0]))
-  print ("       --import [ --text \"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text\" | --folder folder]")
-  print ("       --db *db.sqlite")
-  print ("       --model *small medium..")
-  print ("       --query [ last last10 byDay byTitle chunks10 ] (show chunks) or simply \"SELECT xyz from schedule\"")
-  print ("       --pretty (apply carriage returns)")
-  print ("       --gettext week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"")
-  print ("       --gettext chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\" (run %s -q last10 first, to get some values)" % (sys.argv[0]))
-  print ("         --wordCloud [--mergeRecords] [--show] (generate word cloud for gettext output)")
-  print ("         --stopLevel *0 1 2 (add various levels of stopwords)")
-  print ("         --stopFile  stopWordsFile.txt (add words from file on top of other levels)")
-  print ("         --max_words *4000")
-  print ("         --font_path *\"fonts\\Quicksand-Bold.ttf\"")
-  # print ("       --misinformation week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\" (misinformation heatmap)")
-  exit(RC)
-#
 
 # If you use the TEXT storage class to store date and time value, you need to use the ISO8601 string format as follows:
 # YYYY-MM-DD HH:MM:SS.SSS
@@ -303,10 +373,10 @@ def cursor(localSqlDb, conn, sql, data=None):
   records = []
   try:
     if data:
-      if debug: print(("    cursor: cur.execute(%s) ... %s ...") %(sql, data[0]), file=sys.stderr)
+      if verbose > 1: print(("    cursor: cur.execute(%s) ... %s ...") %(sql, data[0]), file=sys.stderr)
       cur.execute(sql, data)
     else:
-      if debug: print(("    cursor: cur.execute(%s) ...") %(sql), file=sys.stderr)
+      if verbose > 1: print(("    cursor: cur.execute(%s) ...") %(sql), file=sys.stderr)
       cur.execute(sql)
     records = cur.fetchall()
     if verbose: print("    cursor: %s records" % (len(records)))
@@ -321,179 +391,6 @@ def chunk2condDict(chunkName):
   chunk = Chunk(chunkName)
   print("ddebug"+chunk.start)
 #
-
-####################################### main #######################################
-####################################### main #######################################
-####################################### main #######################################
-# Remove 1st argument which is the script itself
-argumentList = sys.argv[1:]
-# define short Options
-options = "hvd:it:f:m:q:pg:wM"
-# define Long options
-long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "mergeRecords", "noStopwords", "stopLevel=", "font_path=", "show", "max_words=", "stopFile="]
-try:
-  # Parsing argument
-  arguments, values = getopt.getopt(argumentList, options, long_options)
-  # print (arguments) # [('-f', '41'), ('--model', 'small'), ('--verbose', ''), ('-h', '')]
-  # print (values)    # []
-  # checking each argument
-  for currentArgument, currentValue in arguments:
-    if currentArgument in ("-h", "--help"):
-      usage()
-      exit(99)
-    elif currentArgument in ("-v", "--verbose"):
-      if verbose: print (("[bright_black]verbose:[/]       %s") % (True))
-      verbose = True
-    elif currentArgument in ("-q", "--query"):
-      if currentValue in ("last10","10"):
-        sqlQuery = sqlLast10
-      elif currentValue in ("1","last"):
-        sqlQuery = sqlLast1
-      elif currentValue in ("Day","byDay"):
-        sqlQuery = sqlCountsByDay
-      elif currentValue in ("title","byTitle"):
-        sqlQuery = sqlCountsByTile
-      elif currentValue in ("chunks10","chunksLast10"):
-        sqlQuery = sqlListChunksLast10
-      else:
-        sqlQuery = currentValue
-      if verbose: print (("[bright_black]query:[/]         %s") % (currentValue))
-    elif currentArgument in ("-p", "--pretty"):
-      if verbose: print (("[bright_black]pretty:[/]        %s") % (True))
-      pretty = True
-    elif currentArgument in ("-M", "--mergeRecords"):
-      if verbose: print (("[bright_black]merge records:[/] %s") % (True))
-      mergeRecords = True
-    elif currentArgument in ("-i", "--import"):
-      if verbose: print (("[bright_black]import:[/]        %s") % (True))
-      importChunks = True
-    elif currentArgument in ("--noStopwords"):
-      if verbose: print (("[bright_black]noStopwords:[/]   %s") % (True))
-      noStopwords = True
-    elif currentArgument in ("--show"):
-      if verbose: print (("[bright_black]show:[/]          %s") % (True))
-      showPicture = True
-    elif currentArgument in ("--stopLevel"):
-      if verbose: print (("[bright_black]stopLevel:[/]     %s") % (currentValue))
-      stopLevel = int(currentValue)
-    elif currentArgument in ("-t", "--text"):
-      if verbose: print (("[bright_black]inputTextFile:[/] %s") % (currentValue))
-      inputTextFile = Path(currentValue)
-    elif currentArgument in ("-d", "--db"):
-      if verbose: print (("[bright_black]localSqlDb:[/]    %s") % (currentValue))
-      localSqlDb = Path(currentValue)
-    elif currentArgument in ("-f", "--folder"):
-      if verbose: print (("[bright_black]inputFolder:[/]   %s") % (currentValue))
-      inputFolder = Path(currentValue)
-    elif currentArgument in ("-m", "--model"):
-      if verbose: print (("[bright_black]model:[/]         %s") % (currentValue))
-      model = currentValue
-    elif currentArgument in ("-g", "--gettext"):
-      if verbose: print (("[bright_black]gettext:[/]       %s") % (currentValue))
-      gettext = currentValue
-      if not gettext:
-        print("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"")
-        print("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\" (mutually exclusive to the others)")
-        usage(1)
-      if gettext.find("chunk=") > -1:
-        chunkName = re.split(r"[=]",gettext)[1]
-        # chunk2condDict(chunkName)
-        # KJZZ_2023-10-13_Fri_1700-1730_All Things Considered
-        # we already defined a class that will gently split the name for us
-        # python KJZZ-db.py --gettext chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v
-        chunk = Chunk(chunkName)
-        condDict["start"]  = chunk.start
-      else:
-        conditions = re.split(r"[+]",gettext)
-        for condition in conditions:
-          key = re.split(r"[=]",condition)[0]
-          if key in validKeys:
-            condDict[key] = re.split(r"[=]",condition)[1]
-          else:
-            print(("[red]error: %s is invalid in %s[/]") %(key,condition))
-            print("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"")
-            print("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"")
-            usage(1)
-    elif currentArgument in ("-w", "--wordCloud"):
-      if verbose: print (("[bright_black]wordCloud:[/]     %s") % (True))
-      wordCloud = True
-    elif currentArgument in ("--font_path"):
-      if verbose: print (("[bright_black]font_path:[/]     %s") % (True))
-      font_path = Path(currentValue)
-    elif currentArgument in ("--max_words"):
-      if verbose: print (("[bright_black]max_words:[/]     %s") % (currentValue))
-      wordCloudDict["max_words"] = int(currentValue)
-    elif currentArgument in ("--stopFile"):
-      if verbose: print (("[bright_black]inputTextFile:[/] %s") % (currentValue))
-      inputStopWordsFile = Path(currentValue)
-      with open(inputStopWordsFile, 'r') as fd:
-        for line in fd:
-          wordCloudDict["inputStopWords"].append(line.strip())
-      # print(inputStopWords)
-except getopt.error as err:
-  # output error, and return with an error code
-  print(("[red]%s[/]") % (err), file=sys.stderr)
-  usage(1)
-
-
-if (not importChunks and not sqlQuery and not gettext):
-  print ("[red]error: must pass at least --import + [ --text / --folder ] or --query or --gettext[/]")
-  usage(1)
-#
-
-
-if (localSqlDb):
-  if verbose: print(("localSqlDb %s passed") % (localSqlDb))
-  if (not os.path.isfile(localSqlDb) or os.path.getsize(localSqlDb) == 0):
-    print(("localSqlDb %s is empty") % (localSqlDb))
-    # localSqlDb.unlink()
-    conn = db_init(localSqlDb)
-  else:
-    conn = db_init(localSqlDb)
-else:
-  print ("[red]error: localSqlDb undefined[/]")
-  usage(1)
-#
-
-
-if importChunks:
-  if inputTextFile:
-    if os.path.isfile(inputTextFile):
-      if verbose: print(("inputTextFile %s passed") % (inputTextFile))
-      inputFiles += inputTextFile
-    else:
-      if verbose: print("[red]%s not found[/]" % (inputTextFile))
-    #
-  #
-  if inputFolder:
-    if os.path.isdir(inputFolder):
-      if verbose: print(("  listing folder %s ...") % (inputFolder))
-      # inputFiles = sorted([os.fsdecode(file) for file in os.listdir(inputFolder) if os.fsdecode(file).endswith(".text")])
-      # inputFiles = sorted([os.path.join(inputFolder, file) for file in os.listdir(inputFolder) if os.fsdecode(file).endswith(".text")] , key=os.path.getctime)
-      inputFiles = [str(child.resolve()) for child in Path.iterdir(Path(inputFolder)) if os.fsdecode(child).endswith(".text")]
-      for inputFile in inputFiles:
-        if (os.path.getsize(inputFile) == 0):
-          if verbose: print(("    %s is empty") % (inputFile))
-          inputFiles.remove(inputFile)
-        # else:
-          # print(("    reading %s ...") % (inputFile))
-          # with open(inputFile, 'r') as pointer:
-            # text = pointer.read()
-            # print(text)
-      # print(("  %s") % (inputFiles))
-      db_load(inputFiles, localSqlDb, conn, model)
-      # we will also print a summary
-      sqlQuery = sqlCountsByTile
-    else:
-      if verbose: print("[red]%s not found[/]" % (inputFolder))
-      exit(0)
-    #
-  #
-elif (inputTextFile or inputFolder):
-  usage(1)
-#
-
-
 
 # # this works only with full key replacement
 # subs = { "Houston": "HOU", "L.A. Clippers": "LAC", }
@@ -524,43 +421,30 @@ def replaceNum2Days(record):
     return newRecord
   else:
     return (newRecord,)
-
-
-# python KJZZ-db.py -q chunks10 -v -p
-if sqlQuery:
-  if verbose: print("  execute %s" % (sqlQuery))
-  records = cursor(localSqlDb, conn, sqlQuery)
-  # SQLite: %w = day of week 0-6 with Sunday==0
-  # But we want Mon Tue etc so we replace text in each tuple.
-  # Oh yeah, sqlite3 fetchall returns a list of tuples.
-  # Each record is a tuple: ('KJZZ_2023-10-13_5_1630-1700_All Things Considered',),
-  if sqlQuery.find('_%w_') > -1:
-    # replaceNum2Days will output the same format: list of tuples
-    # What we should do is grab the recursive replace function I wrote 10 years ago, pfff where is it
-    records = [replaceNum2Days(record) for record in records]
-    # records[0] = map(lambda x: str.replace(x, "[br]", "<br/>"), records[0])
-  if pretty:
-    for record in records:
-      print(('"%s"') %(record))
-  else:
-    print(records)
-  exit(0)
 #
 
 
 def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordCloudDict):
   # https://github.com/amueller/word_cloud/blob/main/examples/simple.py
   from collections import Counter
-  stopWords = title.split()
+  stopWords = title.replace("=", " ").split()
   
   wordsList = text.split()
   numWords = len(wordsList)
-  title = "%s words=%s max=%s scale=%s" % (title, numWords, wordCloudDict["max_words"], wordCloudDict["relative_scaling"])
+  title = "%s words=%s maxw=%s minf=%s maxf=%s scale=%s relscale=%s" % (
+    title, 
+    numWords, 
+    wordCloudDict["max_words"]["value"], 
+    wordCloudDict["min_font_size"]["value"], 
+    wordCloudDict["max_font_size"]["value"], 
+    wordCloudDict["scale"]["value"], 
+    wordCloudDict["relative_scaling"]["value"], 
+  )
   fileName = title.replace(": ", "=").replace(":", "")
   
   if not noStopwords:
     for i in range(level + 1): stopWords += stopwords[i]
-    stopWords += wordCloudDict["inputStopWords"]
+    stopWords += wordCloudDict["inputStopWords"]["value"]
     # print(len(STOPWORDS))
     STOPWORDS.update(stopWords)
     # print(len(STOPWORDS))
@@ -570,26 +454,42 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
     if verbose: print("    genWordCloud: most 10 common words before: %s" % (Counter(wordsList).most_common(10)))
     cleanWordsList = [word for word in re.split("\W+",text) if word.lower() not in stopWords]
     if verbose: print("    genWordCloud: most 10 common words after:  %s" % (Counter(cleanWordsList).most_common(10)))
-    if verbose: print("    genWordCloud: %s words - %s stopWords == %s total words (%s words removed)" %(numWords,len(STOPWORDS),len(cleanWordsList),numWords - len(cleanWordsList)))
-    if verbose: print("    genWordCloud: stopWords = %s" %(str(STOPWORDS)))
+    print("    genWordCloud: %s words - %s stopWords (%s words removed) == %s total words" %(numWords,len(STOPWORDS),numWords - len(cleanWordsList),len(cleanWordsList)))
+    if verbose > 1: print("    genWordCloud: stopWords = %s" %(str(STOPWORDS)))
   else:
     if verbose: print("    genWordCloud: %s words" %(numWords))
   # image 1: Display the generated image:
   # font_path="fonts\\Quicksand-Regular.ttf"
   wordcloud = WordCloud(
                         stopwords=STOPWORDS, 
-                        background_color=wordCloudDict["background_color"], 
-                        max_words=wordCloudDict["max_words"], 
-                        width=wordCloudDict["width"], 
-                        height=wordCloudDict["height"], 
-                        relative_scaling=wordCloudDict["relative_scaling"], 
-                        normalize_plurals=wordCloudDict["normalize_plurals"], 
-                        min_word_length=3,
-                        min_font_size=4,
-                        font_path=font_path,
-                        scale=2,
+                        background_color=wordCloudDict["background_color"]["value"], 
+                        max_words=wordCloudDict["max_words"]["value"], 
+                        width=wordCloudDict["width"]["value"], 
+                        height=wordCloudDict["height"]["value"], 
+                        relative_scaling=wordCloudDict["relative_scaling"]["value"], 
+                        normalize_plurals=wordCloudDict["normalize_plurals"]["value"], 
+                        font_path=wordCloudDict["font_path"]["value"], 
+                        min_word_length=wordCloudDict["min_word_length"]["value"], 
+                        min_font_size=wordCloudDict["min_font_size"]["value"], 
+                        max_font_size=wordCloudDict["max_font_size"]["value"], 
+                        scale=wordCloudDict["scale"]["value"], 
+                        collocation_threshold=wordCloudDict["collocation_threshold"]["value"], 
                         ).generate(text)
   # wordcloud.generate_from_frequencies(Counter(cleanWordsList))
+                        # stopwords=STOPWORDS, 
+                        # background_color=wordCloudDict["background_color"]["value"], 
+                        # max_words=wordCloudDict["max_words"]["value"], 
+                        # width=wordCloudDict["width"]["value"], 
+                        # height=wordCloudDict["height"]["value"], 
+                        # relative_scaling=wordCloudDict["relative_scaling"]["value"], 
+                        # normalize_plurals=wordCloudDict["normalize_plurals"]["value"], 
+                        # font_path=wordCloudDict["font_path"]["value"], 
+                        # min_word_length=wordCloudDict["min_word_length"]["value"], 
+                        # min_font_size=wordCloudDict["min_font_size"]["value"], 
+                        # max_font_size=wordCloudDict["max_font_size"]["value"], 
+                        # scale=wordCloudDict["scale"]["value"], 
+                        # collocation_threshold=wordCloudDict["collocation_threshold"]["value"], 
+                        # ).generate_from_frequencies(Counter(cleanWordsList))
     
   # # trying to save image + add legend 1
   # plt.figure()
@@ -639,6 +539,252 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
   # The pil way (if you don't have matplotlib)
   # image = wordcloud.to_image()
   # image.show()
+#
+
+
+def usage(RC=99):
+  print (("usage: python %s --help") % (sys.argv[0]))
+  print ("  --import [ --text \"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text\" | --folder folder]")
+  print ("  -v, --verbose\n                   -vv -vvv increase verbosity.")
+  print ("  --db *db.sqlite\n                   Path to the local db.")
+  print ("  -m, --model *small medium...\n                   Model used by whisper to transcribe the text to import.")
+  print ("  -q, --query [ last last10 byDay byTitle chunks10 ]\n                   Show what's in the db.")
+  print ("  -p, --pretty\n                   Convert \\n to carriage returns when printing out text.")
+  print ("  -g, --gettext  selector=value : chunk | date | datetime | week | Day | time | title")
+  print ("                   Outputs all text from the selector.")
+  print ("                 chunk=\"KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title\" (run %s -q chunks10 to get some values)" % (sys.argv[0]))
+  print ("                 date=2023-10-08[+time=HH:MM]")
+  print ("                 datetime=\"2023-10-08 HH:MM\"")
+  print ("                 week=42 (iso week with Mon first)")
+  print ("                 Day=Fri (Ddd)")
+  print ("                 title=\"title of the show\", see https://kjzz.org/kjzz-print-schedule")
+  print ("        example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"\n                Will get text from that chunk of programming only. Chunks are 30mn long.")
+  print ("        example: week=41+Day=Fri+title=\"All Things Considered\"\n                Same as above but will get text from the entire episode.")
+  print ("    --wordCloud  generate word cloud from gettext output. Will not output any text.")
+  print ("      --noMerge    Do not merge 30mn chunks of the same title within the same day.")
+  print ("      --show       Opens the wordCloud picture upon generation.")
+  print ("      --stopLevel  *0 1 2 3 4 5 (add various levels of stopwords)")
+  for key,content in wordCloudDict.items():
+    if content["input"]: print ("      --%s *%s %s" %(key, content["value"], content["info"]))
+  # print ("            --inputStopWordsFiles file.txt (add words from file on top of other levels)")
+  # print ("            --max_words *4000")
+  # print ("            --font_path *\"fonts\\Quicksand-Bold.ttf\"")
+  # print ("       --misinformation week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\" (misinformation heatmap)")
+  exit(RC)
+#
+
+
+####################################### main #######################################
+####################################### main #######################################
+####################################### main #######################################
+# Remove 1st argument which is the script itself
+argumentList = sys.argv[1:]
+# define short Options
+options = "hvd:it:f:m:q:pg:"
+# define Long options
+long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "noStopwords", "stopLevel=", "font_path=", "show", "max_words=", "inputStopWordsFiles="]
+wordCloudDictToParams = [(lambda x: '--' + x)(x) for x in wordCloudDict.keys()]
+wordCloudDictToOptions = [(lambda x: x + '=')(x) for x in wordCloudDict.keys()]
+long_options += wordCloudDictToOptions
+
+try:
+  # Parsing argument
+  arguments, values = getopt.getopt(argumentList, options, long_options)
+  # print (arguments) # [('-f', '41'), ('--model', 'small'), ('--verbose', ''), ('-h', '')]
+  # print (values)    # []
+
+  # checking critical arguments
+  for currentArgument, currentValue in arguments:
+    if currentArgument in ("-h", "--help"):
+      usage()
+      exit(99)
+    elif currentArgument in ("-v", "--verbose"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgument, True))
+      verbose += 1
+
+  if verbose: print (("[bright_black]%-20s:[/] %s") % ('argument', 'value'))
+  if verbose: print (("[bright_black]%-20s:[/] %s") % ('----------------', '----------------'))
+
+  # checking each argument
+  for currentArgument, currentValue in arguments:
+    currentArgumentClean = currentArgument.replace('-','')
+    
+    if currentArgument in ("-q", "--query"):
+      if currentValue in ("last10","10"):
+        sqlQuery = sqlLast10
+      elif currentValue in ("1","last"):
+        sqlQuery = sqlLast1
+      elif currentValue in ("Day","byDay"):
+        sqlQuery = sqlCountsByDay
+      elif currentValue in ("title","byTitle"):
+        sqlQuery = sqlCountsByTile
+      elif currentValue in ("chunks10","chunksLast10"):
+        sqlQuery = sqlListChunksLast10
+      else:
+        sqlQuery = currentValue
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+    elif currentArgument in ("-p", "--pretty"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgument, True))
+      pretty = True
+    elif currentArgument in ("--noMerge"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, False))
+      mergeRecords = False
+    elif currentArgument in ("-i", "--import"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      importChunks = True
+    elif currentArgument in ("--noStopwords"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      noStopwords = True
+    elif currentArgument in ("--show"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      showPicture = True
+    elif currentArgument in ("--stopLevel"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      stopLevel = int(currentValue)
+    elif currentArgument in ("-t", "--text"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      inputTextFile = Path(currentValue)
+    elif currentArgument in ("-d", "--db"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      localSqlDb = Path(currentValue)
+    elif currentArgument in ("-f", "--folder"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      inputFolder = Path(currentValue)
+    elif currentArgument in ("-m", "--model"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      model = currentValue
+    elif currentArgument in ("-g", "--gettext"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      gettext = currentValue
+      if not gettext:
+        print("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"")
+        print("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\" (mutually exclusive to the others)")
+        usage(1)
+      if gettext.find("chunk=") > -1:
+        chunkName = re.split(r"[=]",gettext)[1]
+        # chunk2condDict(chunkName)
+        # KJZZ_2023-10-13_Fri_1700-1730_All Things Considered
+        # we already defined a class that will gently split the name for us
+        # python KJZZ-db.py --gettext chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v
+        chunk = Chunk(chunkName)
+        condDict["start"]  = chunk.start
+      else:
+        conditions = re.split(r"[+]",gettext)
+        for condition in conditions:
+          key = re.split(r"[=]",condition)[0]
+          if key in validKeys:
+            condDict[key] = re.split(r"[=]",condition)[1]
+          else:
+            print(("[red]error: %s is invalid in %s[/]") %(key,condition))
+            print("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"")
+            print("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"")
+            usage(1)
+    elif currentArgument in ("--wordCloud"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      wordCloud = True
+    
+    # now processing any values from wordCloudDict that are valid inputs
+    elif (currentArgument in (wordCloudDictToParams) and wordCloudDict[currentArgumentClean]["input"]):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      if isinstance(wordCloudDict[currentArgumentClean]["default"],int):    wordCloudDict[currentArgumentClean]["value"] = int(currentValue)
+      if isinstance(wordCloudDict[currentArgumentClean]["default"],float):  wordCloudDict[currentArgumentClean]["value"] = float(currentValue)
+      if isinstance(wordCloudDict[currentArgumentClean]["default"],list):   wordCloudDict[currentArgumentClean]["value"].append(currentValue)
+      if isinstance(wordCloudDict[currentArgumentClean]["default"],str):    wordCloudDict[currentArgumentClean]["value"] = currentValue
+except getopt.error as err:
+  # output error, and return with an error code
+  print(("[red]%s[/]") % (err), file=sys.stderr)
+  usage(1)
+
+# Process inputStopWordsFiles:
+if len(wordCloudDict["inputStopWordsFiles"]["value"]) > 0:
+  for inputStopWordsFile in wordCloudDict["inputStopWordsFiles"]["value"]:
+    with open(inputStopWordsFile, 'r') as fd:
+      for line in fd:
+        wordCloudDict["inputStopWords"]["value"].append(line.strip())
+    print("  %s stopWords imported from '%s'" %(len(wordCloudDict["inputStopWords"]["value"]), inputStopWordsFile))
+
+
+if (not importChunks and not sqlQuery and not gettext):
+  print ("[red]error: must pass at least --import + [ --text / --folder ] or --query or --gettext[/]")
+  usage(1)
+#
+
+
+if (localSqlDb):
+  if verbose: print(("localSqlDb %s passed") % (localSqlDb))
+  if (not os.path.isfile(localSqlDb) or os.path.getsize(localSqlDb) == 0):
+    print(("localSqlDb %s is empty") % (localSqlDb))
+    # localSqlDb.unlink()
+    conn = db_init(localSqlDb)
+  else:
+    conn = db_init(localSqlDb)
+else:
+  print ("[red]error: localSqlDb undefined[/]")
+  usage(1)
+#
+
+
+if importChunks:
+  if inputTextFile:
+    if os.path.isfile(inputTextFile):
+      if verbose: print(("inputTextFile %s passed") % (inputTextFile))
+      inputFiles += inputTextFile
+    else:
+      if verbose: print("[red]%s not found[/]" % (inputTextFile))
+    #
+  #
+  if inputFolder:
+    if os.path.isdir(inputFolder):
+      if verbose: print(("  listing folder %s ...") % (inputFolder))
+      # inputFiles = sorted([os.fsdecode(file) for file in os.listdir(inputFolder) if os.fsdecode(file).endswith(".text")])
+      # inputFiles = sorted([os.path.join(inputFolder, file) for file in os.listdir(inputFolder) if os.fsdecode(file).endswith(".text")] , key=os.path.getctime)
+      inputFiles = [str(child.resolve()) for child in Path.iterdir(Path(inputFolder)) if os.fsdecode(child).endswith(".text")]
+      for inputFile in inputFiles:
+        if (os.path.getsize(inputFile) == 0):
+          if verbose: print(("    %s is empty") % (inputFile))
+          inputFiles.remove(inputFile)
+        # else:
+          # print(("    reading %s ...") % (inputFile))
+          # with open(inputFile, 'r') as pointer:
+            # text = pointer.read()
+            # print(text)
+      # print(("  %s") % (inputFiles))
+      db_load(inputFiles, localSqlDb, conn, model)
+      # we will also print a summary:
+      print("[bright_black]\npython KJZZ-db.py -q title[/]")
+      # sqlQuery = sqlCountsByTile
+    else:
+      if verbose: print("[red]%s not found[/]" % (inputFolder))
+      exit(0)
+    #
+  #
+elif (inputTextFile or inputFolder):
+  usage(1)
+#
+
+
+
+# python KJZZ-db.py -q chunks10 -v -p
+if sqlQuery:
+  if verbose: print("  execute %s" % (sqlQuery))
+  records = cursor(localSqlDb, conn, sqlQuery)
+  # SQLite: %w = day of week 0-6 with Sunday==0
+  # But we want Mon Tue etc so we replace text in each tuple.
+  # Oh yeah, sqlite3 fetchall returns a list of tuples.
+  # Each record is a tuple: ('KJZZ_2023-10-13_5_1630-1700_All Things Considered',),
+  if sqlQuery.find('_%w_') > -1:
+    # replaceNum2Days will output the same input format: str or tuple: 0->Sun 1->Mon etc
+    # What we should do is grab the recursive replace function I wrote 10 years ago, pfff where is it
+    records = [replaceNum2Days(record) for record in records]
+    # records[0] = map(lambda x: str.replace(x, "[br]", "<br/>"), records[0])
+  if pretty:
+    for record in records:
+      print(('"%s"') %(record))
+  else:
+    print(records)
+  exit(0)
+#
+
 
 
 # python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v -p
@@ -660,17 +806,17 @@ if gettext:
   
   # python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v -wordCloud
   # python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
-  # python KJZZ-db.py -g title="All Things Considered" -v --wordCloud --mergeRecords
-  # python KJZZ-db.py -g title="All Things Considered" -v --wordCloud --mergeRecords
-  # python KJZZ-db.py -g title="BBC Newshour" -v --wordCloud --mergeRecords
-  # python KJZZ-db.py -g title="BBC World Business Report" -v --wordCloud --mergeRecords
-  # python KJZZ-db.py -g title="BBC World Service" -v --wordCloud --mergeRecords
-  # python KJZZ-db.py -g title="Fresh Air" -v --wordCloud --mergeRecords
-  # python KJZZ-db.py -g title="Here and Now" -v --wordCloud --mergeRecords
-  # python KJZZ-db.py -g title="Marketplace" -v --wordCloud --mergeRecords
-  # python KJZZ-db.py -g title="Morning Edition" -v --wordCloud --mergeRecords
-  # python KJZZ-db.py -g title="The Show" -v --wordCloud --mergeRecords
-  # python KJZZ-db.py -g title="Fresh Air"+week=41 -v --wordCloud --mergeRecords
+  # python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
+  # python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
+  # python KJZZ-db.py -g title="BBC Newshour" -v --wordCloud
+  # python KJZZ-db.py -g title="BBC World Business Report" -v --wordCloud
+  # python KJZZ-db.py -g title="BBC World Service" -v --wordCloud
+  # python KJZZ-db.py -g title="Fresh Air" -v --wordCloud
+  # python KJZZ-db.py -g title="Here and Now" -v --wordCloud
+  # python KJZZ-db.py -g title="Marketplace" -v --wordCloud
+  # python KJZZ-db.py -g title="Morning Edition" -v --wordCloud
+  # python KJZZ-db.py -g title="The Show" -v --wordCloud
+  # python KJZZ-db.py -g title="Fresh Air"+week=41 -v --wordCloud
   if wordCloud:
     from wordcloud import WordCloud
     from wordcloud import STOPWORDS
@@ -685,7 +831,7 @@ if gettext:
       i = 1
       for record in records:
         if verbose: print("  gettext: image %s" % (i))
-        if debug:   print("  gettext: record = \n %s" %(record))
+        if verbose > 1:   print("  gettext: record = \n %s" %(record))
         genWordCloud(record[0], title, noStopwords, stopLevel, wordCloudDict)
       i += 1
     if showPicture: plt.show()

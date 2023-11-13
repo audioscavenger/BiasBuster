@@ -1,4 +1,4 @@
-# BiasBuster - WIP 0.9.3
+# BiasBuster - WIP 0.9.4
 
 Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast. BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
 
@@ -92,16 +92,69 @@ This Python script does the following:
 
 ```
 usage: python KJZZ-db.py --help
-       --import [ --text "KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text" | --folder folder]
-       --db *db.sqlite
-       --model *small medium..
-       --query [ last last10 byDay byTitle chunks10 ] (show chunks) or simply "SELECT xyz from schedule"
-       --pretty (apply carriage returns)
-       --gettext week=41[+title="BBC Newshour"] | date=2023-10-08[+time=HH:MM] | datetime="2023-10-08 HH:MM"
-       --gettext chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" (run KJZZ-db.py -q last10 first, to get some values)
-         --wordCloud [--mergeRecords] [--show] (generate word cloud for gettext output)
-         --stopLevel *0 1 2 (add various levels of stopwords)
-         --font_path *"fonts\Quicksand-Bold.ttf"
+  --import [ --text "KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text" | --folder folder]
+  --db *db.sqlite
+  -m, --model *small medium..
+  -q, --query [ last last10 byDay byTitle chunks10 ] (show chunks) or simply "SELECT xyz from schedule"
+  -p, --pretty (apply carriage returns)
+  -g, --gettext  selector=value : chunk | date | datetime | week | Day | time | title
+                   Outputs all text from the selector.
+                 chunk="KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title" (run KJZZ-db.py -q chunks10 to get some values)
+                 date=2023-10-08[+time=HH:MM]
+                 datetime="2023-10-08 HH:MM"
+                 week=42 (iso week with Mon first)
+                 Day=Fri (Ddd)
+                 title="title of the show", see https://kjzz.org/kjzz-print-schedule
+        example: chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered"
+                Will get text from that chunk of programming only. Chunks are 30mn long.
+        example: week=41+Day=Fri+title="All Things Considered"
+                Same as above but will get text from the entire episode.
+    --wordCloud  generate word cloud from gettext output. Will not output any text.
+      --noMerge    Do not merge 30mn chunks of the same title within the same day.
+      --show       Opens the wordCloud picture upon generation.
+      --stopLevel  *0 1 2 3 4 5 (add various levels of stopwords)
+      --max_words *1000 number (default=200)
+               The maximum number of words in the Cloud.
+      --width *2000 int (default=400)
+               Width of the canvas.
+      --height *1000 int (default=400)
+               Height of the canvas.
+      --min_word_length *3 int, default=0
+               Minimum number of letters a word must have to be included.
+      --min_font_size *4 int (default=4)
+               Smallest font size to use. Will stop when there is no more room in this size.
+      --max_font_size *400  int or None (default=None)
+               Maximum font size for the largest word. If None, height of the image is used.
+      --scale *1 float (default=1)
+               Scaling between computation and drawing. For large word-cloud images,
+               using scale instead of larger canvas size is significantly faster, but
+               might lead to a coarser fit for the words.
+      --relative_scaling *auto float (default='auto')
+               Importance of relative word frequencies for font-size.  With
+               relative_scaling=0, only word-ranks are considered.  With
+               relative_scaling=1, a word that is twice as frequent will have twice
+               the size.  If you want to consider the word frequencies and not only
+               their rank, relative_scaling around .5 often looks good.
+               If 'auto' it will be set to 0.5 unless repeat is true, in which
+               case it will be set to 0.
+      --background_color *white color value (default='black')
+               Background color for the word cloud image.
+      --normalize_plurals *True bool, default=True
+               Whether to remove trailing 's' from words. If True and a word
+               appears with and without a trailing 's', the one with trailing 's'
+               is removed and its counts are added to the version without
+               trailing 's' -- unless the word ends with 'ss'. Ignored if using
+               generate_from_frequencies.
+      --inputStopWordsFiles *[WindowsPath('stopWords.Wordlist-Adjectives-All.txt')] file, default=None
+               Text file containing one stopWord per line, can be repeated.
+      --font_path *fonts\Quicksand-Bold.ttf string, default=None
+               Font path to the font that will be used (OTF or TTF).
+      --collocation_threshold *30 int, default=30
+               Bigrams must have a Dunning likelihood collocation score greater than this
+               parameter to be counted as bigrams. Default of 30 is arbitrary.
+               See Manning, C.D., Manning, C.D. and Schütze, H., 1999. Foundations of
+               Statistical Natural Language Processing. MIT press, p. 162
+               https://nlp.stanford.edu/fsnlp/promo/colloc.pdf#page=22
 ```
 
 ### File naming convention
@@ -171,13 +224,13 @@ Adding _pretty_ will flatten the results as text:
 
 ## gettext
 validKeys = they will be used as parameters for the SQL query:
+- chunk
 - date
 - datetime
 - week
 - Day
 - time
 - title
-- chunk
 
 You can also combine the keys with *+*, examples:
 - ALL of BBC Newshour for week 41: `--gettext week=41+title="BBC Newshour"`
@@ -229,13 +282,31 @@ localSqlDb kjzz.db passed
 wordCloud generated:
 ![KJZZ start=2023-10-19 1500 words=4952 max=4000 scale=0](assets/wordCloud_example1.png)
 
+
+### Generate a cloud a an episode of "Freakonomics" on week 42
+`python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt`
+![KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto](assets/KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto.png)
+
+### Generate a cloud a an episode of "Freakonomics" on week 42 with smaller max font size
+`python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt`
+Notice how more smaller words are stacked and make the cloud illegigle:
+![KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=200 scale=1 relscale=auto](assets/KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=200 scale=1 relscale=auto.png)
+
+### Generate a cloud a an episode of "Freakonomics" on week 42 without stopWords
+No stopWords: adjectives are now prominents and the cloud has no meaning anymore:
+`python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 0 --show --max_words=1000`
+![KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto noStopWords](assets/KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto noStopWords.png)
+
+
 # Roadmap
-- [ ] 0.9.7   TODO separate KJZZ into its own table to add other broadcasters
-- [ ] 0.9.6   TODO web ui
-- [ ] 0.9.5   TODO automate mp3 downloads from cloud + process + uploads from/to cloud server
-- [ ] 0.9.4   TODO adding bias_score.py from https://github.com/auroracramer/language-model-bias
-- [ ] 0.9.3   WIP adding Misinformation heatmap from https://github.com/PDXBek/Misinformation
-- [x] 0.9.2   updated stopwords
+- [ ] 0.9.?   TODO separate KJZZ into its own table to add other broadcasters
+- [ ] 0.9.?   TODO web ui
+- [ ] 0.9.?   TODO automate mp3 downloads from cloud + process + uploads from/to cloud server
+- [ ] 0.9.?   TODO adding bias_score.py from https://github.com/auroracramer/language-model-bias
+- [ ] 0.9.?   WIP adding Misinformation heatmap from https://github.com/PDXBek/Misinformation
+- [x] 0.9.4   wordCloudDict parameters are auto-added to script arguments and --help is auto-build
+- [x] 0.9.3   added and played with most of the genWordCloud parameters in wordCloudDict
+- [x] 0.9.2   updated stopwords to level 5 + you can add many files with --inputStopWordsFiles
 - [x] 0.9.1   added wordCloud from https://github.com/amueller/word_cloud/blob/main/examples/simple.py
 - [x] 0.9.0   automated mp3 process with whisper-faster from https://github.com/Purfview/whisper-standalone-win
 
@@ -256,9 +327,11 @@ wordCloud generated:
 
 
 ## Acknowledgements
-- rich:           https://github.com/Textualize/rich
+- rich print:     https://github.com/Textualize/rich
 - wordcloud:      https://github.com/amueller/word_cloud
 - gender bias:    https://github.com/auroracramer/language-model-bias
 - Misinformation: https://github.com/PDXBek/Misinformation
 - IA transcribe:  https://github.com/Purfview/whisper-standalone-win
+- Thesaurus and adjectives:  https://github.com/taikuukaits/SimpleWordlists/tree/master
+- stopWords list: https://www.ranks.nl/stopwords
 

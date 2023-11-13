@@ -39,19 +39,21 @@ IF "%~1"=="" (
   echo   python KJZZ-db.py -q chunks10 -p
   echo   python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v --wordCloud
   echo   python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
-  echo   python KJZZ-db.py -g title="All Things Considered" -v --wordCloud --mergeRecords
-  echo   python KJZZ-db.py -g title="All Things Considered" -v --wordCloud --mergeRecords
-  echo   python KJZZ-db.py -g title="BBC Newshour" -v --wordCloud --mergeRecords
-  echo   python KJZZ-db.py -g title="BBC World Business Report" -v --wordCloud --mergeRecords
-  echo   python KJZZ-db.py -g title="BBC World Service" -v --wordCloud --mergeRecords
-  echo   python KJZZ-db.py -g title="Fresh Air" -v --wordCloud --mergeRecords
-  echo   python KJZZ-db.py -g title="Here and Now" -v --wordCloud --mergeRecords
-  echo   python KJZZ-db.py -g title="Marketplace" -v --wordCloud --mergeRecords
-  echo   python KJZZ-db.py -g title="Morning Edition" -v --wordCloud --mergeRecords
-  echo   python KJZZ-db.py -g title="The Show" -v --wordCloud --mergeRecords
-  echo   python KJZZ-db.py -g week=42+Day=Mon+title="The Show" -v --wordCloud --mergeRecords --stopLevel 2
-  echo   python KJZZ-db.py -g week=42+Day=Mon+title="All Things Considered" --wordCloud --mergeRecords --stopLevel 3 --show
-  echo   python KJZZ-db.py -g week=42 --wordCloud --mergeRecords --stopLevel 3 --show --max_words=10000
+  echo   python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
+  echo   python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
+  echo   python KJZZ-db.py -g title="BBC Newshour" -v --wordCloud
+  echo   python KJZZ-db.py -g title="BBC World Business Report" -v --wordCloud
+  echo   python KJZZ-db.py -g title="BBC World Service" -v --wordCloud
+  echo   python KJZZ-db.py -g title="Fresh Air" -v --wordCloud
+  echo   python KJZZ-db.py -g title="Here and Now" -v --wordCloud
+  echo   python KJZZ-db.py -g title="Marketplace" -v --wordCloud
+  echo   python KJZZ-db.py -g title="Morning Edition" -v --wordCloud
+  echo   python KJZZ-db.py -g title="The Show" -v --wordCloud
+  echo   python KJZZ-db.py -g week=42+Day=Mon+title="The Show" -v --wordCloud --stopLevel 2
+  echo   python KJZZ-db.py -g week=42+Day=Mon+title="All Things Considered" --wordCloud --stopLevel 3 --show
+  echo   python KJZZ-db.py -g week=42 --wordCloud --stopLevel 3 --show --max_words=10000
+  echo   python KJZZ-db.py -g week=44 --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles  stopWords.Wordlist-Adjectives-All.txt
+  echo   python KJZZ-db.py -g week=43+title="TED Radio Hour" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles  stopWords.Wordlist-Adjectives-All.txt
   
   cmd /k
   exit
