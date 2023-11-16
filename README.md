@@ -1,4 +1,4 @@
-# BiasBuster - WIP 0.9.4
+# BiasBuster - WIP 0.9.5
 
 Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast. BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
 
@@ -285,15 +285,20 @@ wordCloud generated:
 
 ### Generate a cloud a an episode of "Freakonomics" on week 42
 `python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt`
+
 ![KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto](assets/KJZZ%20week=42%20title=Freakonomics%20words=8523%20maxw=1000%20minf=4%20maxf=400%20scale=1%20relscale=auto.png)
 
 ### Generate a cloud a an episode of "Freakonomics" on week 42 with smaller max font size
 `python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt`
+
 Notice how more smaller words are stacked and make the cloud illegigle:
+
 ![KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=200 scale=1 relscale=auto](assets/KJZZ%20week=42%20title=Freakonomics%20words=8523%20maxw=1000%20minf=4%20maxf=200%20scale=1%20relscale=auto.png)
 
 ### Generate a cloud a an episode of "Freakonomics" on week 42 without stopWords
+
 No stopWords: adjectives are now prominents and the cloud has no meaning anymore:
+
 `python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 0 --show --max_words=1000`
 ![KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto noStopWords](assets/KJZZ%20week=42%20title=Freakonomics%20words=8523%20maxw=1000%20minf=4%20maxf=400%20scale=1%20relscale=auto%20noStopWords.png)
 
@@ -303,7 +308,7 @@ No stopWords: adjectives are now prominents and the cloud has no meaning anymore
 - [ ] 0.9.?   TODO web ui
 - [ ] 0.9.?   TODO automate mp3 downloads from cloud + process + uploads from/to cloud server
 - [ ] 0.9.?   TODO adding bias_score.py from https://github.com/auroracramer/language-model-bias
-- [ ] 0.9.?   WIP adding Misinformation heatmap from https://github.com/PDXBek/Misinformation
+- [ ] 0.9.5   adding Misinformation heatmap from https://github.com/PDXBek/Misinformation
 - [x] 0.9.4   wordCloudDict parameters are auto-added to script arguments and --help is auto-build
 - [x] 0.9.3   added and played with most of the genWordCloud parameters in wordCloudDict
 - [x] 0.9.2   updated stopwords to level 5 + you can add many files with --inputStopWordsFiles

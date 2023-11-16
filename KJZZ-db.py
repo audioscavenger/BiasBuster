@@ -1,6 +1,6 @@
 # author:  AudioscavengeR
 # license: GPLv2
-# version: 0.9.4
+# version: 0.9.5
 
 # Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast. BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
 # Will produce:
@@ -32,11 +32,12 @@
 # python KJZZ-db.py -g week=42+Day=Mon+title="All Things Considered" --wordCloud --stopLevel 3 --show
 # python KJZZ-db.py -g week=42 --wordCloud --stopLevel 3 --show --max_words=10000
 # python KJZZ-db.py -g week=43 --wordCloud --stopLevel 4 --show --max_words=10000
-# python KJZZ-db.py -g week=44 --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles  stopWords.Wordlist-Adjectives-All.txt
-# python KJZZ-db.py -g week=43+title="TED Radio Hour" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt
+# python KJZZ-db.py -g week=44 --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+# python KJZZ-db.py -g week=43+title="TED Radio Hour" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
 # week=42+title="Freakonomics" is about men/women
-# python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 5 --show --max_words=10000 --inputStopWordsFiles  stopWords.Wordlist-Adjectives-All.txt
-# for /l %a in (40,1,45) DO python KJZZ-db.py -g week=%a+title="TED Radio Hour" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles  stopWords.Wordlist-Adjectives-All.txt
+# python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 5 --show --max_words=10000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+# for /l %a in (40,1,45) DO python KJZZ-db.py -g week=%a+title="TED Radio Hour" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+# python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 5 --show --max_words=10000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
 
 
 # TODO: explore stopWords from https://github.com/taikuukaits/SimpleWordlists/tree/master
@@ -539,7 +540,71 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
   # The pil way (if you don't have matplotlib)
   # image = wordcloud.to_image()
   # image.show()
-#
+# genWordCloud
+
+
+def genMisinfoBarGraph(text, title, wordCloudDict=wordCloudDict):
+  print("%s" %( title ))
+  heatMap = { 
+    "explanatory":{"words":[],"heatCount":0}, 
+    "retractors":{"words":[],"heatCount":0}, 
+    "sourcing":{"words":[],"heatCount":0}, 
+    "uncertainty":{"words":[],"heatCount":0}, 
+  }
+  textWordsLen = len(text.split())
+  
+  # build the lists of heat words
+  for heatFactor in heatMap.keys():
+    with open('heatMap.'+heatFactor+'.csv', 'r') as fd:
+      for line in fd:
+        heatMap[heatFactor]["words"].append(line.strip())
+      if verbose: print("  %s: words = %s" %( heatFactor, len(heatMap[heatFactor]["words"]) ))
+    
+    # count occurences in the text
+    for word in heatMap[heatFactor]["words"]:
+      # print("  "+word)
+      heatMap[heatFactor]["heatCount"] += sum(1 for _ in re.finditer(r'\b%s\b' % re.escape(word), text))
+      
+    heatMap[heatFactor]["heat"] = ( 100 * heatMap[heatFactor]["heatCount"] / textWordsLen )
+    print("    %s heatCount %s" %( heatFactor, heatMap[heatFactor]["heatCount"] ))
+    print("    %s heat      %s" %( heatFactor, heatMap[heatFactor]["heat"] ))
+    
+
+# genMisinfoBarGraph
+
+
+
+def loadInputFolder(inputFolder):
+  if os.path.isdir(inputFolder):
+    if verbose: print(("  listing folder %s ...") % (inputFolder))
+    # inputFiles = sorted([os.fsdecode(file) for file in os.listdir(inputFolder) if os.fsdecode(file).endswith(".text")])
+    # inputFiles = sorted([os.path.join(inputFolder, file) for file in os.listdir(inputFolder) if os.fsdecode(file).endswith(".text")] , key=os.path.getctime)
+    inputFiles = [str(child.resolve()) for child in Path.iterdir(Path(inputFolder)) if os.fsdecode(child).endswith(".text")]
+    
+    for inputFile in inputFiles:
+      if (os.path.getsize(inputFile) == 0):
+        if verbose: print(("    %s is empty") % (inputFile))
+        inputFiles.remove(inputFile)
+      
+    return inputFiles
+  else:
+    if verbose: print("[red]%s not found[/]" % (inputFolder))
+    exit(0)
+  #
+# loadInputFolder
+
+
+def loadInputFile(inputTextFile):
+  if os.path.isfile(inputTextFile):
+    if (os.path.getsize(inputFile) > 0):
+      if verbose: print(("inputTextFile %s passed") % (inputTextFile))
+      return [inputTextFile]
+    else:
+      if verbose: print(("    %s is empty") % (inputFile))
+  else:
+    if verbose: print("[red]%s not found[/]" % (inputTextFile))
+  #
+# loadInputFile
 
 
 def usage(RC=99):
@@ -560,6 +625,7 @@ def usage(RC=99):
   print ("                 title=\"title of the show\", see https://kjzz.org/kjzz-print-schedule")
   print ("        example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"\n                Will get text from that chunk of programming only. Chunks are 30mn long.")
   print ("        example: week=41+Day=Fri+title=\"All Things Considered\"\n                Same as above but will get text from the entire episode.")
+  print ("    --misInformation  generate misInformation heatmap for all 4 factors: explanatory/retractors/sourcing/uncertainty")
   print ("    --wordCloud  generate word cloud from gettext output. Will not output any text.")
   print ("      --noMerge    Do not merge 30mn chunks of the same title within the same day.")
   print ("      --show       Opens the wordCloud picture upon generation.")
@@ -569,7 +635,7 @@ def usage(RC=99):
   # print ("            --inputStopWordsFiles file.txt (add words from file on top of other levels)")
   # print ("            --max_words *4000")
   # print ("            --font_path *\"fonts\\Quicksand-Bold.ttf\"")
-  # print ("       --misinformation week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\" (misinformation heatmap)")
+  # print ("       --gettext week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"")
   exit(RC)
 #
 
@@ -582,7 +648,7 @@ argumentList = sys.argv[1:]
 # define short Options
 options = "hvd:it:f:m:q:pg:"
 # define Long options
-long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "noStopwords", "stopLevel=", "font_path=", "show", "max_words=", "inputStopWordsFiles="]
+long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "noStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation"]
 wordCloudDictToParams = [(lambda x: '--' + x)(x) for x in wordCloudDict.keys()]
 wordCloudDictToOptions = [(lambda x: x + '=')(x) for x in wordCloudDict.keys()]
 long_options += wordCloudDictToOptions
@@ -682,6 +748,16 @@ try:
     elif currentArgument in ("--wordCloud"):
       if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
       wordCloud = True
+      heatMap = False
+    elif currentArgument in ("--misInformation"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      wordCloud = False
+      heatMap = True
+
+      # wget https://raw.githubusercontent.com/PDXBek/Misinformation/master/lists/explanatory.csv -O heatMap.explanatory.csv
+      # wget https://raw.githubusercontent.com/PDXBek/Misinformation/master/lists/retractors.csv  -O heatMap.retractors.csv
+      # wget https://raw.githubusercontent.com/PDXBek/Misinformation/master/lists/sourcing.csv    -O heatMap.sourcing.csv
+      # wget https://raw.githubusercontent.com/PDXBek/Misinformation/master/lists/uncertainty.csv -O heatMap.uncertainty.csv
     
     # now processing any values from wordCloudDict that are valid inputs
     elif (currentArgument in (wordCloudDictToParams) and wordCloudDict[currentArgumentClean]["input"]):
@@ -710,7 +786,7 @@ if (not importChunks and not sqlQuery and not gettext):
 #
 
 
-if (localSqlDb):
+if localSqlDb:
   if verbose: print(("localSqlDb %s passed") % (localSqlDb))
   if (not os.path.isfile(localSqlDb) or os.path.getsize(localSqlDb) == 0):
     print(("localSqlDb %s is empty") % (localSqlDb))
@@ -726,41 +802,21 @@ else:
 
 if importChunks:
   if inputTextFile:
-    if os.path.isfile(inputTextFile):
-      if verbose: print(("inputTextFile %s passed") % (inputTextFile))
-      inputFiles += inputTextFile
-    else:
-      if verbose: print("[red]%s not found[/]" % (inputTextFile))
-    #
-  #
+    inputFiles += loadInputFile(inputTextFile)
+  
   if inputFolder:
-    if os.path.isdir(inputFolder):
-      if verbose: print(("  listing folder %s ...") % (inputFolder))
-      # inputFiles = sorted([os.fsdecode(file) for file in os.listdir(inputFolder) if os.fsdecode(file).endswith(".text")])
-      # inputFiles = sorted([os.path.join(inputFolder, file) for file in os.listdir(inputFolder) if os.fsdecode(file).endswith(".text")] , key=os.path.getctime)
-      inputFiles = [str(child.resolve()) for child in Path.iterdir(Path(inputFolder)) if os.fsdecode(child).endswith(".text")]
-      for inputFile in inputFiles:
-        if (os.path.getsize(inputFile) == 0):
-          if verbose: print(("    %s is empty") % (inputFile))
-          inputFiles.remove(inputFile)
-        # else:
-          # print(("    reading %s ...") % (inputFile))
-          # with open(inputFile, 'r') as pointer:
-            # text = pointer.read()
-            # print(text)
-      # print(("  %s") % (inputFiles))
-      db_load(inputFiles, localSqlDb, conn, model)
-      # we will also print a summary:
-      print("[bright_black]\npython KJZZ-db.py -q title[/]")
-      # sqlQuery = sqlCountsByTile
-    else:
-      if verbose: print("[red]%s not found[/]" % (inputFolder))
-      exit(0)
-    #
-  #
+    inputFiles += loadInputFolder(inputFolder)
+  
+  for inputFile in inputFiles:
+    db_load(inputFiles, localSqlDb, conn, model)
+  
+  # we will also print a summary:
+  if verbose: print("[bright_black]\npython KJZZ-db.py -q title[/]")
+  if verbose: sqlQuery = sqlCountsByTile
+
 elif (inputTextFile or inputFolder):
   usage(1)
-#
+# importChunks
 
 
 
@@ -804,19 +860,8 @@ if gettext:
     if verbose: print("  gettext: 0 records for %s" %(condDict))
     exit(0)
   
-  # python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v -wordCloud
-  # python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
-  # python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
-  # python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
-  # python KJZZ-db.py -g title="BBC Newshour" -v --wordCloud
-  # python KJZZ-db.py -g title="BBC World Business Report" -v --wordCloud
-  # python KJZZ-db.py -g title="BBC World Service" -v --wordCloud
-  # python KJZZ-db.py -g title="Fresh Air" -v --wordCloud
-  # python KJZZ-db.py -g title="Here and Now" -v --wordCloud
-  # python KJZZ-db.py -g title="Marketplace" -v --wordCloud
-  # python KJZZ-db.py -g title="Morning Edition" -v --wordCloud
-  # python KJZZ-db.py -g title="The Show" -v --wordCloud
-  # python KJZZ-db.py -g title="Fresh Air"+week=41 -v --wordCloud
+  
+  # first we check if a wordCloud is requested:
   if wordCloud:
     from wordcloud import WordCloud
     from wordcloud import STOPWORDS
@@ -836,12 +881,31 @@ if gettext:
       i += 1
     if showPicture: plt.show()
   
-  else:
-    if pretty:
-      for record in records:
-        print(('"%s"') %(record))
+  
+  # then we check if a misInformation heatMap is requested:
+  elif heatMap:
+    if mergeRecords:
+      for record in records: mergedText += record[0]
+      genMisinfoBarGraph(mergedText, title, wordCloudDict)
     else:
-      print(records)
+      for record in records:
+        genMisinfoBarGraph(record, title, wordCloudDict)
+  
+  
+  # Finally, we just output gettext:
+  else:
+    if mergeRecords:
+      for record in records: mergedText += record[0]
+      if pretty:
+        print(('"%s"') %(mergedText))
+      else:
+        print(mergedText)
+    else:
+      for record in records:
+        if pretty:
+          print(('"%s"') %(record))
+        else:
+          print(record)
   exit(0)
 #
 
@@ -856,6 +920,28 @@ if gettext:
 
 
 exit()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 import regex

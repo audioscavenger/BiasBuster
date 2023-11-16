@@ -9,13 +9,20 @@
 !.db
 !.xlsx
 !.cmd
+
+!heatMap.*.csv
+
 !stopWords.ranks.nl.uniq.txt
 !stopWords.Wordlist-Adjectives-All.txt
-!KJZZ-schedule.json
+
 !assets/
+
+!KJZZ-schedule.json
 !kjkk/kjkk.sh
 !kjkk/KJZZ-schedule.json
 !kjkk/KJZZ-schedule.xlsx
+# ---> BiasBuster <---
+
 
 # ---> Windows
 # Windows thumbnail cache files
