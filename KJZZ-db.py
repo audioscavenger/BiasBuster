@@ -174,7 +174,7 @@ wordCloudDict = {
     "input": True, 
     "default": [], 
     "value": [], 
-    "info": "file, default=None\n               Text file containing one stopWord per line, can be repeated.", 
+    "info": "file, default=None\n               Text file containing one stopWord per line.\n               You can pass --inputStopWordsFiles multiple times.", 
   },
   "inputStopWords": {
     "input": False, 
@@ -609,12 +609,13 @@ def loadInputFile(inputTextFile):
 
 def usage(RC=99):
   print (("usage: python %s --help") % (sys.argv[0]))
-  print ("  --import [ --text \"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text\" | --folder folder]")
-  print ("  -v, --verbose\n                   -vv -vvv increase verbosity.")
-  print ("  --db *db.sqlite\n                   Path to the local db.")
-  print ("  -m, --model *small medium...\n                   Model used by whisper to transcribe the text to import.")
-  print ("  -q, --query [ last last10 byDay byTitle chunks10 ]\n                   Show what's in the db.")
-  print ("  -p, --pretty\n                   Convert \\n to carriage returns when printing out text.")
+  print ("")
+  print ("  --import [ --text \"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text\" | --folder folder ]")
+  print ("    -m, --model *small medium...\n                   Model that you used with whisper, to transcribe the text to import.")
+  print ("")
+  print ("  --db *kjzz.db  Path to the local SQlite db.")
+  print ("  -q, --query [ title last last10 byDay byTitle chunks10 ]\n                   Show what's in the db.")
+  print ("")
   print ("  -g, --gettext  selector=value : chunk | date | datetime | week | Day | time | title")
   print ("                   Outputs all text from the selector.")
   print ("                 chunk=\"KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title\" (run %s -q chunks10 to get some values)" % (sys.argv[0]))
@@ -625,13 +626,16 @@ def usage(RC=99):
   print ("                 title=\"title of the show\", see https://kjzz.org/kjzz-print-schedule")
   print ("        example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"\n                Will get text from that chunk of programming only. Chunks are 30mn long.")
   print ("        example: week=41+Day=Fri+title=\"All Things Considered\"\n                Same as above but will get text from the entire episode.")
-  print ("    --misInformation  generate misInformation heatmap for all 4 factors: explanatory/retractors/sourcing/uncertainty")
-  print ("    --wordCloud  generate word cloud from gettext output. Will not output any text.")
-  print ("      --noMerge    Do not merge 30mn chunks of the same title within the same day.")
-  print ("      --show       Opens the wordCloud picture upon generation.")
-  print ("      --stopLevel  *0 1 2 3 4 5 (add various levels of stopwords)")
+  print ("    -p, --pretty\n                   Convert \\n to carriage returns when only printing out text.\n                   Ignored when outputing pictures.")
+  print ("    --noMerge\n                   Do not merge 30mn chunks of the same title within the same day.")
+  print ("    --misInformation\n                   PICture: generate misInformation heatmap for all 4 factors:\n                   explanatory/retractors/sourcing/uncertainty")
+  print ("    --wordCloud\n                   PICture: generate word cloud from gettext output. Will not output any text.")
+  print ("      --show\n                   Opens the wordCloud picture upon generation.")
+  print ("      --stopLevel  *0 1 2 3 4 5\n                   add various levels of stopwords")
   for key,content in wordCloudDict.items():
     if content["input"]: print ("      --%s *%s %s" %(key, content["value"], content["info"]))
+  print ("")
+  print ("  -v, --verbose\n                   -vv -vvv increase verbosity.")
   # print ("            --inputStopWordsFiles file.txt (add words from file on top of other levels)")
   # print ("            --max_words *4000")
   # print ("            --font_path *\"fonts\\Quicksand-Bold.ttf\"")
@@ -780,12 +784,14 @@ if len(wordCloudDict["inputStopWordsFiles"]["value"]) > 0:
     print("  %s stopWords imported from '%s'" %(len(wordCloudDict["inputStopWords"]["value"]), inputStopWordsFile))
 
 
+
 if (not importChunks and not sqlQuery and not gettext):
-  print ("[red]error: must pass at least --import + [ --text / --folder ] or --query or --gettext[/]")
+  print ("[red]error: must pass at least --import / --query / --gettext[/]")
   usage(1)
 #
 
 
+# DB cheack and init, first.
 if localSqlDb:
   if verbose: print(("localSqlDb %s passed") % (localSqlDb))
   if (not os.path.isfile(localSqlDb) or os.path.getsize(localSqlDb) == 0):
@@ -800,27 +806,32 @@ else:
 #
 
 
+# Import of new chunks of radio
 if importChunks:
+  # first we build inputFiles
   if inputTextFile:
     inputFiles += loadInputFile(inputTextFile)
-  
   if inputFolder:
     inputFiles += loadInputFolder(inputFolder)
   
-  for inputFile in inputFiles:
-    db_load(inputFiles, localSqlDb, conn, model)
+  # second we load the db with inputFiles
+  if len(inputFiles):
+    for inputFile in inputFiles:
+      db_load(inputFiles, localSqlDb, conn, model)
   
-  # we will also print a summary:
-  if verbose: print("[bright_black]\npython KJZZ-db.py -q title[/]")
-  if verbose: sqlQuery = sqlCountsByTile
-
-elif (inputTextFile or inputFolder):
-  usage(1)
+    # finally we will also print a summary:
+    if verbose: print("[bright_black]\npython KJZZ-db.py -q title[/]")
+    if verbose: sqlQuery = sqlCountsByTile
+  else:
+    usage(1)
 # importChunks
 
 
-
+# sometimes a query can be set after an import. 
+# Therefore, execute query comes after.
+#
 # python KJZZ-db.py -q chunks10 -v -p
+#
 if sqlQuery:
   if verbose: print("  execute %s" % (sqlQuery))
   records = cursor(localSqlDb, conn, sqlQuery)
@@ -849,11 +860,15 @@ if gettext:
   title = "KJZZ"
   
   for key in condDict.keys():
+    # build the SQL query:
     sqlGettext += (" and %s = '%s'" % (key,condDict[key]))
+    
     # reformat start time for the filename:
     if key == "start":
       condDict[key] = parser.parse(chunk.start).strftime("%Y-%m-%d %H:%M")
-    title += " %s=%s" % (key,condDict[key])
+    
+    # build a title that contains 
+    title += " %s=%s" % (key, condDict[key])
   if verbose: print("  gettext: %s" %(sqlGettext))
   records = cursor(localSqlDb, conn, sqlGettext)
   if len(records) == 0:
