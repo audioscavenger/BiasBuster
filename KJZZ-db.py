@@ -814,11 +814,12 @@ if importChunks:
   if inputFolder:
     inputFiles += loadInputFolder(inputFolder)
   
+  print(inputFiles)
+  
   # second we load the db with inputFiles
   if len(inputFiles):
-    for inputFile in inputFiles:
-      db_load(inputFiles, localSqlDb, conn, model)
-  
+    db_load(inputFiles, localSqlDb, conn, model)
+    
     # finally we will also print a summary:
     if verbose: print("[bright_black]\npython KJZZ-db.py -q title[/]")
     if verbose: sqlQuery = sqlCountsByTile

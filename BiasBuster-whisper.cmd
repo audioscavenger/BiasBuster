@@ -130,4 +130,14 @@ REM no arguments? open a command prompt
 IF     "%~1"=="" cmd /k
 
 :end
+
+IF NOT "%~1"=="" (
+  IF EXIST "%~1\*" (
+    del /f /q "%~1\*.log"
+    call %stableROOT%\activate
+    echo python KJZZ-db.py -i -f "%~1"
+    python KJZZ-db.py -i -f "%~1"
+  )
+)
+
 timeout /t 10
