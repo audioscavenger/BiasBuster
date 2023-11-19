@@ -302,6 +302,19 @@ No stopWords: adjectives are now prominents and the cloud has no meaning anymore
 `python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 0 --show --max_words=1000`
 ![KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto noStopWords](assets/KJZZ%20week=42%20title=Freakonomics%20words=8523%20maxw=1000%20minf=4%20maxf=400%20scale=1%20relscale=auto%20noStopWords.png)
 
+### Generate a PIE about how uncertain information is in a program
+
+`python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show`
+![pie KJZZ week=42 title=Morning Edition Day=Mon](assets/pie%20KJZZ%20week=42%20title=Morning%20Edition%20Day=Mon.png)
+
+
+### Generate a heat map about how uncertain information is in multiple chunks of a program
+
+Simply add --noMerge: --graph will be ignored when treating multiple chunks
+
+`python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge --show`
+![heatMap KJZZ week=42 title=Morning Edition Day=Mon](assets/heatMap%20KJZZ%20week=42%20title=Morning%20Edition%20Day=Mon.png)
+
 
 # Roadmap
 - [ ] 0.9.?   TODO separate KJZZ into its own table to add other broadcasters
