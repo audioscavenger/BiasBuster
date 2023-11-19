@@ -1,5 +1,19 @@
 # ---> BiasBuster
-*
+
+misInformation/*
+kjzz/*
+tmp/*
+*.png
+*.txt
+*.log
+*.zip
+*.7z
+*.lnk
+*.url
+*.exe
+gitsync*
+
+!requirements.txt
 !.gitattributes
 !LICENSE
 !README.md
@@ -11,13 +25,12 @@
 !.cmd
 
 !heatMap.*.csv
-
-!stopWords.ranks.nl.uniq.txt
+!stopWords.ranks.nl.txt
 !stopWords.Wordlist-Adjectives-All.txt
 
-!assets/
+!assets/*
+!fonts/*
 
-!KJZZ-schedule.json
 !kjkk/kjkk.sh
 !kjkk/KJZZ-schedule.json
 !kjkk/KJZZ-schedule.xlsx

@@ -1,12 +1,16 @@
 # BiasBuster - WIP 0.9.5
 
-Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast. BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
+Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast. 
+BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
 
-Will provide a UI and option to process other broadcasts very soon.
+BiasBuster Will provide a UI and option to process+manage other broadcasts very soon.
 
 Comes in 2 parts: 
 - Linux part for a Cloud server, to download the mp3 (bash)
 - Windows part, to transcribe mp3 to text, SQLite database management, and word analysis
+
+The meat of the project is current KJZZ-db.py on Windows. 
+It should be portable to Linux as-is, since I do not use hard-coded path separators.
 
 
 # Under the hood
@@ -92,11 +96,21 @@ This Python script does the following:
 
 ```
 usage: python KJZZ-db.py --help
-  --import [ --text "KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text" | --folder folder]
-  --db *db.sqlite
-  -m, --model *small medium..
-  -q, --query [ last last10 byDay byTitle chunks10 ] (show chunks) or simply "SELECT xyz from schedule"
-  -p, --pretty (apply carriage returns)
+  --import < --text "KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text" | --folder folder >
+    -m, --model *small medium...
+                   Model that you used with whisper, to transcribe the text to import.
+    -p, --pretty
+                   Convert \n to carriage returns and does json2text.
+                   Ignored when outputing pictures.
+    --output *./
+                   Where to outputs pictures.
+    --show
+                   Opens the picture upon generation.
+
+  --db *kjzz.db  Path to the local SQlite db.
+  -q, --query [ title last last10 byDay byTitle chunks10 ]
+                   Show what's in the db.
+
   -g, --gettext  selector=value : chunk | date | datetime | week | Day | time | title
                    Outputs all text from the selector.
                  chunk="KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title" (run KJZZ-db.py -q chunks10 to get some values)
@@ -109,11 +123,18 @@ usage: python KJZZ-db.py --help
                 Will get text from that chunk of programming only. Chunks are 30mn long.
         example: week=41+Day=Fri+title="All Things Considered"
                 Same as above but will get text from the entire episode.
-    --wordCloud  generate word cloud from gettext output. Will not output any text.
-      --noMerge    Do not merge 30mn chunks of the same title within the same day.
-      --show       Opens the wordCloud picture upon generation.
-      --stopLevel  *0 1 2 3 4 5 (add various levels of stopwords)
-      --max_words *1000 number (default=200)
+    --noMerge
+                   Do not merge 30mn chunks of the same title within the same day.
+    --misInformation
+                   PICture: generate misInformation heatmap for all 4 factors:
+                   explanatory/retractors/sourcing/uncertainty
+      --graph *bar | pie | line
+                   What graph you want. Ignored with --noMerge: heat map will be generated instead.
+    --wordCloud
+                   PICture: generate word cloud from gettext output. Will not output any text.
+      --stopLevel  *0 1 2 3 4 5
+                   add various levels of stopwords
+      --max_words *1000 int (default=200)
                The maximum number of words in the Cloud.
       --width *2000 int (default=400)
                Width of the canvas.
@@ -125,7 +146,7 @@ usage: python KJZZ-db.py --help
                Smallest font size to use. Will stop when there is no more room in this size.
       --max_font_size *400  int or None (default=None)
                Maximum font size for the largest word. If None, height of the image is used.
-      --scale *1 float (default=1)
+      --scale *1.0 float (default=1)
                Scaling between computation and drawing. For large word-cloud images,
                using scale instead of larger canvas size is significantly faster, but
                might lead to a coarser fit for the words.
@@ -145,9 +166,10 @@ usage: python KJZZ-db.py --help
                is removed and its counts are added to the version without
                trailing 's' -- unless the word ends with 'ss'. Ignored if using
                generate_from_frequencies.
-      --inputStopWordsFiles *[WindowsPath('stopWords.Wordlist-Adjectives-All.txt')] file, default=None
-               Text file containing one stopWord per line, can be repeated.
-      --font_path *fonts\Quicksand-Bold.ttf string, default=None
+      --inputStopWordsFiles *[] file, default=None
+               Text file containing one stopWord per line.
+               You can pass --inputStopWordsFiles multiple times.
+      --font_path *fonts\Quicksand-Bold.ttf str, default=None
                Font path to the font that will be used (OTF or TTF).
       --collocation_threshold *30 int, default=30
                Bigrams must have a Dunning likelihood collocation score greater than this
@@ -155,6 +177,9 @@ usage: python KJZZ-db.py --help
                See Manning, C.D., Manning, C.D. and Schütze, H., 1999. Foundations of
                Statistical Natural Language Processing. MIT press, p. 162
                https://nlp.stanford.edu/fsnlp/promo/colloc.pdf#page=22
+
+  -v, --verbose
+                   -vv -vvv increase verbosity.
 ```
 
 ### File naming convention
@@ -172,24 +197,16 @@ _Day_ is redundant since we have the date, but makes the chunk name convenient t
 
 # KJZZ-db.py Usage
 
-## Database chunks listing
-`python KJZZ-db.py -q title`
+KJZZ-db.py needs at least `--import | --query | --gettext`.
 
-Outputs how many 30mn chunks are stored, by title and by Day:
-```
- db_init: 314 chunks found in kjzz.db
-[
-    ('All Things Considered', 'Fri', 6),
-    ('All Things Considered', 'Mon', 6),
-    ('All Things Considered', 'Sat', 2),
-    ('All Things Considered', 'Sun', 2),
-    ...
-```
+## Import new data
+`-i, --import` *< --text file | --folder folder >*
 
-## Import text files in the Database
-`python KJZZ-db.py --import --folder 42`
+### Import text files in the Database
+`python KJZZ-db.py --import --folder kjzz\\42`
 
-Will import every text file in the folder "42" (week 42), and will avoid chunks already present in the database.
+Will import every text file in the folder "kjzz\42" (week 42).
+--import will always avoid chunks already present in the database.
 
 ```
   db_init: 314 chunks found in kjzz.db
@@ -202,14 +219,47 @@ Will import every text file in the folder "42" (week 42), and will avoid chunks 
 Loading... ---------------------------------------- 100% 0:00:00
   db_load: done loading 53/146 files
 ```
+If you need a --force option to overwrite existing chunks, please file a PR.
 
-## List the last chunks loaded
+
+## Query database
+`-q, --query` *<title last last10 byDay byTitle chunks10>*
+
+### Database titles overview
+
+`python KJZZ-db.py -q byTitle`
+
+Outputs how many 30mn chunks are stored, by title and by Day:
+```
+[
+  ('All Things Considered', 'Fri', 6),
+  ('All Things Considered', 'Mon', 6),
+  ('All Things Considered', 'Sat', 2),
+  ('All Things Considered', 'Sun', 2),
+  ...
+```
+
+### Database title flat listing
+
+`python KJZZ-db.py -q title --pretty`
+
+Outputs alphabetically sorted list of all programing in the database, useful for loops for instance:
+```
+"All Things Considered"
+"BBC Newshour"
+"BBC World Business Report"
+"BBC World Service"
+"Bullseye"
+"Climate One"
+...
+```
+
+### List the last chunks loaded
 `python KJZZ-db.py --query chunks10 -pretty`
 
-Adding _pretty_ will flatten the results as text:
+Adding _pretty_ will flatten the output as simple text:
 
 ```
-  db_init: 367 chunks found in kjzz.db
 "KJZZ_2023-10-19_Thu_1930-2000_Fresh Air"
 "KJZZ_2023-10-19_Thu_1900-1930_Fresh Air"
 "KJZZ_2023-10-19_Thu_1830-1900_BBC World Business Report"
@@ -223,18 +273,21 @@ Adding _pretty_ will flatten the results as text:
 ```
 
 ## gettext
+`-g, --gettext` *< chunk= | date= | datetime= | week= | Day= | time= | title= >*
+
 validKeys = they will be used as parameters for the SQL query:
-- chunk
-- date
-- datetime
-- week
-- Day
-- time
-- title
+- chunk="KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title"
+- date=2023-10-08[+time=HH:MM]
+- datetime="2023-10-08 HH:MM"
+- week=42 (iso week with Mon first)
+- Day=Fri (Ddd)
+- title="title of the show", see https://kjzz.org/kjzz-print-schedule
+
 
 You can also combine the keys with *+*, examples:
 - ALL of BBC Newshour for week 41: `--gettext week=41+title="BBC Newshour"`
 - ALL programs for a specific day [and time]: `--gettext date=2023-10-08[+time=HH:MM]`
+- ALL programs for a specific week: `--gettext week=42`
 - Specific date and time (30mn chunk): `--gettext datetime="2023-10-08 HH:MM"`
 
 
@@ -310,13 +363,28 @@ No stopWords: adjectives are now prominents and the cloud has no meaning anymore
 
 ### Generate a heat map about how uncertain information is in multiple chunks of a program
 
-Simply add --noMerge: --graph will be ignored when treating multiple chunks
+Simply add --noMerge: --graph will be ignored when treating multiple chunks, and output a heat map instead.
 
 `python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge --show`
 ![heatMap KJZZ week=42 title=Morning Edition Day=Mon](assets/heatMap%20KJZZ%20week=42%20title=Morning%20Edition%20Day=Mon.png)
 
+### Generate ALL word cloud picures for each program of a given week
+
+The loop below will generate png files for each program of each day of week 42:
+
+`for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt --output kjzz)`
+
+Notice how the order of --gettext parameters influence the file names: 
+this is useful when you want your files sorted a certain way. 
+
+The loop above will have them sorted by Title. 
+If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
+
+
 
 # Roadmap
+- [ ] 0.9.?   TODO should the case matter for title?
+- [ ] 0.9.?   TODO include some of the most offensive Hexspeak from https://en.wikipedia.org/wiki/Hexspeak to trigger fools
 - [ ] 0.9.?   TODO separate KJZZ into its own table to add other broadcasters
 - [ ] 0.9.?   TODO web ui
 - [ ] 0.9.?   TODO automate mp3 downloads from cloud + process + uploads from/to cloud server
@@ -337,19 +405,34 @@ Simply add --noMerge: --graph will be ignored when treating multiple chunks
 ### Windows
 
 - Python 3.x:
-  - getopt, sys, os, re, regex, io, time, datetime, pathlib
-  - json, urllib, random, sqlite3, collections, matplotlib
+  - getopt, sys, os, re, regex, io, time, datetime, pathlib, json, urllib, random, sqlite3, collections
+- Python 3.x modules:
   - rich
+  - pandas
+  - numpy
+  - matplotlib
+  - seaborn
   - wordcloud
-- whisper-faster from https://github.com/Purfview/whisper-standalone-win
+  - pngquant
+  - PyOptipng
+- Windows software:
+  - whisper-faster from https://github.com/Purfview/whisper-standalone-win
 
 
 ## Acknowledgements
 - rich print:     https://github.com/Textualize/rich
-- wordcloud:      https://github.com/amueller/word_cloud
+- pngquant:       https://github.com/kornelski/pngquant
+- wordCloud:      https://github.com/amueller/word_cloud
 - gender bias:    https://github.com/auroracramer/language-model-bias
-- Misinformation: https://github.com/PDXBek/Misinformation
+- misInformation: https://github.com/PDXBek/Misinformation
+  - heatMap.explanatory.csv
+  - heatMap.retractors.csv
+  - heatMap.sourcing.csv
+  - heatMap.uncertainty.csv
 - IA transcribe:  https://github.com/Purfview/whisper-standalone-win
-- Thesaurus and adjectives:  https://github.com/taikuukaits/SimpleWordlists/tree/master
-- stopWords list: https://www.ranks.nl/stopwords
+- stopWords lists: 
+  - ranks.nl compilation:     https://www.ranks.nl/stopwords
+    - stopWords.ranks.nl.txt
+  - Thesaurus and adjectives: https://github.com/taikuukaits/SimpleWordlists/tree/master
+    - stopWords.Wordlist-Adjectives-All.txt
 
