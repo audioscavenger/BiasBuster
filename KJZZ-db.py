@@ -38,7 +38,9 @@
 # python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
 # for /l %a in (40,1,45) DO python KJZZ-db.py -g week=%a+title="TED Radio Hour" --wordCloud --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
 # python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
-# python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --noMerge --misInformation --graph pie --show --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+
+# python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show
+# python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
 
 # generate all thumbnails for week 42:
 # for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt --output kjzz)
@@ -61,6 +63,12 @@ from pathlib import Path
 # https://github.com/Textualize/rich
 from rich import print
 from rich.progress import track, Progress
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from matplotlib import style
 
 # # example of progress bar:
 # with Progress() as progress:
@@ -457,7 +465,6 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
     wordCloudDict["scale"]["value"], 
     wordCloudDict["relative_scaling"]["value"], 
   )
-  fileName = title.replace(": ", "=").replace(":", "")
   
   if not noStopwords:
     for i in range(level + 1): stopWords += stopwords[i]
@@ -541,6 +548,8 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
   # )
   # plt.tight_layout(pad=1)
   plt.imshow(wordcloud, interpolation='bilinear')
+
+  fileName = title.replace(": ", "=").replace(":", "")
   plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
   print("    genWordCloud: file = \"%s\"" % (os.path.join(outputFolder, fileName  + ".png")))
 
@@ -591,8 +600,10 @@ def genMisinfoBarGraph(text, title, wordCloudDict=wordCloudDict, graph="bar"):
   Y = []
   for dic in heatMap.values():
     Y.append(dic["heat"])
-  if graph == "bar": graph_bar(X, Y, title)
-  if graph == "pie": graph_pie(X, Y, title)
+  
+  fileName = graph + " " + title.replace(": ", "=").replace(":", "")
+  if graph == "bar": graph_bar(X, Y, title, fileName)
+  if graph == "pie": graph_pie(X, Y, title, fileName)
     
 # genMisinfoBarGraph
 
@@ -640,7 +651,8 @@ def genMisinfoHeatMap(textArray, title, wordCloudDict=wordCloudDict, graph="bar"
     i += 1
     titleArray.append(title)
   
-  graph_heatMap(heatMaps, X, titleArray)
+  fileName = "heatMap " + title.replace(": ", "=").replace(":", "")
+  graph_heatMap(heatMaps, X, titleArray, title, fileName)
 
 # genMisinfoHeatMap
 
@@ -680,36 +692,60 @@ def loadInputFile(inputTextFile):
 
 
 
-def graph_lines(X, Y, title=""):
+def graph_lines(X, Y, title="", fileName=""):
   # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.plot_date.html
   plt.plot_date(X,Y,linestyle='solid')
   plt.xticks(rotation=45)
   plt.ylabel('count')
   plt.xlabel('date')
-  plt.show()
+
+  # always save BEFORE show
+  if fileName: plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
+  # plt.show()
 # graph_lines
 
 
-def graph_bar(X, Y, title=""):
+def graph_bar(X, Y, title="", fileName=""):
   # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.bar.html
   plt.bar(X,Y)
   plt.xticks(rotation=45)
   plt.ylabel('count')
   plt.xlabel('date')
-  plt.show()
+
+  # always save BEFORE show
+  if fileName: plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
+  # plt.show()
 # graph_bar
 
 
-def graph_pie(X, Y, title=""):
+def graph_pie(X, Y, title="", fileName=""):
   # https://matplotlib.org/stable/gallery/pie_and_polar_charts/pie_features.html#sphx-glr-gallery-pie-and-polar-charts-pie-features-py
+  # fig, ax = plt.subplots(figsize=(20, 10))  # 2000 x 1000
   fig, ax = plt.subplots()
   ax.pie(Y, labels=X)
+  ax.set_title(title)
+  ax.axis("off")
+
+  # always save BEFORE show
+  if fileName: plt.savefig( os.path.join(outputFolder, fileName  + ".png"), 
+                            dpi=100,
+                            bbox_inches='tight',
+                            )
   plt.show()
+  
+  # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.savefig.html
+  # savefig(fname, *, transparent=None, dpi='figure', format=None,
+        # metadata=None, bbox_inches=None, pad_inches=0.1,
+        # facecolor='auto', edgecolor='auto', backend=None,
+        # **kwargs
+       # )
+  
 # graph_pie
 
 
-def graph_heatMap(arrays, X, Y, title=""):
-  print("graph_heatMap: "+title)
+def graph_heatMap(arrays, X, Y, title="", fileName=""):
+  print("graph_heatMap: title    = "+title)
+  print("graph_heatMap: fileName = "+fileName)
   # title = "Harvest of local farmers (in tons/year)"
   # Y = ["cucumber", "tomato", "lettuce", "asparagus",
                 # "potato", "wheat", "barley"]
@@ -743,8 +779,10 @@ def graph_heatMap(arrays, X, Y, title=""):
 
   ax.set_title(title)
   fig.tight_layout()
-  plt.show()
-  # plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
+
+  # always save BEFORE show
+  if fileName: plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
+  # plt.show()
 
 # graph_heatMap
 
@@ -1036,8 +1074,6 @@ if gettext:
     from wordcloud import WordCloud
     from wordcloud import STOPWORDS
     # print(STOPWORDS)
-    import matplotlib
-    import matplotlib.pyplot as plt
     
     if mergeRecords:
       for record in records: mergedText += record[0]
@@ -1054,18 +1090,12 @@ if gettext:
   
   # then we check if a misInformation heatMap is requested:
   elif heatMap:
-    import numpy as np
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    import matplotlib.dates as mdates
-    from matplotlib import style
-    
     if mergeRecords:
       for record in records: mergedText += record[0]
       genMisinfoBarGraph(mergedText, title, wordCloudDict, graph)
     else:
       genMisinfoHeatMap(records, title, wordCloudDict)
-  
+    if showPicture: plt.show()
   
   # Finally, we just output gettext:
   else:
