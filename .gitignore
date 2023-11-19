@@ -31,9 +31,9 @@ gitsync*
 !assets/*
 !fonts/*
 
-!kjkk/kjkk.sh
-!kjkk/KJZZ-schedule.json
-!kjkk/KJZZ-schedule.xlsx
+!kjzz/kjzz.sh
+!kjzz/KJZZ-schedule.json
+!kjzz/KJZZ-schedule.xlsx
 # ---> BiasBuster <---
 
 
