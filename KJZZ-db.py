@@ -34,22 +34,30 @@
 # python KJZZ-db.py -g week=43 --wordCloud --stopLevel 4 --show --max_words=10000
 # python KJZZ-db.py -g week=44 --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
 # python KJZZ-db.py -g week=43+title="TED Radio Hour" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
-# week=42+title="Freakonomics" is about men/women
-# python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 5 --show --max_words=10000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
-# for /l %a in (40,1,45) DO python KJZZ-db.py -g week=%a+title="TED Radio Hour" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
-# python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 5 --show --max_words=10000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+#   example: week=42+title="Freakonomics" is about men/women
+# python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+# for /l %a in (40,1,45) DO python KJZZ-db.py -g week=%a+title="TED Radio Hour" --wordCloud --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+# python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+# python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --noMerge --misInformation --graph pie --show --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+
+# generate all thumbnails for week 42:
+# for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.uniq.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt --output kjzz)
+
 
 
 # TODO: explore stopWords from https://github.com/taikuukaits/SimpleWordlists/tree/master
 # TODO: analyse bias
 # egrep -i "trans[gsv]" *text
-# egrep -i "\bgay\b|lesb|bisex,transg|queer|gender" *text
+# egrep -i "\bgay\b|\blesb|\bbisex|\btransg|\bqueer|gender|LGBT" *text
 # egrep -i "diversity|equity|inclusion" *text
+# egrep -i "Soros" *text
 
-import getopt, sys, os, re, regex, io, time, datetime
+
+
+
+import getopt, sys, os, re, regex, io, time, datetime, json, urllib, random, sqlite3
 from dateutil import parser
 from pathlib import Path
-import json, urllib, random, sqlite3
 # https://github.com/Textualize/rich
 from rich import print
 from rich.progress import track, Progress
@@ -86,6 +94,8 @@ mergedText = ""
 noStopwords = False
 showPicture = False
 inputStopWords = []
+outputFolder = Path(".")
+graph = "bar"
 
 # busybox sed -E "s/^.{,3}$//g" stopWords.ranks.nl.txt | busybox sort | busybox uniq >stopWords.ranks.nl.uniq.txt 
 # https://www.ranks.nl/stopwords
@@ -96,7 +106,7 @@ inputStopWords = []
 stopwords = {
   0: ["what", "who", "is", "as", "at", "he", "the", "an", "to", "in", "for", "of", "or", "by", "with", "on", "this", "that", "be", "and", "it", "its", "no", "yes"],
   1: ["NPR", "KJZZ", "org", "BBC", "gift", "make", "support", "sustaining", "member", "doubled", "thank", "you", "call", "news", "month", "help", "give", "donation", "contribution", "please", "drive"],
-  2: ["say", "says", "said", "new", "one", "re", "not", "but", "are", "from", "become", "still", "way", "went"],
+  2: ["let", "say", "says", "said", "new", "one", "re", "not", "but", "are", "from", "become", "still", "way", "went"],
   3: ["now", "know", "will", "going", "well", "yeah", "okay", "really", "actually", "right", "think", "today", "time", "thing", "things", "kind", "lot", "part", "year", "years", "show", "morning", "see", "much", "want", "made", "sort", "come", "came", "comes", "day", "need", "got"],
   4: ["even", "never", "always", "next", "case", "another", "coming", "number", "many", "two", "something", "look", "talk", "little", "first", "last", "people", "good", "mean", "back", "around", "almost", "called", "trying", "point", "week", "take", "work", "hour", "live", "edition", "report"],
   5: ["Israel", "Israeli", "Gaza", "Hamas", "Phoenix"],
@@ -214,7 +224,13 @@ sqlCountsByDay = """ SELECT Day, title, count(start)
   # ('Fri', 'Science Friday', 2),
   # ('Fri', 'The Show', 2),
 
-sqlCountsByTile = """ SELECT title, Day, count(title)
+sqlTitles = """ SELECT title
+          from schedule 
+          GROUP BY title
+          ORDER BY title, strftime('%w',start)
+          """
+
+sqlCountsByTitle = """ SELECT title, Day, count(title)
           from schedule 
           GROUP BY title, Day
           ORDER BY title, strftime('%w',start)
@@ -525,8 +541,8 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
   # )
   # plt.tight_layout(pad=1)
   plt.imshow(wordcloud, interpolation='bilinear')
-  plt.savefig(fileName  + ".png", bbox_inches='tight')
-  print("    genWordCloud: file = \"%s.png\"" % (fileName))
+  plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
+  print("    genWordCloud: file = \"%s\"" % (os.path.join(outputFolder, fileName  + ".png")))
 
 
   # # image 2: lower max_font_size
@@ -543,13 +559,14 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
 # genWordCloud
 
 
-def genMisinfoBarGraph(text, title, wordCloudDict=wordCloudDict):
+def genMisinfoBarGraph(text, title, wordCloudDict=wordCloudDict, graph="bar"):
   print("%s" %( title ))
+  # heatMap = {     "explanatory":{"words":[],"heatCount":0,"heat":0},     "retractors":{"words":[],"heatCount":0,"heat":0},     "sourcing":{"words":[],"heatCount":0,"heat":0},     "uncertainty":{"words":[],"heatCount":0,"heat":0},   }
   heatMap = { 
-    "explanatory":{"words":[],"heatCount":0}, 
-    "retractors":{"words":[],"heatCount":0}, 
-    "sourcing":{"words":[],"heatCount":0}, 
-    "uncertainty":{"words":[],"heatCount":0}, 
+    "explanatory":{"words":[],"heatCount":0,"heat":0}, 
+    "retractors":{"words":[],"heatCount":0,"heat":0}, 
+    "sourcing":{"words":[],"heatCount":0,"heat":0}, 
+    "uncertainty":{"words":[],"heatCount":0,"heat":0}, 
   }
   textWordsLen = len(text.split())
   
@@ -569,8 +586,63 @@ def genMisinfoBarGraph(text, title, wordCloudDict=wordCloudDict):
     print("    %s heatCount %s" %( heatFactor, heatMap[heatFactor]["heatCount"] ))
     print("    %s heat      %s" %( heatFactor, heatMap[heatFactor]["heat"] ))
     
-
+  
+  X = heatMap.keys()
+  Y = []
+  for dic in heatMap.values():
+    Y.append(dic["heat"])
+  if graph == "bar": graph_bar(X, Y, title)
+  if graph == "pie": graph_pie(X, Y, title)
+    
 # genMisinfoBarGraph
+
+
+def genMisinfoHeatMap(textArray, title, wordCloudDict=wordCloudDict, graph="bar"):
+
+  titleArray = []
+  heatMaps = []
+  i=0
+  for text in textArray:
+    heatMap = { 
+      "explanatory":{"words":[],"heatCount":0,"heat":0}, 
+      "retractors":{"words":[],"heatCount":0,"heat":0}, 
+      "sourcing":{"words":[],"heatCount":0,"heat":0}, 
+      "uncertainty":{"words":[],"heatCount":0,"heat":0}, 
+    }
+    X = heatMap.keys()
+
+    print("%s" %( title ))
+    # heatMap = {     "explanatory":{"words":[],"heatCount":0,"heat":0},     "retractors":{"words":[],"heatCount":0,"heat":0},     "sourcing":{"words":[],"heatCount":0,"heat":0},     "uncertainty":{"words":[],"heatCount":0,"heat":0},   }
+    textWordsLen = len(text[0].split())
+    
+    # build the lists of heat words
+    for heatFactor in heatMap.keys():
+      with open('heatMap.'+heatFactor+'.csv', 'r') as fd:
+        for line in fd:
+          heatMap[heatFactor]["words"].append(line.strip())
+        if verbose: print("  %s: words = %s" %( heatFactor, len(heatMap[heatFactor]["words"]) ))
+      
+      # count occurences in the text
+      for word in heatMap[heatFactor]["words"]:
+        # print("  "+word)
+        heatMap[heatFactor]["heatCount"] += sum(1 for _ in re.finditer(r'\b%s\b' % re.escape(word), text[0]))
+        
+      heatMap[heatFactor]["heat"] = round( 100 * heatMap[heatFactor]["heatCount"] / textWordsLen , 1 )
+      print("    %s heatCount %s" %( heatFactor, heatMap[heatFactor]["heatCount"] ))
+      print("    %s heat      %s" %( heatFactor, heatMap[heatFactor]["heat"] ))
+      
+    
+    Y = []
+    for dic in heatMap.values():
+      Y.append(dic["heat"])
+    heatMaps.append(Y)
+    
+    i += 1
+    titleArray.append(title)
+  
+  graph_heatMap(heatMaps, X, titleArray)
+
+# genMisinfoHeatMap
 
 
 
@@ -607,11 +679,84 @@ def loadInputFile(inputTextFile):
 # loadInputFile
 
 
+
+def graph_lines(X, Y, title=""):
+  # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.plot_date.html
+  plt.plot_date(X,Y,linestyle='solid')
+  plt.xticks(rotation=45)
+  plt.ylabel('count')
+  plt.xlabel('date')
+  plt.show()
+# graph_lines
+
+
+def graph_bar(X, Y, title=""):
+  # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.bar.html
+  plt.bar(X,Y)
+  plt.xticks(rotation=45)
+  plt.ylabel('count')
+  plt.xlabel('date')
+  plt.show()
+# graph_bar
+
+
+def graph_pie(X, Y, title=""):
+  # https://matplotlib.org/stable/gallery/pie_and_polar_charts/pie_features.html#sphx-glr-gallery-pie-and-polar-charts-pie-features-py
+  fig, ax = plt.subplots()
+  ax.pie(Y, labels=X)
+  plt.show()
+# graph_pie
+
+
+def graph_heatMap(arrays, X, Y, title=""):
+  print("graph_heatMap: "+title)
+  # title = "Harvest of local farmers (in tons/year)"
+  # Y = ["cucumber", "tomato", "lettuce", "asparagus",
+                # "potato", "wheat", "barley"]
+  # X = ["Farmer Joe", "Upland Bros.", "Smith Gardening",
+             # "Agrifun", "Organiculture", "BioGoods Ltd.", "Cornylee Corp."]
+  # indices = np.array([[0.8, 2.4, 2.5, 3.9, 0.0, 4.0, 0.0],
+                      # [2.4, 0.0, 4.0, 1.0, 2.7, 0.0, 0.0],
+                      # [1.1, 2.4, 0.8, 4.3, 1.9, 4.4, 0.0],
+                      # [0.6, 0.0, 0.3, 0.0, 3.1, 0.0, 0.0],
+                      # [0.7, 1.7, 0.6, 2.6, 2.2, 6.2, 0.0],
+                      # [1.3, 1.2, 0.0, 0.0, 0.0, 3.2, 5.1],
+                      # [0.1, 2.0, 0.0, 1.4, 0.0, 1.9, 6.3]])
+  indices = np.array(arrays)
+
+  fig, ax = plt.subplots()
+  im = ax.imshow(indices)
+
+  # Show all ticks and label them with the respective list entries
+  ax.set_xticks(np.arange(len(X)), labels=X)
+  ax.set_yticks(np.arange(len(Y)), labels=Y)
+
+  # Rotate the tick labels and set their alignment.
+  plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+           rotation_mode="anchor")
+
+  # Loop over data dimensions and create text annotations.
+  for i in range(len(Y)):
+    for j in range(len(X)):
+      text = ax.text(j, i, indices[i, j],
+                     ha="center", va="center", color="w")
+
+  ax.set_title(title)
+  fig.tight_layout()
+  plt.show()
+  # plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
+
+# graph_heatMap
+
+
+
 def usage(RC=99):
   print (("usage: python %s --help") % (sys.argv[0]))
   print ("")
-  print ("  --import [ --text \"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text\" | --folder folder ]")
+  print ("  --import < --text \"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text\" | --folder folder >")
   print ("    -m, --model *small medium...\n                   Model that you used with whisper, to transcribe the text to import.")
+  print ("    -p, --pretty\n                   Convert \\n to carriage returns and does json2text.\n                   Ignored when outputing pictures.")
+  print ("    --output *./\n                   Where to outputs pictures.")
   print ("")
   print ("  --db *kjzz.db  Path to the local SQlite db.")
   print ("  -q, --query [ title last last10 byDay byTitle chunks10 ]\n                   Show what's in the db.")
@@ -626,9 +771,10 @@ def usage(RC=99):
   print ("                 title=\"title of the show\", see https://kjzz.org/kjzz-print-schedule")
   print ("        example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"\n                Will get text from that chunk of programming only. Chunks are 30mn long.")
   print ("        example: week=41+Day=Fri+title=\"All Things Considered\"\n                Same as above but will get text from the entire episode.")
-  print ("    -p, --pretty\n                   Convert \\n to carriage returns when only printing out text.\n                   Ignored when outputing pictures.")
   print ("    --noMerge\n                   Do not merge 30mn chunks of the same title within the same day.")
   print ("    --misInformation\n                   PICture: generate misInformation heatmap for all 4 factors:\n                   explanatory/retractors/sourcing/uncertainty")
+  print ("      --graph *bar | pie\n                   What graph you want.")
+  print ("      --show\n                   Opens the graph picture upon generation.")
   print ("    --wordCloud\n                   PICture: generate word cloud from gettext output. Will not output any text.")
   print ("      --show\n                   Opens the wordCloud picture upon generation.")
   print ("      --stopLevel  *0 1 2 3 4 5\n                   add various levels of stopwords")
@@ -652,7 +798,7 @@ argumentList = sys.argv[1:]
 # define short Options
 options = "hvd:it:f:m:q:pg:"
 # define Long options
-long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "noStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation"]
+long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "noStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation", "output=", "graph="]
 wordCloudDictToParams = [(lambda x: '--' + x)(x) for x in wordCloudDict.keys()]
 wordCloudDictToOptions = [(lambda x: x + '=')(x) for x in wordCloudDict.keys()]
 long_options += wordCloudDictToOptions
@@ -686,8 +832,10 @@ try:
         sqlQuery = sqlLast1
       elif currentValue in ("Day","byDay"):
         sqlQuery = sqlCountsByDay
-      elif currentValue in ("title","byTitle"):
-        sqlQuery = sqlCountsByTile
+      elif currentValue in ("title"):
+        sqlQuery = sqlTitles
+      elif currentValue in ("byTitle"):
+        sqlQuery = sqlCountsByTitle
       elif currentValue in ("chunks10","chunksLast10"):
         sqlQuery = sqlListChunksLast10
       else:
@@ -720,9 +868,15 @@ try:
     elif currentArgument in ("-f", "--folder"):
       if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
       inputFolder = Path(currentValue)
+    elif currentArgument in ("--output"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      outputFolder = Path(currentValue)
     elif currentArgument in ("-m", "--model"):
       if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
       model = currentValue
+    elif currentArgument in ("--graph"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      if currentValue in ["bar", "pie"]: graph = currentValue
     elif currentArgument in ("-g", "--gettext"):
       if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
       gettext = currentValue
@@ -822,7 +976,7 @@ if importChunks:
     
     # finally we will also print a summary:
     if verbose: print("[bright_black]\npython KJZZ-db.py -q title[/]")
-    if verbose: sqlQuery = sqlCountsByTile
+    if verbose: sqlQuery = sqlCountsByTitle
   else:
     usage(1)
 # importChunks
@@ -900,12 +1054,17 @@ if gettext:
   
   # then we check if a misInformation heatMap is requested:
   elif heatMap:
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import matplotlib.dates as mdates
+    from matplotlib import style
+    
     if mergeRecords:
       for record in records: mergedText += record[0]
-      genMisinfoBarGraph(mergedText, title, wordCloudDict)
+      genMisinfoBarGraph(mergedText, title, wordCloudDict, graph)
     else:
-      for record in records:
-        genMisinfoBarGraph(record, title, wordCloudDict)
+      genMisinfoHeatMap(records, title, wordCloudDict)
   
   
   # Finally, we just output gettext:
@@ -919,7 +1078,7 @@ if gettext:
     else:
       for record in records:
         if pretty:
-          print(('"%s"') %(record))
+          print(('"%s"') %(record[0]))
         else:
           print(record)
   exit(0)
