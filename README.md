@@ -200,7 +200,7 @@ _Day_ is redundant since we have the date, but makes the chunk name convenient t
 KJZZ-db.py needs at least `--import | --query | --gettext`.
 
 ## Import new data
-`-i, --import` *< --text file | --folder folder >*
+`-i, --import` *--text file | --folder folder*
 
 ### Import text files in the Database
 `python KJZZ-db.py --import --folder kjzz\\42`
@@ -223,7 +223,7 @@ If you need a --force option to overwrite existing chunks, please file a PR.
 
 
 ## Query database
-`-q, --query` *<title last last10 byDay byTitle chunks10>*
+`-q, --query` *title last last10 byDay byTitle chunks10*
 
 
 ### Database titles overview
@@ -274,7 +274,7 @@ Adding _pretty_ will flatten the output as simple text:
 ```
 
 ## gettext
-`-g, --gettext` *< chunk= | date= | datetime= | week= | Day= | time= | title= >*
+`-g, --gettext` * chunk= | date= | datetime= | week= | Day= | time= | title= *
 
 validKeys = they will be used as parameters for the SQL query:
 - chunk="KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title"
