@@ -225,6 +225,7 @@ If you need a --force option to overwrite existing chunks, please file a PR.
 ## Query database
 `-q, --query` *<title last last10 byDay byTitle chunks10>*
 
+
 ### Database titles overview
 
 `python KJZZ-db.py -q byTitle`
@@ -435,4 +436,5 @@ If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
     - stopWords.ranks.nl.txt
   - Thesaurus and adjectives: https://github.com/taikuukaits/SimpleWordlists/tree/master
     - stopWords.Wordlist-Adjectives-All.txt
+
 

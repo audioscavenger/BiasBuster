@@ -16,7 +16,6 @@ gitsync*
 !requirements.txt
 !.gitattributes
 !LICENSE
-!README.md
 !.md
 !.py
 !.sh
