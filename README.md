@@ -58,8 +58,11 @@ The schedule does not look like it's going to change until next year.
 
 
 ## Windows part 1: BiasBuster-whisper.cmd
-- Transcribe the mp3 to text with Purfview/whisper-standalone-win and CUDA
-The whole point of using Windows is to put this GTX 3090 to good use. Whisper-Faster is compiled and ready to use. I tried my best to compile whisper, whisper-bin-x64, whisper-cpp, but failed miserably. This project apparently requires you to install 6GB of CUDA SDK to compile on Windows.
+- Transcribe the mp3 to text with Purfview/whisper-standalone-win and CUDA.
+The whole point of using Windows is to put this GTX 3090 to good use. 
+Whisper-Faster is compiled and ready to use. 
+I tried my best to compile whisper, whisper-bin-x64, and whisper-cpp, but failed miserably. 
+Compiling it apparently requires you to install 6GB of CUDA SDK on Windows. My C: drive is full, sorry.
 
 Here is how to transcribe the mp3 downloaded:
 
@@ -69,8 +72,8 @@ Here is how to transcribe the mp3 downloaded:
 4. update `BiasBuster-whisper.cmd` to point to Whisper-Faster folder
 5. copy `BiasBuster-whisper.cmd` as a shortcut in the sendTo folder (access by typing `shell:sendTo`)
 6. download mp3 from your Cloud server
-7. right-click the folder and select BiasBuster-whisper
-8. watch the magick of IA transcription
+7. right-click the folder and select _BiasBuster-whisper_
+8. watch the magic of IA transcription
 
 The script as it is, will produce multiple text file formats, but this project only uses `.text` extensions at the moment: pure text, no timestamps.
 
@@ -85,14 +88,13 @@ This Python script does the following:
   - [x] query statistics on what is stored
   - [x] query words based on schedule
   - [x] generate word cloud
+  - [x] generate misinformation heatmap
   - [ ] generate gender bias analysis
-  - [ ] generate misinformation heatmap
   - [ ] what else?
 
 
 ### Usage
 `python KJZZ-db.py --help`
-
 
 ```
 usage: python KJZZ-db.py --help
@@ -124,16 +126,16 @@ usage: python KJZZ-db.py --help
         example: week=41+Day=Fri+title="All Things Considered"
                 Same as above but will get text from the entire episode.
     --noMerge
-                   Do not merge 30mn chunks of the same title within the same day.
+                   Do not merge 30mn chunks of the same title within the same timeframe.
     --misInformation
-                   PICture: generate misInformation heatmap for all 4 factors:
+                   PICture: generate misInformation graph or heatmap for all 4 factors:
                    explanatory/retractors/sourcing/uncertainty
       --graph *bar | pie | line
                    What graph you want. Ignored with --noMerge: heat map will be generated instead.
     --wordCloud
                    PICture: generate word cloud from gettext output. Will not output any text.
-      --stopLevel  *0 1 2 3 4 5
-                   add various levels of stopwords
+      --stopLevel  *0 1 2 3 4
+                   add various levels of stopwords.
       --max_words *1000 int (default=200)
                The maximum number of words in the Cloud.
       --width *2000 int (default=400)
@@ -186,13 +188,14 @@ usage: python KJZZ-db.py --help
 
 #### For KJZZ
 Mp3 files must be named like so, in order to be matched against KJZZ-schedule.json during loading of the database:
+
 ```
 KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text
      ^          ^   ^         ^                     ^
      YYYY-MM-DD Day HHMM      Program name          text (for folder import)
 ```
 
-_Day_ is redundant since we have the date, but makes the chunk name convenient to interact with.
+_Day_ is redundant since we have the date, but makes the chunk name and database, convenient to interact with.
 
 
 # KJZZ-db.py Usage
@@ -333,7 +336,7 @@ localSqlDb kjzz.db passed
     genWordCloud: file = "KJZZ start=2023-10-19 1500 words=4952 max=4000 scale=0.png"
 ```
 
-wordCloud generated:
+wordCloud generated: Notice how it makes no sense as onlt the stop words are highlighted
 ![KJZZ start=2023-10-19 1500 words=4952 max=4000 scale=0](assets/wordCloud_example1.png)
 
 
@@ -390,7 +393,7 @@ If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
 - [ ] 0.9.?   TODO web ui
 - [ ] 0.9.?   TODO automate mp3 downloads from cloud + process + uploads from/to cloud server
 - [ ] 0.9.?   TODO adding bias_score.py from https://github.com/auroracramer/language-model-bias
-- [ ] 0.9.5   adding Misinformation heatmap from https://github.com/PDXBek/Misinformation
+- [x] 0.9.5   added misInformation heatmap from https://github.com/PDXBek/Misinformation
 - [x] 0.9.4   wordCloudDict parameters are auto-added to script arguments and --help is auto-build
 - [x] 0.9.3   added and played with most of the genWordCloud parameters in wordCloudDict
 - [x] 0.9.2   updated stopwords to level 5 + you can add many files with --inputStopWordsFiles
