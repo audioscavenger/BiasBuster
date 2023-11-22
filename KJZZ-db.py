@@ -1,7 +1,13 @@
 # BiasBuster
 # author:  AudioscavengeR
 # license: GPLv2
-# version: 0.9.5
+
+# version: 0.9.6 WIP
+# 1. add options
+# 2. generate chunk names to build the schedule
+# 3. define html week template
+# 4.  
+
 
 # Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast. BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
 # Will produce:
@@ -42,6 +48,7 @@
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
+# python KJZZ-db.py --html 42 --byChunk
 
 # generate all thumbnails for week 42:
 # for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt --output kjzz)
@@ -113,6 +120,9 @@ showPicture = False
 inputStopWords = []
 outputFolder = Path(".")
 graph = "bar"
+weekNumber = 0
+jsonScheduleFile = os.path.realpath("kjzz/\\KJZZ-schedule.json")
+byChunk = False
 
 # busybox sed -E "s/^.{,3}$//g" stopWords.ranks.nl.txt | busybox sort | busybox uniq >stopWords.ranks.nl.txt 
 # https://www.ranks.nl/stopwords
@@ -865,6 +875,139 @@ def graph_heatMap(arrays, X, Y, title="", fileName=""):
 # exit()
 
 
+
+# jsonSchedule looks like this, with every hour in a day, except where we have half-hour programs
+# {
+    # '00:00': {
+        # 'Mon': 'BBC World Service',
+        # 'Tue': 'Classic Jazz with Chazz Rayburn',
+        # 'Wed': 'Classic Jazz with Bryan Houston',
+        # 'Thu': 'Classic Jazz with Bryan Houston',
+        # 'Fri': 'Classic Jazz with Michele Robins',
+        # 'Sat': 'Classic Jazz with Michele Robins',
+        # 'Sun': 'BBC World Service'
+    # },
+    # '01:00': {
+
+def getNextKey(timeList, key):
+  if key+1 < len(timeList):
+    # print("len=%s timelist[%s] = %s" %(len(timeList), key, timeList[key]))
+    return timeList[key+1]
+  else:
+    return None
+
+def getPrevKey(timeList, key):
+  if key > 0:
+    # print("len=%s timelist[%s] = %s" %(len(timeList), key, timeList[key]))
+    return timeList[key-1]
+  else:
+    return None
+
+def genHtml(weekNumber, byChunk=0):
+
+  # load json
+  if os.path.isfile(jsonScheduleFile):
+    with open(jsonScheduleFile, 'r') as fd:
+      jsonSchedule = json.load(fd)
+      
+    # # alternatively, the old way:
+    # f = open(jsonScheduleFile)
+    # jsonSchedule = json.load(f)
+    # f.close()
+
+  html  = '''<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title data-l10n-id="KJZZ week %i"></title>
+  </head>
+  <body>
+    ''' %(weekNumber)
+  html += '<table border="1">'
+  html += '<tr>'
+  html += '  <thead><tr><th>Time</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>'
+  html += '  <tbody>'
+  
+  # loop json
+  # html += '    <tr><td>00:00</td><td>BBC World Service</td><td>Classic Jazz with Chazz Rayburn</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Michele Robins</td><td>Classic Jazz with Michele Robins</td><td>BBC World Service</td></tr>'
+
+  rowspanDict = {}
+  timeList    = list(reversed(list(jsonSchedule.keys())))
+  DayList     = list(jsonSchedule["00:00"].keys())
+  # print(DayList)
+  rowspan  = {}
+  for Day in DayList: rowspan[Day] = 1
+  
+  # we reverse because that's the only way to increase the rowspan of the first occurance of the same title
+  for key, startTime in enumerate(timeList):
+    rowspanDict[startTime] = {}
+    for Day in DayList:
+
+      # without +1, jsonSchedule[timeList[key+1]] will error out with IndexError: list index out of range
+      # with +1,    we will not process the last startTime == 23:00
+      # solution:   create a dumb function for if key+1 < len(timeList) == getNextKey
+      
+      # By default we start with a normal, chunked cell of 30mn:
+      rowspanDict[startTime][Day] = '<td>%s</td>' %(jsonSchedule[startTime][Day])
+      
+      if not byChunk:
+        # if we are not processing the last key:
+        if getNextKey(timeList, key):
+          # print(startTime)
+          if jsonSchedule[startTime][Day] == jsonSchedule[getNextKey(timeList, key)][Day]:
+            rowspanDict[startTime][Day] = ''
+            rowspan[Day] += 1
+            # print("%s +1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], jsonSchedule[getNextKey(timeList, key)][Day]))
+          else:
+            if rowspan[Day] > 1: rowspanDict[startTime][Day] = '<td rowspan="%i">%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day])
+            # print("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], jsonSchedule[getNextKey(timeList, key)][Day]))
+            rowspan[Day]  = 1
+        
+        # if we are processing the last key == 00:00 since we loop in reverse:
+        else:
+          if rowspan[Day] > 1: rowspanDict[startTime][Day] = '<td rowspan="%i">%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day])
+          # print("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], None))
+          # rowspan[Day]  = 1   # seems useless
+        
+  
+  print(rowspanDict)
+  for startTime in jsonSchedule.keys():
+    # html += '    <tr><td>00:00</td><td>BBC World Service</td><td>Classic Jazz with Chazz Rayburn</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Michele Robins</td><td>Classic Jazz with Michele Robins</td><td>BBC World Service</td></tr>'
+    print    ('    <tr><td>%s</td>'           %(startTime))
+    html   += '    <tr><td>%s</td>'           %(startTime)
+    
+    for Day in DayList:
+      html   +=     '%s'  %(rowspanDict[startTime][Day])
+    html   +=     '</tr>\n'
+  
+  html += '  </tbody>'
+  html += '</tr>'
+  html += '</table>'
+  html += '</body></html>'
+  
+  # print(html)
+  outputFile = os.path.join(os.path.dirname(jsonScheduleFile),"week"+str(weekNumber)+".html")
+  with open(outputFile, 'w') as fd:
+    fd.write(html)
+    print("output: %s" %(outputFile))
+
+
+
+  # <table border="1">
+  # <tr>
+    # <thead><tr><th>Time</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>
+    # <tbody>
+      # <tr><td>00:00</td><td>BBC World Service</td><td>Classic Jazz with Chazz Rayburn</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Michele Robins</td><td>Classic Jazz with Michele Robins</td><td>BBC World Service</td></tr>
+      # <tr><td>01:00</td><td>BBC World Service</td><td>BBC World Service</td><td>BBC World Service</td><td>BBC World Service</td><td>BBC World Service</td><td>BBC World Service</td><td>BBC World Service</td></tr>
+    # </tbody>
+  # </tr>
+  # </table>
+
+  return html
+# genHtml
+
+
+
 def usage(RC=99):
   print (("usage: python %s --help") % (sys.argv[0]))
   print ("")
@@ -876,6 +1019,9 @@ def usage(RC=99):
   print ("")
   print ("  --db *kjzz.db  Path to the local SQlite db.")
   print ("  -q, --query [ title last last10 byDay byTitle chunks10 ]\n                   Show what's in the db.")
+  print ("")
+  print ("  --html [--byChunk]<week>\n                   Generate week number's schedule as an html table.")
+  print (" \n                   Outputs ./kjzz/weekNN[-byChunk].html")
   print ("")
   print ("  -g, --gettext  selector=value : chunk= | date= | datetime= | week= | Day= | time= | title=")
   print ("                   Outputs all text from the selector.")
@@ -912,7 +1058,7 @@ argumentList = sys.argv[1:]
 # define short Options
 options = "hviq:g:d:t:f:m:p"
 # define Long options
-long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "noStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation", "output=", "graph="]
+long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "noStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation", "output=", "graph=", "html=", "byChunk"]
 wordCloudDictToParams = [(lambda x: '--' + x)(x) for x in wordCloudDict.keys()]
 wordCloudDictToOptions = [(lambda x: x + '=')(x) for x in wordCloudDict.keys()]
 long_options += wordCloudDictToOptions
@@ -1026,6 +1172,12 @@ try:
     elif currentArgument in ("--graph"):
       if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
       if currentValue in ["bar", "pie"]: graph = currentValue
+    elif currentArgument in ("--html"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      weekNumber = int(currentValue)
+    elif currentArgument in ("--byChunk"):
+      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      byChunk = True
     elif currentArgument in ("--wordCloud"):
       if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
       wordCloud = True
@@ -1062,7 +1214,7 @@ if len(wordCloudDict["inputStopWordsFiles"]["value"]) > 0:
 
 
 
-if (not importChunks and not sqlQuery and not gettext):
+if (not importChunks and not sqlQuery and not gettext and not weekNumber):
   print ("[red]error: must pass at least --import / --query / --gettext[/]")
   usage(1)
 #
@@ -1106,6 +1258,9 @@ if importChunks:
 # importChunks
 
 
+# importChunks can be combined with subsequent requests
+
+
 # sometimes a query can be set after an import. 
 # Therefore, execute query comes after.
 #
@@ -1128,7 +1283,7 @@ if sqlQuery:
       print(('"%s"') %(record))
   else:
     print(records)
-  exit(0)
+  # exit(0)
 #
 
 
@@ -1204,9 +1359,13 @@ if gettext:
           print(('"%s"') %(record[1]))
         else:
           print(record)
-  exit(0)
+  # exit(0)
 #
 
+
+if weekNumber:
+  genHtml(weekNumber)
+# weekNumber:
 
 
 # sql = """ SELECT * from schedule where start = '2023-10-08 23:00:00.000'; """

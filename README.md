@@ -1,4 +1,4 @@
-# BiasBuster - WIP 0.9.5
+# BiasBuster - WIP 0.9.6
 
 Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast. 
 BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
@@ -112,6 +112,9 @@ usage: python KJZZ-db.py --help
   --db *kjzz.db  Path to the local SQlite db.
   -q, --query [ title last last10 byDay byTitle chunks10 ]
                    Show what's in the db.
+
+  --html <week>
+                   Generate week number's schedule as an html table.
 
   -g, --gettext  selector=value : chunk | date | datetime | week | Day | time | title
                    Outputs all text from the selector.
@@ -390,9 +393,9 @@ If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
 - [ ] 0.9.?   TODO should the case matter for title?
 - [ ] 0.9.?   TODO include some of the most offensive Hexspeak from https://en.wikipedia.org/wiki/Hexspeak to trigger fools
 - [ ] 0.9.?   TODO separate KJZZ into its own table to add other broadcasters
-- [ ] 0.9.?   TODO web ui
 - [ ] 0.9.?   TODO automate mp3 downloads from cloud + process + uploads from/to cloud server
 - [ ] 0.9.?   TODO adding bias_score.py from https://github.com/auroracramer/language-model-bias
+- [ ] 0.9.6   WIP web ui
 - [x] 0.9.5   added misInformation heatmap from https://github.com/PDXBek/Misinformation
 - [x] 0.9.4   wordCloudDict parameters are auto-added to script arguments and --help is auto-build
 - [x] 0.9.3   added and played with most of the genWordCloud parameters in wordCloudDict
