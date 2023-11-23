@@ -84,7 +84,6 @@ title BiasBuster: transcribe sounds to text with Whisper-Faster
 echo existingModels:      %existingModels%
 
 IF NOT "%~1"=="" (
-  pushd "%~sdp1"
   echo availableModels:    %models%
   set /P     model=model?              [%model%] 
   set /P    delete=delete after?       [%delete%] 
@@ -136,10 +135,11 @@ IF EXIST "%~1\*" (
 REM no arguments? open a command prompt
 IF     "%~1"=="" cmd /k
 
-:end
+
+:import
 
 IF NOT "%~1"=="" (
-  IF EXIST "%~1\*" (
+  IF EXIST "%~1\*.text" (
     del /f /q "%~1\*.log"
     call %stableROOT%\activate
     echo python KJZZ-db.py -i -f "%~1"
@@ -147,4 +147,6 @@ IF NOT "%~1"=="" (
   )
 )
 
+
+:end
 timeout /t 10

@@ -11,15 +11,21 @@ tmp/*
 *.lnk
 *.url
 *.exe
+*.tmp
 gitsync*
+
+# untrack kjzz.db:
+#   git update-index --assume-unchanged kjzz.db
+# track it again:
+#   git update-index --no-assume-unchanged kjzz.db
 
 !requirements.txt
 !.gitattributes
 !LICENSE
 !.md
+!.db
 !.py
 !.sh
-!.db
 !.xlsx
 !.cmd
 

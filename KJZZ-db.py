@@ -1,16 +1,12 @@
 # BiasBuster
 # author:  AudioscavengeR
 # license: GPLv2
-
-# version: 0.9.6 WIP
-# 1. add options
-# 2. generate chunk names to build the schedule
-# 3. define html week template
-# 4.  
+# version: 0.9.7 WIP
 
 
-# Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast. BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
-# Will produce:
+# Object: Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast.
+# BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
+# BiasBuster will produce:
 # - CUDA word transcription from any audio files, based on Whisper-Faster
 # - Words cloud, based on amueller/word_cloud
 # - Gender bias statistics, based on auroracramer/language-model-bias
@@ -55,6 +51,7 @@
 
 
 
+# TODO: export all configuration into external json files or yaml
 # TODO: explore stopWords from https://github.com/taikuukaits/SimpleWordlists/tree/master
 # TODO: analyse bias
 # egrep -i "trans[gsv]" *text
@@ -65,7 +62,7 @@
 
 
 
-import getopt, sys, os, re, regex, io
+import getopt, sys, os, re, regex, io, inspect
 import glob, time, datetime, json, urllib, random, sqlite3
 from dateutil import parser
 from pathlib import Path
@@ -90,6 +87,15 @@ from   rich.progress import track, Progress
 # -------------------------------------------------
 
 
+# def root():
+  # parent()
+# def parent():
+  # child()
+# def child(stack=''):
+  # for i in reversed(range(0, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
+  # print("%s: " %(stack))
+
+
 # # example of progress bar:
 # with Progress() as progress:
   # task = progress.add_task("twiddling thumbs", total=10)
@@ -99,6 +105,8 @@ from   rich.progress import track, Progress
     # time.sleep(0.2)
     # progress.advance(task)
 # exit()
+
+verbose = 0
 
 importChunks = False
 inputFolder = None
@@ -110,7 +118,6 @@ conn = None
 
 model = "small"
 sqlQuery = None
-verbose = 0
 pretty = False
 wordCloud = False
 misInformation = False
@@ -342,7 +349,7 @@ class Chunk:
 # If you use the TEXT storage class to store date and time value, you need to use the ISO8601 string format as follows:
 # YYYY-MM-DD HH:MM:SS.SSS
 def db_init(localSqlDb):
-  if verbose: print(("  db_init %s") % (localSqlDb), file=sys.stderr)
+  info("localSqlDb %s" %(localSqlDb), 1)
   localSqlDb.touch()
   # localSqlDb.unlink()
   conn = sqlite3.connect(localSqlDb)
@@ -360,15 +367,14 @@ def db_init(localSqlDb):
     """
   try:
     cur.execute(queryInit)
-    print(("[green]  db_init %s: success[/]") % (localSqlDb), file=sys.stderr)
+    info("db_init %s: success" %(localSqlDb), 1)
     return conn
   except Exception as error:
     if not str(error).find("already exists"):
-      # just a warning
-      print(("[yellow]    %s[/]") % (error), file=sys.stderr)
+      info("db_init %s: %s" %(localSqlDb, error), 1)
     else:
       records = cursor(localSqlDb, conn, """SELECT count(start) from schedule""")
-      if not printOut: print(("[green]  db_init: %s chunks found in %s[/]") % (records[0][0],localSqlDb), file=sys.stderr)
+      info("%s chunks found in %s" %(records[0][0], localSqlDb), 1)
       return conn
   #
 #
@@ -384,7 +390,7 @@ def db_init(localSqlDb):
 def db_load(inputFiles, localSqlDb, conn, model):
   loadedFiles = []
   if inputFiles:
-    if verbose: print(("  db_load: %s files") % (len(inputFiles)), file=sys.stderr)
+    info("db_load: %s files" %(len(inputFiles)), 1)
   if not conn:
     conn = sqlite3.connect(localSqlDb)
   
@@ -392,7 +398,7 @@ def db_load(inputFiles, localSqlDb, conn, model):
     task = progress.add_task("Loading...", total=len(inputFiles))
     # KJZZ_2023-10-08_Sun_2300-2330_BBC World Service.text
     for inputFile in inputFiles:
-      if verbose: progress.console.print((f"    db_load: reading %s ...") % (inputFile))
+      if verbose: progress.console.print(("    db_load: reading %s ...") % (inputFile))
       try:
         chunk = Chunk(inputFile, model)
         if verbose: progress.console.print(("    db_load: Chunk: loaded %s") % (chunk.basename))
@@ -414,7 +420,7 @@ def db_load(inputFiles, localSqlDb, conn, model):
         progress.console.print(("[bright_black]    db_load: Chunk already exist: %s[/]") % (chunk.basename))
       progress.advance(task)
   conn.commit()
-  print(("  db_load: done loading %s/%s files") % (len(loadedFiles),len(inputFiles)), file=sys.stderr)
+  info("db_load: done loading %s/%s files" %(len(loadedFiles), len(inputFiles)), 1)
 #
 
 
@@ -425,15 +431,15 @@ def cursor(localSqlDb, conn, sql, data=None):
   records = []
   try:
     if data:
-      if verbose > 1: print(("    cursor: cur.execute(%s) ... %s ...") %(sql, data[0]), file=sys.stderr)
+      info("cur.execute(%s) ... %s ..." %(sql, data[0]), 1)
       cur.execute(sql, data)
     else:
-      if verbose > 1: print(("    cursor: cur.execute(%s) ...") %(sql), file=sys.stderr)
+      info("cur.execute(%s) ..." %(sql), 1)
       cur.execute(sql)
     records = cur.fetchall()
-    if verbose: print("    cursor: %s records" % (len(records)))
+    info("%s records" %(len(records)), 1)
   except Exception as error:
-    print(("[red]    cursor error: %s[/]") % (error), file=sys.stderr)
+    warning("%s" %(error))
   return records
 #
 
@@ -501,13 +507,13 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
     # print(len(stopWords))
     # print(stopWords)
     # WordCloud can remove stopWords by itself just fine, but we do it just have a count
-    if verbose: print("    genWordCloud: most 10 common words before: %s" % (Counter(wordsList).most_common(10)))
+    info("genWordCloud: most 10 common words before: %s" % (Counter(wordsList).most_common(10)), 1)
     cleanWordsList = [word for word in re.split("\W+",text) if word.lower() not in stopWords]
     if verbose: print("    genWordCloud: most 10 common words after:  %s" % (Counter(cleanWordsList).most_common(10)))
-    print("    genWordCloud: %s words - %s stopWords (%s words removed) == %s total words" %(numWords,len(STOPWORDS),numWords - len(cleanWordsList),len(cleanWordsList)))
-    if verbose > 1: print("    genWordCloud: stopWords = %s" %(str(STOPWORDS)))
+    info("genWordCloud: %s words - %s stopWords (%s words removed) == %s total words" %(numWords,len(STOPWORDS),numWords - len(cleanWordsList),len(cleanWordsList)), 1)
+    info("    genWordCloud: stopWords = %s" %(str(STOPWORDS)), 2)
   else:
-    if verbose: print("    genWordCloud: %s words" %(numWords))
+    info("    genWordCloud: %s words" %(numWords), 1)
   # image 1: Display the generated image:
   # font_path="fonts\\Quicksand-Regular.ttf"
   wordcloud = WordCloud(
@@ -610,7 +616,7 @@ def genMisinfoBarGraph(text, title, wordCloudDict=wordCloudDict, graph="bar"):
     with open('heatMap.'+heatFactor+'.csv', 'r') as fd:
       for line in fd:
         heatMap[heatFactor]["words"].append(line.strip())
-      if verbose: print("  %s: words = %s" %( heatFactor, len(heatMap[heatFactor]["words"]) ))
+      info("heatFactor: %s: words = %s" %( heatFactor, len(heatMap[heatFactor]["words"]) ), 1)
     
     # count occurences in the text
     for word in heatMap[heatFactor]["words"]:
@@ -658,7 +664,7 @@ def genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict=wordCloudDict, gr
       with open('heatMap.'+heatFactor+'.csv', 'r') as fd:
         for line in fd:
           heatMap[heatFactor]["words"].append(line.strip())
-        if verbose: print("  %s: words = %s" %( heatFactor, len(heatMap[heatFactor]["words"]) ))
+        info("heatFactor: %s: words = %s" %( heatFactor, len(heatMap[heatFactor]["words"]) ), 1)
       
       # count occurences in the text
       for word in heatMap[heatFactor]["words"]:
@@ -666,8 +672,8 @@ def genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict=wordCloudDict, gr
         heatMap[heatFactor]["heatCount"] += sum(1 for _ in re.finditer(r'\b%s\b' % re.escape(word), text))
         
       heatMap[heatFactor]["heat"] = round( 100 * heatMap[heatFactor]["heatCount"] / textWordsLen , 1 )
-      print("    %s heatCount %s" %( heatFactor, heatMap[heatFactor]["heatCount"] ))
-      print("    %s heat      %s" %( heatFactor, heatMap[heatFactor]["heat"] ))
+      info("heatFactor: %s heatCount %s" %( heatFactor, heatMap[heatFactor]["heatCount"] ), 1)
+      info("heatFactor: %s heat      %s" %( heatFactor, heatMap[heatFactor]["heat"] ), 1)
       
     
     Y = []
@@ -686,7 +692,7 @@ def genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict=wordCloudDict, gr
 
 def loadInputFolder(inputFolder):
   if os.path.isdir(inputFolder):
-    if verbose: print(("  listing folder %s ...") % (inputFolder))
+    info(("  listing folder %s ...") % (inputFolder), 1)
     # inputFiles = sorted([os.fsdecode(file) for file in os.listdir(inputFolder) if os.fsdecode(file).endswith(".text")])
     # inputFiles = sorted([os.path.join(inputFolder, file) for file in os.listdir(inputFolder) if os.fsdecode(file).endswith(".text")] , key=os.path.getctime)
     inputFiles = [str(child.resolve()) for child in Path.iterdir(Path(inputFolder)) if os.fsdecode(child).endswith(".text")]
@@ -698,8 +704,7 @@ def loadInputFolder(inputFolder):
       
     return inputFiles
   else:
-    if verbose: print("[red]%s not found[/]" % (inputFolder))
-    exit(0)
+    error("%s not found" % (inputFolder))
   #
 # loadInputFolder
 
@@ -707,12 +712,12 @@ def loadInputFolder(inputFolder):
 def loadInputFile(inputTextFile):
   if os.path.isfile(inputTextFile):
     if (os.path.getsize(inputFile) > 0):
-      if verbose: print(("inputTextFile %s passed") % (inputTextFile))
+      info("inputTextFile %s passed" % (inputTextFile), 1)
       return [inputTextFile]
     else:
-      if verbose: print(("    %s is empty") % (inputFile))
+      info("%s is empty" % (inputFile), 1)
   else:
-    if verbose: print("[red]%s not found[/]" % (inputTextFile))
+    error("%s not found" % (inputTextFile))
   #
 # loadInputFile
 
@@ -729,6 +734,7 @@ def graph_line(X, Y, title="", fileName=""):
   if fileName:
     plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
     pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
+    info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
   # plt.show()
 # graph_line
 
@@ -745,6 +751,7 @@ def graph_bar(X, Y, title="", fileName=""):
   if fileName:
     plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
     pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
+    info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
   # plt.show()
 # graph_bar
 
@@ -762,6 +769,7 @@ def graph_pie(X, Y, title="", fileName=""):
   if fileName:
     plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
     pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
+    info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
   # plt.show()
   
   # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.savefig.html
@@ -801,8 +809,8 @@ def graph_heatMap(arrays, X, Y, title="", fileName=""):
   # https://matplotlib.org/stable/gallery/images_contours_and_fields/image_annotated_heatmap.html
   # https://seaborn.pydata.org/tutorial/color_palettes.html
   # https://stackoverflow.com/questions/62533046/how-to-add-color-border-or-similar-highlight-to-specifc-element-of-heatmap-in-py
-  if verbose: print("graph_heatMap: title    = "+title)
-  if verbose: print("graph_heatMap: fileName = "+fileName)
+  info("title    = "+title, 1)
+  info("fileName = "+fileName, 1)
   # title = "Harvest of local farmers (in tons/year)"
   # Y = ["cucumber", "tomato", "lettuce", "asparagus",
                 # "potato", "wheat", "barley"]
@@ -1003,7 +1011,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   rowspanDict = {}
   timeList    = list(reversed(list(jsonSchedule.keys())))
   DayList     = list(jsonSchedule[timeList[0]].keys())
-  if verbose >2: print(DayList, file=sys.stderr)
+  info("DayList: %s" %(DayList), 2)
   rowspan  = {}
   for Day in DayList: rowspan[Day] = 1
   
@@ -1029,12 +1037,12 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
       if not byChunk:
         # if we are not processing the last key:
         if getNextKey(timeList, key):
-          if verbose >2: print(startTime, file=sys.stderr)
+          info(startTime, 3)
           if jsonSchedule[startTime][Day] == jsonSchedule[getNextKey(timeList, key)][Day]:
             rowspanDict[startTime][Day] = ''
             cell = ''
             rowspan[Day] += 1
-            if verbose >2: print("%s +1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], jsonSchedule[getNextKey(timeList, key)][Day]), file=sys.stderr)
+            info("%s +1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], jsonSchedule[getNextKey(timeList, key)][Day]), 3)
           else:
             if rowspan[Day] > 1: 
               cell = ''
@@ -1043,7 +1051,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
               if thatPngList:
                 cell = '<img src="%s" alt="%s" class="notByChunk" decoding="async">' %(os.path.basename(thatPngList[0]), os.path.basename(thatPngList[0]))
               rowspanDict[startTime][Day] = '<td rowspan="%s">%s%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], cell)
-            if verbose >2: print("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], jsonSchedule[getNextKey(timeList, key)][Day]), file=sys.stderr)
+            info("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], jsonSchedule[getNextKey(timeList, key)][Day]), 3)
             rowspan[Day]  = 1
         
         # if we are processing the last key == 00:00 since we loop in reverse:
@@ -1055,17 +1063,17 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
             if thatPngList:
               cell = '<img src="%s" alt="%s" class="notByChunk" decoding="async">' %(os.path.basename(thatPngList[0]), os.path.basename(thatPngList[0]))
             rowspanDict[startTime][Day] = '<td rowspan="%s">%s%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], cell)
-          if verbose >2: print("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], None), file=sys.stderr)
+          info("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], None), 3)
       else:
         cell = ''
         rowspanDict[startTime][Day] = '<td rowspan="%s">%s%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], cell)
-        if verbose >2: print("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], None), file=sys.stderr)
+        info("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], None), 3)
         
   
-  if verbose >2: print(rowspanDict, file=sys.stderr)
+  info(rowspanDict, 4)
   for startTime in jsonSchedule.keys():
     # html += '    <tr><td>00:00</td><td>BBC World Service</td><td>Classic Jazz with Chazz Rayburn</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Michele Robins</td><td>Classic Jazz with Michele Robins</td><td>BBC World Service</td></tr>'
-    if verbose >2: print    ('    <tr><td>%s</td>'           %(startTime), file=sys.stderr)
+    info('    <tr><td>%s</td>'           %(startTime), 3)
     html   += '    <tr><td class="startTime">%s</td>'           %(startTime)
     
     for Day in DayList:
@@ -1084,7 +1092,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   outputFile = os.path.join(outputFolder, str(weekNumber), outputFileName)
   with open(outputFile, 'w') as fd:
     fd.write(html)
-    print("output: %s" %(outputFile), file=sys.stderr)
+    info("outputFile: %s" %(outputFile), 1)
 
 
 
@@ -1103,12 +1111,22 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
 
 
 def error(message, RC=1):
-  print    ("[red]error  : %s [/]" %(message), file=sys.stderr)
+  stack = ''
+  for i in reversed(range(1, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
+  print    ("error  : %-30s[red]%s%s [/]" %(stack, " ", message), file=sys.stderr)
   if RC: exit(RC)
 #
 
 def warning(message, RC=0):
-  print ("[yellow]warning: %s [/]" %(message), file=sys.stderr)
+  stack = ''
+  for i in reversed(range(1, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
+  print ("warning: %-30s[yellow]%s%s [/]" %(stack, " ", message), file=sys.stderr)
+#
+
+def info(message, verbosity=0):
+  stack = ''
+  for i in reversed(range(1, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
+  if verbose >= verbosity: print ("info   : %-30s[white]%s%s[/]" %(stack, " ", message), file=sys.stderr)
 #
 
 
@@ -1183,22 +1201,17 @@ try:
     if currentArgument in ("-h", "--help"):
       usage(0)
     elif currentArgument in ("-v", "--verbose"):
-      # if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgument, True))
       verbose += 1
 
-  # if verbose >1: print (("[bright_black]%-20s:[/] %s") % ('argument', 'value'))
-  # if verbose >1: print (("[bright_black]%-20s:[/] %s") % ('----------------', '----------------'))
-
-
   # checking each argument
-  if verbose >1: print (("[bright_black]%-20s:[/] %s") % ('argument', 'value'))
-  if verbose >1: print (("[bright_black]%-20s:[/] %s") % ('----------------', '----------------'))
+  info(("[bright_black]%-20s:[/] %s") % ('argument', 'value'), 2)
+  info(("[bright_black]%-20s:[/] %s") % ('----------------', '----------------'), 2)
   for currentArgument, currentValue in arguments:
     currentArgumentClean = currentArgument.replace('-','')
     
     # IMPORT
     if currentArgument in ("-i", "--import"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       importChunks = True
       
     # QUERY THE DB
@@ -1219,17 +1232,17 @@ try:
         sqlQuery = sqlListChunksLast10
       else:
         sqlQuery = currentValue
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
     
     # OUTPUT and PROCESS STUFF
     elif currentArgument in ("-g", "--gettext"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       gettext = currentValue
       if not gettext:
         error("gettext takes an argument: the program to get the text from!", 0)
-        print("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"")
-        print("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\" (mutually exclusive to the others)")
-        exit(1)
+        info("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"", 0)
+        info("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\" (mutually exclusive to the others)", 0)
+        exit(8)
       if gettext.find("chunk=") > -1:
         chunkName = re.split(r"[=]",gettext)[1]
         # chunk2condDict(chunkName)
@@ -1246,61 +1259,61 @@ try:
             condDict[key] = re.split(r"[=]",condition)[1]
           else:
             error("%s is invalid in %s" %(key, condition), 0)
-            print("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"")
-            print("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"")
-            exit(2)
+            info("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"", 0)
+            info("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"", 0)
+            exit(9)
 
     elif currentArgument in ("-p", "--pretty"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       pretty = True
     elif currentArgument in ("--noMerge"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, False))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, False), 2)
       mergeRecords = False
     elif currentArgument in ("--noStopwords"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       noStopwords = True
     elif currentArgument in ("--show"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       showPicture = True
     elif currentArgument in ("--stopLevel"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       stopLevel = int(currentValue)
     elif currentArgument in ("-t", "--text"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       inputTextFile = Path(currentValue)
     elif currentArgument in ("-d", "--db"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       localSqlDb = Path(currentValue)
     elif currentArgument in ("-f", "--folder"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       inputFolder = Path(currentValue)
     elif currentArgument in ("--output"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       outputFolder = Path(currentValue)
     elif currentArgument in ("-m", "--model"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       model = currentValue
     elif currentArgument in ("--graph"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       if currentValue in ["bar", "pie"]: graph = currentValue
     elif currentArgument in ("--html"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       weekNumber = int(currentValue)
     elif currentArgument in ("--byChunk"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       byChunk = True
     elif currentArgument in ("--printOut"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       printOut = True
     elif currentArgument in ("--listLevel"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       listLevel = currentValue.split(',')
     elif currentArgument in ("--wordCloud"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       wordCloud = True
       misInformation = False
     elif currentArgument in ("--misInformation"):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       wordCloud = False
       misInformation = True
 
@@ -1311,7 +1324,7 @@ try:
     
     # now processing any values from wordCloudDict that are valid inputs
     elif (currentArgument in (wordCloudDictToParams) and wordCloudDict[currentArgumentClean]["input"]):
-      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       if isinstance(wordCloudDict[currentArgumentClean]["default"],int):    wordCloudDict[currentArgumentClean]["value"] = int(currentValue)
       if isinstance(wordCloudDict[currentArgumentClean]["default"],float):  wordCloudDict[currentArgumentClean]["value"] = float(currentValue)
       if isinstance(wordCloudDict[currentArgumentClean]["default"],list):   wordCloudDict[currentArgumentClean]["value"].append(currentValue)
@@ -1319,9 +1332,17 @@ try:
 except getopt.error as err:
   # output error, and return with an error code
   error(err, 3)
+#
 
 
-################## help functions 
+####################################### MANDATORIES #######################################
+if (not importChunks and not sqlQuery and not gettext and not weekNumber and not listLevel):
+  error("must pass at least --import / --query / --gettext / --listLevel", 10)
+####################################### MANDATORIES #######################################
+
+
+
+#################################### help functions
 if listLevel:
   if pretty:
     for level in listLevel: print(('%s') %(" ".join(stopwords[int(level)])))
@@ -1329,40 +1350,30 @@ if listLevel:
     print("stopwords levels: %s" %(stopwords.keys()))
     for level in listLevel: print("%s" %(stopwords[int(level)]))
   exit()
-
-
-if (not importChunks and not sqlQuery and not gettext and not weekNumber):
-  error("must pass at least --import / --query / --gettext")
 #
+#################################### help functions
 
 
-# Process inputStopWordsFiles if any:
-if len(wordCloudDict["inputStopWordsFiles"]["value"]) > 0:
-  for inputStopWordsFile in wordCloudDict["inputStopWordsFiles"]["value"]:
-    with open(inputStopWordsFile, 'r') as fd:
-      for line in fd:
-        wordCloudDict["inputStopWords"]["value"].append(line.strip())
-    print("  %s stopWords imported from '%s'" %(len(wordCloudDict["inputStopWords"]["value"]), inputStopWordsFile))
 
-
-# DB cheack and init, first.
+#################################### db init
 if localSqlDb:
-  if verbose: print(("localSqlDb will be: %s") % (os.path.realpath(localSqlDb)))
+  info("localSqlDb: %s" % (os.path.realpath(localSqlDb)), 1)
   if (not os.path.isfile(localSqlDb) or os.path.getsize(localSqlDb) == 0):
-    print(("localSqlDb %s is empty") % (localSqlDb))
+    info(("localSqlDb: %s is empty") % (localSqlDb), 1)
     # localSqlDb.unlink()
     conn = db_init(localSqlDb)
   else:
     conn = db_init(localSqlDb)
   if (not os.path.isfile(localSqlDb) or os.path.getsize(localSqlDb) == 0):
-    print ("[red]error: localSqlDb could not be created[/]")
-    exit(1)
+    error("localSqlDb %s could not be created" % (os.path.realpath(localSqlDb)), 5)
 else:
-  error('localSqlDb undefined', 5)
+  error('localSqlDb undefined', 6)
 #
+#################################### db init
 
 
-# Import of new chunks of radio
+
+#################################### import of new chunks of radio
 if importChunks:
   # first we build inputFiles
   if inputTextFile:
@@ -1375,23 +1386,23 @@ if importChunks:
     db_load(inputFiles, localSqlDb, conn, model)
     
     # finally we will also print a summary:
-    if verbose: print("[bright_black]\npython KJZZ-db.py -q title[/]")
+    info("python KJZZ-db.py -q title", 1)
     if verbose: sqlQuery = sqlCountsByTitle
   else:
-    error('No files found to import', 6)
+    error('No files found to import', 7)
 # importChunks
+#################################### import of new chunks of radio
 
 
-# importChunks can be combined with subsequent requests
 
-
+#################################### sqlQuery
 # sometimes a query can be set after an import. 
 # Therefore, execute query comes after.
 #
 # python KJZZ-db.py -q chunkLast10 -v -p
 #
 if sqlQuery:
-  if verbose: print("  execute %s" % (sqlQuery))
+  info("sqlQuery: %s" % (sqlQuery), 1)
   records = cursor(localSqlDb, conn, sqlQuery)
   # SQLite: %w = day of week 0-6 with Sunday==0
   # But we want Mon Tue etc so we replace text in each tuple.
@@ -1410,12 +1421,56 @@ if sqlQuery:
   # exit(0)
 #
 
-
 # records = [('2023-10-16 03:00:00.000', "Hi, I'm Phil Latspin..."), ...]
+#################################### sqlQuery
+
+
+
+#################################### genHtml
+if weekNumber:
+  html = genHtml(jsonScheduleFile, outputFolder, weekNumber, True)
+  html = genHtml(jsonScheduleFile, outputFolder, weekNumber, False)
+
+  if printOut: print(html)
+# weekNumber:
+#################################### genHtml
+
 
 
 # python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v -p
+#################################### gettext
 if gettext:
+  ################### Process inputStopWordsFiles if any:
+  if len(wordCloudDict["inputStopWordsFiles"]["value"]) > 0:
+    for inputStopWordsFile in wordCloudDict["inputStopWordsFiles"]["value"]:
+      with open(inputStopWordsFile, 'r') as fd:
+        for line in fd:
+          wordCloudDict["inputStopWords"]["value"].append(line.strip())
+      print("  %s stopWords imported from '%s'" %(len(wordCloudDict["inputStopWords"]["value"]), inputStopWordsFile))
+  #
+
+  sqlGettext = "SELECT start, text from schedule where 1=1"
+  title = "KJZZ"
+  
+  # build the actual query
+  for key in condDict.keys():
+    # build the SQL query:
+    sqlGettext += (" and %s = '%s'" % (key,condDict[key]))
+    
+    # reformat start time for the filename:
+    if key == "start":
+      condDict[key] = parser.parse(chunk.start).strftime("%Y-%m-%d %H:%M")
+    
+    # build a title that contains 
+    title += " %s=%s" % (key, condDict[key])
+  info("sqlGettext: %s" %(sqlGettext), 1)
+  records = cursor(localSqlDb, conn, sqlGettext)
+  if len(records) == 0:
+    info("gettext: 0 records for %s" %(condDict), 1)
+    exit(0)
+  
+  
+  ################## from now on, we may output pictures
   import numpy as np
   import pandas as pd
   import matplotlib.pyplot as plt
@@ -1427,26 +1482,7 @@ if gettext:
   import pngquant
   pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
-  sqlGettext = "SELECT start, text from schedule where 1=1"
-  title = "KJZZ"
-  
-  for key in condDict.keys():
-    # build the SQL query:
-    sqlGettext += (" and %s = '%s'" % (key,condDict[key]))
-    
-    # reformat start time for the filename:
-    if key == "start":
-      condDict[key] = parser.parse(chunk.start).strftime("%Y-%m-%d %H:%M")
-    
-    # build a title that contains 
-    title += " %s=%s" % (key, condDict[key])
-  if verbose: print("  gettext: %s" %(sqlGettext))
-  records = cursor(localSqlDb, conn, sqlGettext)
-  if len(records) == 0:
-    if verbose: print("  gettext: 0 records for %s" %(condDict))
-    exit(1)
-  
-  
+  ################## wordCloud
   # first we check if a wordCloud is requested:
   if wordCloud:
     from wordcloud import WordCloud
@@ -1459,13 +1495,14 @@ if gettext:
     else:
       i = 1
       for record in records:
-        if verbose: print("  gettext: image %s" % (i))
-        if verbose > 1:   print("  gettext: record = \n %s" %(record))
+        info("wordCloud: image %s" % (i), 1)
+        info("wordCloud: record = \n %s" %(record), 2)
         genWordCloud(record[1], title, noStopwords, stopLevel, wordCloudDict)
       i += 1
     if showPicture: plt.show()
   
   
+  ################## misInformation
   # then we check if a misInformation misInformation is requested:
   elif misInformation:
     if mergeRecords:
@@ -1496,14 +1533,7 @@ if gettext:
           print(record)
   # exit(0)
 #
-
-
-if weekNumber:
-  html = genHtml(jsonScheduleFile, outputFolder, weekNumber, True)
-  html = genHtml(jsonScheduleFile, outputFolder, weekNumber, False)
-
-  if printOut: print(html)
-# weekNumber:
+#################################### gettext
 
 
 # sql = """ SELECT * from schedule where start = '2023-10-08 23:00:00.000'; """
