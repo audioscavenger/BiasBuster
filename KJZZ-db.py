@@ -22,7 +22,7 @@
 # python KJZZ-db.py -i -f kjzz\44
 # python KJZZ-db.py -i -f kjzz\45
 # python KJZZ-db.py -q title
-# python KJZZ-db.py -q chunks10 -p
+# python KJZZ-db.py -q chunkLast10 -p
 # python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v --wordCloud
 # python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
 # python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
@@ -65,7 +65,8 @@
 
 
 
-import getopt, sys, os, re, regex, io, time, datetime, json, urllib, random, sqlite3
+import getopt, sys, os, re, regex, io
+import glob, time, datetime, json, urllib, random, sqlite3
 from dateutil import parser
 from pathlib import Path
 from collections import Counter
@@ -74,14 +75,19 @@ from collections import Counter
 # https://github.com/Textualize/rich
 from   rich import print
 from   rich.progress import track, Progress
-import numpy as np
-import pandas as pd
-import pngquant
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-from   matplotlib import style
-from   matplotlib.patches import Rectangle
-import seaborn
+
+# we do not preload this bunch unless we need them:
+# -------------------------------------------------
+# import numpy as np
+# import pandas as pd
+# import matplotlib.pyplot as plt
+# import matplotlib.dates as mdates
+# from   matplotlib import style
+# from   matplotlib.patches import Rectangle
+# import seaborn
+# import pngquant
+# pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
+# -------------------------------------------------
 
 
 # # example of progress bar:
@@ -94,8 +100,6 @@ import seaborn
     # progress.advance(task)
 # exit()
 
-pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
-# inputFolder = "E:\\GPT\\KJZZ\\41"
 importChunks = False
 inputFolder = None
 inputFiles = []
@@ -118,11 +122,13 @@ mergeRecords = True
 noStopwords = False
 showPicture = False
 inputStopWords = []
-outputFolder = Path(".")
+outputFolder = Path("./kjzz")
 graph = "bar"
 weekNumber = 0
-jsonScheduleFile = os.path.realpath("kjzz/\\KJZZ-schedule.json")
+jsonScheduleFile = os.path.realpath("kjzz/KJZZ-schedule.json")
 byChunk = False
+printOut = False
+listLevel = []
 
 # busybox sed -E "s/^.{,3}$//g" stopWords.ranks.nl.txt | busybox sort | busybox uniq >stopWords.ranks.nl.txt 
 # https://www.ranks.nl/stopwords
@@ -233,11 +239,12 @@ wordCloudDict = {
   },
 }
 
-sqlLast10 = """ SELECT * from schedule LIMIT 10 """
-sqlLast1  = """ SELECT * from schedule LIMIT 1 """
+sqlListLast10text = """ SELECT text from schedule LIMIT 10 """
+sqlLastText       = """ SELECT text from schedule LIMIT 1 """
+sqlFirstText      = """ SELECT text from schedule ORDER BY start DESC LIMIT 1 """
 
 # BUG: what we want is order by iso week day = %u but only %w (Sunday first) works
-sqlCountsByDay = """ SELECT Day, title, count(start)
+sqlCountsByDay    = """ SELECT Day, title, count(start)
           from schedule 
           GROUP BY Day, title
           ORDER BY strftime('%w',start)
@@ -273,7 +280,7 @@ sqlCountsByTitle = """ SELECT title, Day, count(title)
 # KJZZ_2023-10-09_Mon_0000-0030_BBC World Service
 # https://www.sqlite.org/lang_datefunc.html
 # https://www.sqlshack.com/sql-convert-date-functions-and-formats/
-# python KJZZ-db.py -q chunks10 -p
+# python KJZZ-db.py -q chunkLast10 -p
 # %w 		day of week 0-6 with Sunday==0 but we want Mon Tue etc
 sqlListChunksLast10 = """ SELECT 'KJZZ_' || strftime('%Y-%m-%d_%w_%H%M-',start) || strftime('%H%M_',stop) || title
           from schedule 
@@ -357,10 +364,11 @@ def db_init(localSqlDb):
     return conn
   except Exception as error:
     if not str(error).find("already exists"):
-      print(("[red]    %s[/]") % (error), file=sys.stderr)
+      # just a warning
+      print(("[yellow]    %s[/]") % (error), file=sys.stderr)
     else:
       records = cursor(localSqlDb, conn, """SELECT count(start) from schedule""")
-      print(("[green]  db_init: %s chunks found in %s[/]") % (records[0][0],localSqlDb), file=sys.stderr)
+      if not printOut: print(("[green]  db_init: %s chunks found in %s[/]") % (records[0][0],localSqlDb), file=sys.stderr)
       return conn
   #
 #
@@ -433,7 +441,7 @@ def chunk2condDict(chunkName):
   # KJZZ_2023-10-13_Fri_1700-1730_All Things Considered
   # we already defined a class that will gently split the name for us
   chunk = Chunk(chunkName)
-  print("ddebug"+chunk.start)
+  # print("ddebug"+chunk.start)
 #
 
 # # this works only with full key replacement
@@ -903,7 +911,21 @@ def getPrevKey(timeList, key):
   else:
     return None
 
-def genHtml(weekNumber, byChunk=0):
+
+def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
+  
+  # old school:
+  # pngList = []
+  # for file in os.listdir(outputFolder):
+    # if file.endswith('.png'):
+      # pngList.append(file)
+
+  # better school:
+  pngPath = r'%s/KJZZ*week=%s*.png' %(os.path.join(outputFolder, str(weekNumber)), weekNumber)
+  pngList = glob.glob(pngPath, recursive=False)
+  # regexp = re.compile(".*week=%s.*title=%s.*Day=%s" %(weekNumber, "The Moth", "Sat"))
+  # print(list(filter(regexp.match, pngList)))
+  # exit()
 
   # load json
   if os.path.isfile(jsonScheduleFile):
@@ -915,17 +937,64 @@ def genHtml(weekNumber, byChunk=0):
     # jsonSchedule = json.load(f)
     # f.close()
 
-  html  = '''<!DOCTYPE html>
+  # how do my table compare to https://kjzz.org/kjzz-print-schedule ? let me know in the comments!
+  html  = '''
+<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8" />
-    <title data-l10n-id="KJZZ week %i"></title>
+    <title data-l10n-id="%s week %s"></title>
+    <style>
+      body {
+        color: #434343;
+      }
+      table {
+        border: 1px solid #DDD;
+        border-collapse: collapse;
+        border-spacing: 0;
+        border-color: 0;
+        font-family: sans-serif;
+        margin: 0;
+        padding: 0;
+        font-size: 11px;
+        line-height: 1.4;
+        text-align: center;
+      }
+      tr.title {
+        background-color: #666;
+        color: white;
+        font-weight: bold;
+      }
+      tr td {
+        border: 1px solid #DDD;
+      }
+      td.startTime {
+        font-weight: bold;
+      }
+      thead {
+        border: 2px solid #666;
+        background-color: #EEE;
+        color: #666;
+        font-weight: bold;
+      }
+      tbody, tfoot {
+        border-top: 1px solid #666;
+      }
+      img.notByChunk {
+        max-width: 15vw; /* width divided by 8 */
+        width: 100%%;
+      }
+    </style>
   </head>
   <body>
-    ''' %(weekNumber)
-  html += '<table border="1">'
+  ''' %("KJZZ",weekNumber)
+  
+  html += '<table>'
   html += '<tr>'
-  html += '  <thead><tr><th>Time</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>'
+  html += '  <thead>'
+  html += '<tr class="title"><td colspan="8">%s week %s</td></tr>' %("KJZZ", weekNumber)
+  html += '<tr><th>Time</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>'
+  html += '  </thead>'
   html += '  <tbody>'
   
   # loop json
@@ -933,8 +1002,8 @@ def genHtml(weekNumber, byChunk=0):
 
   rowspanDict = {}
   timeList    = list(reversed(list(jsonSchedule.keys())))
-  DayList     = list(jsonSchedule["00:00"].keys())
-  # print(DayList)
+  DayList     = list(jsonSchedule[timeList[0]].keys())
+  if verbose >2: print(DayList, file=sys.stderr)
   rowspan  = {}
   for Day in DayList: rowspan[Day] = 1
   
@@ -948,33 +1017,56 @@ def genHtml(weekNumber, byChunk=0):
       # solution:   create a dumb function for if key+1 < len(timeList) == getNextKey
       
       # By default we start with a normal, chunked cell of 30mn:
-      rowspanDict[startTime][Day] = '<td>%s</td>' %(jsonSchedule[startTime][Day])
+      # Also we should not have to filter by week anymore since version 0.9.6 
+      # , we generate both html and png under each ./week subfolder
+      cell = ''
+      regexp = re.compile(".*week=%s.*title=%s.*Day=%s" %(weekNumber, jsonSchedule[startTime][Day], Day))
+      thatPngList = list(filter(regexp.match, pngList))
+      if thatPngList:
+        cell = '<img src="%s" alt="%s" class="notByChunk" decoding="async">' %(os.path.basename(thatPngList[0]), os.path.basename(thatPngList[0]))
+      rowspanDict[startTime][Day] = '<td rowspan="%s">%s%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], cell)
       
       if not byChunk:
         # if we are not processing the last key:
         if getNextKey(timeList, key):
-          # print(startTime)
+          if verbose >2: print(startTime, file=sys.stderr)
           if jsonSchedule[startTime][Day] == jsonSchedule[getNextKey(timeList, key)][Day]:
             rowspanDict[startTime][Day] = ''
+            cell = ''
             rowspan[Day] += 1
-            # print("%s +1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], jsonSchedule[getNextKey(timeList, key)][Day]))
+            if verbose >2: print("%s +1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], jsonSchedule[getNextKey(timeList, key)][Day]), file=sys.stderr)
           else:
-            if rowspan[Day] > 1: rowspanDict[startTime][Day] = '<td rowspan="%i">%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day])
-            # print("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], jsonSchedule[getNextKey(timeList, key)][Day]))
+            if rowspan[Day] > 1: 
+              cell = ''
+              regexp = re.compile(".*week=%s.*title=%s.*Day=%s" %(weekNumber, jsonSchedule[startTime][Day], Day))
+              thatPngList = list(filter(regexp.match, pngList))
+              if thatPngList:
+                cell = '<img src="%s" alt="%s" class="notByChunk" decoding="async">' %(os.path.basename(thatPngList[0]), os.path.basename(thatPngList[0]))
+              rowspanDict[startTime][Day] = '<td rowspan="%s">%s%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], cell)
+            if verbose >2: print("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], jsonSchedule[getNextKey(timeList, key)][Day]), file=sys.stderr)
             rowspan[Day]  = 1
         
         # if we are processing the last key == 00:00 since we loop in reverse:
         else:
-          if rowspan[Day] > 1: rowspanDict[startTime][Day] = '<td rowspan="%i">%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day])
-          # print("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], None))
-          # rowspan[Day]  = 1   # seems useless
+          if rowspan[Day] > 1: 
+            cell = ''
+            regexp = re.compile(".*week=%s.*title=%s.*Day=%s" %(weekNumber, jsonSchedule[startTime][Day], Day))
+            thatPngList = list(filter(regexp.match, pngList))
+            if thatPngList:
+              cell = '<img src="%s" alt="%s" class="notByChunk" decoding="async">' %(os.path.basename(thatPngList[0]), os.path.basename(thatPngList[0]))
+            rowspanDict[startTime][Day] = '<td rowspan="%s">%s%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], cell)
+          if verbose >2: print("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], None), file=sys.stderr)
+      else:
+        cell = ''
+        rowspanDict[startTime][Day] = '<td rowspan="%s">%s%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], cell)
+        if verbose >2: print("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], None), file=sys.stderr)
         
   
-  print(rowspanDict)
+  if verbose >2: print(rowspanDict, file=sys.stderr)
   for startTime in jsonSchedule.keys():
     # html += '    <tr><td>00:00</td><td>BBC World Service</td><td>Classic Jazz with Chazz Rayburn</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Michele Robins</td><td>Classic Jazz with Michele Robins</td><td>BBC World Service</td></tr>'
-    print    ('    <tr><td>%s</td>'           %(startTime))
-    html   += '    <tr><td>%s</td>'           %(startTime)
+    if verbose >2: print    ('    <tr><td>%s</td>'           %(startTime), file=sys.stderr)
+    html   += '    <tr><td class="startTime">%s</td>'           %(startTime)
     
     for Day in DayList:
       html   +=     '%s'  %(rowspanDict[startTime][Day])
@@ -985,11 +1077,14 @@ def genHtml(weekNumber, byChunk=0):
   html += '</table>'
   html += '</body></html>'
   
-  # print(html)
-  outputFile = os.path.join(os.path.dirname(jsonScheduleFile),"week"+str(weekNumber)+".html")
+  if byChunk:
+    outputFileName = "kjzz-week"+str(weekNumber)+"-byChunk.html"
+  else:
+    outputFileName = "kjzz-week"+str(weekNumber)+".html"
+  outputFile = os.path.join(outputFolder, str(weekNumber), outputFileName)
   with open(outputFile, 'w') as fd:
     fd.write(html)
-    print("output: %s" %(outputFile))
+    print("output: %s" %(outputFile), file=sys.stderr)
 
 
 
@@ -1007,45 +1102,59 @@ def genHtml(weekNumber, byChunk=0):
 # genHtml
 
 
+def error(message, RC=1):
+  print    ("[red]error  : %s [/]" %(message), file=sys.stderr)
+  if RC: exit(RC)
+#
+
+def warning(message, RC=0):
+  print ("[yellow]warning: %s [/]" %(message), file=sys.stderr)
+#
+
 
 def usage(RC=99):
-  print (("usage: python %s --help") % (sys.argv[0]))
-  print ("")
-  print ("  --import < --text \"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text\" | --folder folder >")
-  print ("    -m, --model *small medium...\n                   Model that you used with whisper, to transcribe the text to import.")
-  print ("    -p, --pretty\n                   Convert \\n to carriage returns and does json2text.\n                   Ignored when outputing pictures.")
-  print ("    --output *./\n                   Where to outputs pictures.")
-  print ("    --show\n                   Opens the picture upon generation.")
-  print ("")
-  print ("  --db *kjzz.db  Path to the local SQlite db.")
-  print ("  -q, --query [ title last last10 byDay byTitle chunks10 ]\n                   Show what's in the db.")
-  print ("")
-  print ("  --html [--byChunk]<week>\n                   Generate week number's schedule as an html table.")
-  print (" \n                   Outputs ./kjzz/weekNN[-byChunk].html")
-  print ("")
-  print ("  -g, --gettext  selector=value : chunk= | date= | datetime= | week= | Day= | time= | title=")
-  print ("                   Outputs all text from the selector.")
-  print ("                 chunk=\"KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title\" (run %s -q chunks10 to get some values)" % (sys.argv[0]))
-  print ("                 date=2023-10-08[+time=HH:MM]")
-  print ("                 datetime=\"2023-10-08 HH:MM\"")
-  print ("                 week=42 (iso week with Mon first)")
-  print ("                 Day=Fri (Ddd)")
-  print ("                 title=\"title of the show\", see https://kjzz.org/kjzz-print-schedule")
-  print ("        example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"\n                Will get text from that chunk of programming only. Chunks are 30mn long.")
-  print ("        example: week=41+Day=Fri+title=\"All Things Considered\"\n                Same as above but will get text from the entire episode.")
-  print ("    --noMerge\n                   Do not merge 30mn chunks of the same title within the same timeframe.")
-  print ("    --misInformation\n                   PICture: generate misInformation graph or heatmap for all 4 factors:\n                   explanatory/retractors/sourcing/uncertainty")
-  print ("      --graph *bar | pie | line\n                   What graph you want. Ignored with --noMerge: heat map will be generated instead.")
-  print ("    --wordCloud\n                   PICture: generate word cloud from gettext output. Will not output any text.")
-  print ("      --stopLevel  *0 1 2 3 4\n                   add various levels of stopwords")
+  usage  = (("usage: python %s --help") % (sys.argv[0]))+os.linesep
+  usage += ("")+os.linesep
+  usage += ("  --import < --text \"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text\" | --folder inputFolder >")+os.linesep
+  usage += ("    -m, --model *%s medium large...\n                   Model that you used with whisper, to transcribe the text to import." %(model))+os.linesep
+  usage += ("    -p, --pretty\n                   Convert \\n to carriage returns and does json2text.\n                   Ignored when outputing pictures.")+os.linesep
+  usage += ("    --output *%s\n                   Folder where to output pictures.." %(outputFolder))+os.linesep
+  usage += ("    --show\n                   Opens the picture upon generation.")+os.linesep
+  usage += ("")+os.linesep
+  usage += ("  --db *%s    Path to the local SQlite db." %(localSqlDb))+os.linesep
+  usage += ("  -q, --query [ title first last last10 byDay byTitle chunkLast10 ]\n                   Quick and dirty way to see what's in the db.")+os.linesep
+  usage += ("")+os.linesep
+  usage += ("  --html [--byChunk --printOut] <week>\n                   Generate week number's schedule as an html table.")+os.linesep
+  usage += ("                   Generates html file %s/week00[-byChunk].html" %(outputFolder))+os.linesep
+  usage += ("                   --byChunk outputs schedule by 30mn chucks, no rowspan.")+os.linesep
+  usage += ("                   --printOut will output html on the prompt, can be used as an API with cgi-bin.")+os.linesep
+  usage += ("")+os.linesep
+  usage += ("  -g, --gettext  selector=value : chunk= | date= | datetime= | week= | Day= | time= | title=")+os.linesep
+  usage += ("                   Outputs all text from the selector:")+os.linesep
+  usage += ("                   chunk=\"KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title\" (run %s -q chunkLast10 to get some values)" % (sys.argv[0]))+os.linesep
+  usage += ("                   date=2023-10-08[+time=HH:MM]")+os.linesep
+  usage += ("                   datetime=\"2023-10-08 HH:MM\"")+os.linesep
+  usage += ("                   week=42 (iso week with Mon first)")+os.linesep
+  usage += ("                   Day=Fri (Ddd)")+os.linesep
+  usage += ("                   title=\"title of the show\", see https://kjzz.org/kjzz-print-schedule")+os.linesep
+  usage += ("          example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"\n                   Will get text from that chunk of programming only. Chunks are 30mn long.")+os.linesep
+  usage += ("          example: week=41+Day=Fri+title=\"All Things Considered\"\n                   Same as above but will get text from the entire episode.")+os.linesep
+  usage += ("    --noMerge\n                   Do not merge 30mn chunks of the same title within the same timeframe.")+os.linesep
+  usage += ("    --misInformation\n                   PICture: generate misInformation graph or heatmap for all 4 factors:\n                   explanatory/retractors/sourcing/uncertainty")+os.linesep
+  usage += ("      --graph *bar | pie | line\n                   What graph you want. Ignored with --noMerge: heat map will be generated instead.")+os.linesep
+  usage += ("    --wordCloud\n                   PICture: generate word cloud from gettext output. Will not output any text.")+os.linesep
+  usage += ("      --stopLevel  *0 1 2 3 4\n                   add various levels of stopwords")+os.linesep
+  usage += ("        --listLevel <0[,1 ..]> to just show the words in that level(s).")+os.linesep+os.linesep
   for key,content in wordCloudDict.items():
-    if content["input"]: print ("      --%s *%s %s" %(key, content["value"], content["info"]))
-  print ("")
-  print ("  -v, --verbose\n                   -vv -vvv increase verbosity.")
-  # print ("            --inputStopWordsFiles file.txt (add words from file on top of other levels)")
-  # print ("            --max_words *4000")
-  # print ("            --font_path *\"fonts\\Quicksand-Bold.ttf\"")
-  # print ("       --gettext week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"")
+    if content["input"]: usage += ("      --%s *%s %s" %(key, content["value"], content["info"]))+os.linesep
+  usage += ("")+os.linesep
+  usage += ("  -v, --verbose\n                   -vv -vvv increase verbosity.")+os.linesep
+  # usage += ("            --inputStopWordsFiles file.txt (add words from file on top of other levels)")+os.linesep
+  # usage += ("            --max_words *4000")+os.linesep
+  # usage += ("            --font_path *\"fonts\\Quicksand-Bold.ttf\"")+os.linesep
+  # usage += ("       --gettext week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"")+os.linesep
+  
+  print(usage)
   exit(RC)
 #
 
@@ -1058,7 +1167,7 @@ argumentList = sys.argv[1:]
 # define short Options
 options = "hviq:g:d:t:f:m:p"
 # define Long options
-long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "noStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation", "output=", "graph=", "html=", "byChunk"]
+long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "noStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation", "output=", "graph=", "html=", "byChunk", "printOut", "listLevel="]
 wordCloudDictToParams = [(lambda x: '--' + x)(x) for x in wordCloudDict.keys()]
 wordCloudDictToOptions = [(lambda x: x + '=')(x) for x in wordCloudDict.keys()]
 long_options += wordCloudDictToOptions
@@ -1072,8 +1181,7 @@ try:
   # checking critical arguments
   for currentArgument, currentValue in arguments:
     if currentArgument in ("-h", "--help"):
-      usage()
-      exit(99)
+      usage(0)
     elif currentArgument in ("-v", "--verbose"):
       # if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgument, True))
       verbose += 1
@@ -1096,29 +1204,32 @@ try:
     # QUERY THE DB
     elif currentArgument in ("-q", "--query"):
       if currentValue in ("last10","10"):
-        sqlQuery = sqlLast10
-      elif currentValue in ("1","last"):
-        sqlQuery = sqlLast1
+        sqlQuery = sqlListLast10text
+      elif currentValue in ("last"):
+        sqlQuery = sqlLastText
+      elif currentValue in ("first"):
+        sqlQuery = sqlFirstText
       elif currentValue in ("Day","byDay"):
         sqlQuery = sqlCountsByDay
       elif currentValue in ("title"):
         sqlQuery = sqlTitles
       elif currentValue in ("byTitle"):
         sqlQuery = sqlCountsByTitle
-      elif currentValue in ("chunks10","chunksLast10"):
+      elif currentValue in ("chunkLast10","chunksLast10"):
         sqlQuery = sqlListChunksLast10
       else:
         sqlQuery = currentValue
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
     
     # OUTPUT and PROCESS STUFF
     elif currentArgument in ("-g", "--gettext"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
       gettext = currentValue
       if not gettext:
+        error("gettext takes an argument: the program to get the text from!", 0)
         print("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"")
         print("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\" (mutually exclusive to the others)")
-        usage(1)
+        exit(1)
       if gettext.find("chunk=") > -1:
         chunkName = re.split(r"[=]",gettext)[1]
         # chunk2condDict(chunkName)
@@ -1134,56 +1245,62 @@ try:
           if key in validKeys:
             condDict[key] = re.split(r"[=]",condition)[1]
           else:
-            print(("[red]error: %s is invalid in %s[/]") %(key,condition))
+            error("%s is invalid in %s" %(key, condition), 0)
             print("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"")
             print("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"")
-            usage(1)
+            exit(2)
 
     elif currentArgument in ("-p", "--pretty"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
       pretty = True
     elif currentArgument in ("--noMerge"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, False))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, False))
       mergeRecords = False
     elif currentArgument in ("--noStopwords"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
       noStopwords = True
     elif currentArgument in ("--show"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
       showPicture = True
     elif currentArgument in ("--stopLevel"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
       stopLevel = int(currentValue)
     elif currentArgument in ("-t", "--text"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
       inputTextFile = Path(currentValue)
     elif currentArgument in ("-d", "--db"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
       localSqlDb = Path(currentValue)
     elif currentArgument in ("-f", "--folder"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
       inputFolder = Path(currentValue)
     elif currentArgument in ("--output"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
       outputFolder = Path(currentValue)
     elif currentArgument in ("-m", "--model"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
       model = currentValue
     elif currentArgument in ("--graph"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
       if currentValue in ["bar", "pie"]: graph = currentValue
     elif currentArgument in ("--html"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
       weekNumber = int(currentValue)
     elif currentArgument in ("--byChunk"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
       byChunk = True
+    elif currentArgument in ("--printOut"):
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      printOut = True
+    elif currentArgument in ("--listLevel"):
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      listLevel = currentValue.split(',')
     elif currentArgument in ("--wordCloud"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
       wordCloud = True
       misInformation = False
     elif currentArgument in ("--misInformation"):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True))
       wordCloud = False
       misInformation = True
 
@@ -1194,30 +1311,38 @@ try:
     
     # now processing any values from wordCloudDict that are valid inputs
     elif (currentArgument in (wordCloudDictToParams) and wordCloudDict[currentArgumentClean]["input"]):
-      if verbose: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
+      if verbose >1: print (("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue))
       if isinstance(wordCloudDict[currentArgumentClean]["default"],int):    wordCloudDict[currentArgumentClean]["value"] = int(currentValue)
       if isinstance(wordCloudDict[currentArgumentClean]["default"],float):  wordCloudDict[currentArgumentClean]["value"] = float(currentValue)
       if isinstance(wordCloudDict[currentArgumentClean]["default"],list):   wordCloudDict[currentArgumentClean]["value"].append(currentValue)
       if isinstance(wordCloudDict[currentArgumentClean]["default"],str):    wordCloudDict[currentArgumentClean]["value"] = currentValue
 except getopt.error as err:
   # output error, and return with an error code
-  print(("[red]%s[/]") % (err), file=sys.stderr)
-  usage(1)
+  error(err, 3)
 
-# Process inputStopWordsFiles:
+
+################## help functions 
+if listLevel:
+  if pretty:
+    for level in listLevel: print(('%s') %(" ".join(stopwords[int(level)])))
+  else:
+    print("stopwords levels: %s" %(stopwords.keys()))
+    for level in listLevel: print("%s" %(stopwords[int(level)]))
+  exit()
+
+
+if (not importChunks and not sqlQuery and not gettext and not weekNumber):
+  error("must pass at least --import / --query / --gettext")
+#
+
+
+# Process inputStopWordsFiles if any:
 if len(wordCloudDict["inputStopWordsFiles"]["value"]) > 0:
   for inputStopWordsFile in wordCloudDict["inputStopWordsFiles"]["value"]:
     with open(inputStopWordsFile, 'r') as fd:
       for line in fd:
         wordCloudDict["inputStopWords"]["value"].append(line.strip())
     print("  %s stopWords imported from '%s'" %(len(wordCloudDict["inputStopWords"]["value"]), inputStopWordsFile))
-
-
-
-if (not importChunks and not sqlQuery and not gettext and not weekNumber):
-  print ("[red]error: must pass at least --import / --query / --gettext[/]")
-  usage(1)
-#
 
 
 # DB cheack and init, first.
@@ -1233,8 +1358,7 @@ if localSqlDb:
     print ("[red]error: localSqlDb could not be created[/]")
     exit(1)
 else:
-  print ("[red]error: localSqlDb undefined[/]")
-  usage(1)
+  error('localSqlDb undefined', 5)
 #
 
 
@@ -1254,7 +1378,7 @@ if importChunks:
     if verbose: print("[bright_black]\npython KJZZ-db.py -q title[/]")
     if verbose: sqlQuery = sqlCountsByTitle
   else:
-    usage(1)
+    error('No files found to import', 6)
 # importChunks
 
 
@@ -1264,7 +1388,7 @@ if importChunks:
 # sometimes a query can be set after an import. 
 # Therefore, execute query comes after.
 #
-# python KJZZ-db.py -q chunks10 -v -p
+# python KJZZ-db.py -q chunkLast10 -v -p
 #
 if sqlQuery:
   if verbose: print("  execute %s" % (sqlQuery))
@@ -1292,6 +1416,17 @@ if sqlQuery:
 
 # python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v -p
 if gettext:
+  import numpy as np
+  import pandas as pd
+  import matplotlib.pyplot as plt
+  import matplotlib.dates as mdates
+  from   matplotlib import style
+  from   matplotlib.patches import Rectangle
+  import seaborn
+  import pngquant
+  import pngquant
+  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
+
   sqlGettext = "SELECT start, text from schedule where 1=1"
   title = "KJZZ"
   
@@ -1364,7 +1499,10 @@ if gettext:
 
 
 if weekNumber:
-  genHtml(weekNumber)
+  html = genHtml(jsonScheduleFile, outputFolder, weekNumber, True)
+  html = genHtml(jsonScheduleFile, outputFolder, weekNumber, False)
+
+  if printOut: print(html)
 # weekNumber:
 
 

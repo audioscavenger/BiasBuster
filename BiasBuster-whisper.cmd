@@ -36,7 +36,7 @@ IF "%~1"=="" (
   call %stableROOT%\activate
   echo   python KJZZ-db.py -i -f kjzz\43
   echo   python KJZZ-db.py -q title
-  echo   python KJZZ-db.py -q chunks10 -p
+  echo   python KJZZ-db.py -q chunkLast10 -p
   echo   python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v --wordCloud
   echo   python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
   echo   python KJZZ-db.py -g title="All Things Considered" -v --wordCloud

@@ -3,14 +3,22 @@
 Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast. 
 BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
 
+<div align="center"> 
+  <img src="https://img.shields.io/github/forks/audioscavenger/BiasBuster?style=for-the-badge">
+  <img src="https://img.shields.io/github/stars/audioscavenger/BiasBuster?style=for-the-badge">
+  <img src="https://img.shields.io/github/issues/audioscavenger/BiasBuster?style=for-the-badge">
+  <img src="https://img.shields.io/github/issues-pr/audioscavenger/BiasBuster?style=for-the-badge">
+  <img src="https://img.shields.io/github/license/audioscavenger/BiasBuster?style=for-the-badge">
+</div>
+
 BiasBuster Will provide a UI and option to process+manage other broadcasts very soon.
 
 Comes in 2 parts: 
 - Linux part for a Cloud server, to download the mp3 (bash)
 - Windows part, to transcribe mp3 to text, SQLite database management, and word analysis
 
-The meat of the project is current KJZZ-db.py on Windows. 
-It should be portable to Linux as-is, since I do not use hard-coded path separators.
+The meat of the project is currently KJZZ-db.py that works on Windows. 
+It should be portable to Linux as-is.
 
 
 # Under the hood
@@ -89,6 +97,11 @@ This Python script does the following:
   - [x] query words based on schedule
   - [x] generate word cloud
   - [x] generate misinformation heatmap
+  - [x] generate html week pages
+  - [x] generate html week pages that have pictures
+  - [ ] generate html week pages that have links
+  - [ ] generate html week pages that are useful
+  - [ ] generate html week pages that are interactive
   - [ ] generate gender bias analysis
   - [ ] what else?
 
@@ -98,36 +111,40 @@ This Python script does the following:
 
 ```
 usage: python KJZZ-db.py --help
-  --import < --text "KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text" | --folder folder >
-    -m, --model *small medium...
+
+  --import < --text "KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text" | --folder inputFolder >
+    -m, --model *small medium large...
                    Model that you used with whisper, to transcribe the text to import.
     -p, --pretty
                    Convert \n to carriage returns and does json2text.
                    Ignored when outputing pictures.
-    --output *./
-                   Where to outputs pictures.
+    --output *kjzz
+                   Folder where to output pictures.
     --show
                    Opens the picture upon generation.
 
-  --db *kjzz.db  Path to the local SQlite db.
-  -q, --query [ title last last10 byDay byTitle chunks10 ]
-                   Show what's in the db.
+  --db *kjzz.db    Path to the local SQlite db.
+  -q, --query [ title first last last10 byDay byTitle chunkLast10 ]
+                   Quick and dirty way to see what's in the db.
 
-  --html <week>
+  --html [--byChunk --printOut] <week>
                    Generate week number's schedule as an html table.
+                   Generates html file kjzz/week00[-byChunk].html
+                   --byChunk outputs schedule by 30mn chucks, no rowspan.
+                   --printOut will output html on the prompt, can be used as an API with cgi-bin.
 
-  -g, --gettext  selector=value : chunk | date | datetime | week | Day | time | title
-                   Outputs all text from the selector.
-                 chunk="KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title" (run KJZZ-db.py -q chunks10 to get some values)
-                 date=2023-10-08[+time=HH:MM]
-                 datetime="2023-10-08 HH:MM"
-                 week=42 (iso week with Mon first)
-                 Day=Fri (Ddd)
-                 title="title of the show", see https://kjzz.org/kjzz-print-schedule
-        example: chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered"
-                Will get text from that chunk of programming only. Chunks are 30mn long.
-        example: week=41+Day=Fri+title="All Things Considered"
-                Same as above but will get text from the entire episode.
+  -g, --gettext  selector=value : chunk= | date= | datetime= | week= | Day= | time= | title=
+                   Outputs all text from the selector:
+                   chunk="KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title" (run KJZZ-db.py -q chunkLast10 to get some values)
+                   date=2023-10-08[+time=HH:MM]
+                   datetime="2023-10-08 HH:MM"
+                   week=42 (iso week with Mon first)
+                   Day=Fri (Ddd)
+                   title="title of the show", see https://kjzz.org/kjzz-print-schedule
+          example: chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered"
+                   Will get text from that chunk of programming only. Chunks are 30mn long.
+          example: week=41+Day=Fri+title="All Things Considered"
+                   Same as above but will get text from the entire episode.
     --noMerge
                    Do not merge 30mn chunks of the same title within the same timeframe.
     --misInformation
@@ -138,7 +155,9 @@ usage: python KJZZ-db.py --help
     --wordCloud
                    PICture: generate word cloud from gettext output. Will not output any text.
       --stopLevel  *0 1 2 3 4
-                   add various levels of stopwords.
+                   add various levels of stopwords
+        --listLevel <0[,1 ..]> to just show the words in that level(s).
+
       --max_words *1000 int (default=200)
                The maximum number of words in the Cloud.
       --width *2000 int (default=400)
@@ -229,7 +248,9 @@ If you need a --force option to overwrite existing chunks, please file a PR.
 
 
 ## Query database
-`-q, --query` *title last last10 byDay byTitle chunks10*
+`-q, --query` *title first last last10 byDay byTitle chunkLast10*
+
+Quick and dirty way to see what's in the db.
 
 
 ### Database titles overview
@@ -262,7 +283,7 @@ Outputs alphabetically sorted list of all programing in the database, useful for
 ```
 
 ### List the last chunks loaded
-`python KJZZ-db.py --query chunks10 -pretty`
+`python KJZZ-db.py --query chunkLast10 -pretty`
 
 Adding _pretty_ will flatten the output as simple text:
 
@@ -395,7 +416,7 @@ If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
 - [ ] 0.9.?   TODO separate KJZZ into its own table to add other broadcasters
 - [ ] 0.9.?   TODO automate mp3 downloads from cloud + process + uploads from/to cloud server
 - [ ] 0.9.?   TODO adding bias_score.py from https://github.com/auroracramer/language-model-bias
-- [ ] 0.9.6   WIP web ui
+- [x] 0.9.6   WIP web ui - actually just generates an html page of the week's programing
 - [x] 0.9.5   added misInformation heatmap from https://github.com/PDXBek/Misinformation
 - [x] 0.9.4   wordCloudDict parameters are auto-added to script arguments and --help is auto-build
 - [x] 0.9.3   added and played with most of the genWordCloud parameters in wordCloudDict
@@ -412,7 +433,7 @@ If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
 ### Windows
 
 - Python 3.x:
-  - getopt, sys, os, re, regex, io, time, datetime, pathlib, json, urllib, random, sqlite3, collections
+  - getopt, sys, os, re, regex, io, glob, time, datetime, pathlib, json, urllib, random, sqlite3, collections
 - Python 3.x modules:
   - rich
   - pandas
@@ -421,7 +442,6 @@ If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
   - seaborn
   - wordcloud
   - pngquant
-  - PyOptipng
 - Windows software:
   - whisper-faster from https://github.com/Purfview/whisper-standalone-win
 
@@ -443,4 +463,27 @@ If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
   - Thesaurus and adjectives: https://github.com/taikuukaits/SimpleWordlists/tree/master
     - stopWords.Wordlist-Adjectives-All.txt
 
+
+## Support
+
+👍🏻 If you're using this project & happy with it or you appreciate what I do and wish to support my work, you can consider by
+
+<div align='center'>
+⭐️ Starring & Sharing the project is also appreciated. Thanks! ❤️
+</div>
+
+[![GitHub Repo stars](https://img.shields.io/badge/share%20on-reddit-red?logo=reddit)](https://reddit.com/submit?url=https://github.com/audioscavenger/BiasBuster&title=Discover%20the%20bias%20and%20the%20agenda%20of%20KJZZ%20radio%20broadcasts)
+[![GitHub Repo stars](https://img.shields.io/badge/share%20on-hacker%20news-orange?logo=ycombinator)](https://news.ycombinator.com/submitlink?u=https://github.com/audioscavenger/BiasBuster)
+[![GitHub Repo stars](https://img.shields.io/badge/share%20on-twitter-03A9F4?logo=twitter)](https://twitter.com/share?url=https://github.com/audioscavenger/BiasBuster&text=Discover%20the%20bias%20and%20the%20agenda%20of%20KJZZ%20radio%20broadcasts)
+[![GitHub Repo stars](https://img.shields.io/badge/share%20on-facebook-1976D2?logo=facebook)](https://www.facebook.com/sharer/sharer.php?u=https://github.com/audioscavenger/BiasBuster)
+[![GitHub Repo stars](https://img.shields.io/badge/share%20on-linkedin-3949AB?logo=linkedin)](https://www.linkedin.com/shareArticle?url=https://github.com/audioscavenger/BiasBuster&title=Discover%20the%20bias%20and%20the%20agenda%20of%20KJZZ%20radio%20broadcasts)
+
+## Contribution
+
+I will be open to any contribution. If you have any idea, please let me know. 
+I am by no means an expert in English language or statistics. Any idea to help reveal the agenda of the programmings is welcome.
+
+## License
+
+This project is under [GPL-2.0](https://github.com/audioscavenger/BiasBuster/blob/master/LICENSE) License.
 
