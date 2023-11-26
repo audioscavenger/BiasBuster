@@ -398,7 +398,7 @@ Simply add --noMerge: --graph will be ignored when treating multiple chunks, and
 `python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge --show`
 ![heatMap KJZZ week=42 title=Morning Edition Day=Mon](assets/heatMap%20KJZZ%20week=42%20title=Morning%20Edition%20Day=Mon.png)
 
-### Generate ALL word cloud pictures for each program of a given week
+### Batch to generate ALL word cloud pictures for each program of a given week
 
 The loop below will generate png files for each program of each day of week 42:
 
@@ -411,6 +411,15 @@ The loop above will have them sorted by Title.
 If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
 
 
+### Batch to generate ALL word cloud pictures for each program of a given week
+
+The loop below will generate png files for each program of each day of week 42 along with the html page:
+
+`python KJZZ-db.py --html 42 --autoGenerate`
+![week41 example](assets/week41%20example.png)
+
+
+
 
 # Roadmap
 - [ ] 0.9.?   TODO should the case matter for title?
@@ -419,33 +428,33 @@ If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
 - [ ] 0.9.?   TODO automate mp3 downloads from cloud + process + uploads from/to cloud server
 - [ ] 0.9.?   TODO adding bias_score.py from https://github.com/auroracramer/language-model-bias
 - [x] 0.9.8   release html_builder
-  -           fixed error Tcl_AsyncDelete: async handler deleted by the wrong thread
-  -           updated README.md
-  -           wordCloud() and genWordCloud() can be called from anywhere
-  -           added plt.close() to save memory
-  -           rebuild wordCloud png file title where needed
-  -           updated usage()
-  -           passing progress bar value to relevant info() logger lines
-  -           fixed logging levels almost everywhere
-  -           renamed info to usage in wordCloudDict
-  -           default stopLevel is indeed 4 not 0
-  -           added automatic missing pictures where necessary
-  -           added html progress bar
-  -           added --autoGenerate and --dryRun
-  -           frozen table headers
-  -           added prev/next links
-  -           perfected table generation
+  - fixed error Tcl_AsyncDelete: async handler deleted by the wrong thread
+  - updated README.md
+  - wordCloud() and genWordCloud() can be called from anywhere
+  - added plt.close() to save memory
+  - rebuild wordCloud png file title where needed
+  - updated usage()
+  - passing progress bar value to relevant info() logger lines
+  - fixed logging levels almost everywhere
+  - renamed info to usage in wordCloudDict
+  - default stopLevel is indeed 4 not 0
+  - added automatic missing pictures where necessary
+  - added html progress bar
+  - added --autoGenerate and --dryRun
+  - frozen table headers
+  - added prev/next links
+  - perfected table generation
 - [x] 0.9.7   standardised logging
-  -           added --silent
-  -           default verbose = 1
-  -           standardised logging
+  - added --silent
+  - default verbose = 1
+  - standardised logging
 - [x] 0.9.6   WIP web ui - actually just generates an html page of the week's programing
-  -           added options --html --byChunk
-  -           added home-made html table generator from json schedule
-  -           html table has an okay look and shows existing wordClouds
-  -           html and png are generated under their respective week's folder
-  -           cleaned up usage() and created error() functions
-  -           completed week 46 import
+  - added options --html --byChunk
+  - added home-made html table generator from json schedule
+  - html table has an okay look and shows existing wordClouds
+  - html and png are generated under their respective week's folder
+  - cleaned up usage() and created error() functions
+  - completed week 46 import
 - [x] 0.9.5   added misInformation heatmap from https://github.com/PDXBek/Misinformation
 - [x] 0.9.4   wordCloudDict parameters are auto-added to script arguments and --help is auto-build
 - [x] 0.9.3   added and played with most of the genWordCloud parameters in wordCloudDict
