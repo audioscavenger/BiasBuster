@@ -4,7 +4,7 @@ Identify and challenge bias in language wording, primarily directed at KJZZ's ra
 BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
 
 <div align="center"> 
-  <img src="https://img.shields.io/github/releases/audioscavenger/BiasBuster?style=for-the-badge">
+  <img src="https://img.shields.io/github/release/audioscavenger/BiasBuster?style=for-the-badge">
   <img src="https://img.shields.io/github/forks/audioscavenger/BiasBuster?style=for-the-badge">
   <img src="https://img.shields.io/github/stars/audioscavenger/BiasBuster?style=for-the-badge">
   <img src="https://img.shields.io/github/issues/audioscavenger/BiasBuster?style=for-the-badge">
