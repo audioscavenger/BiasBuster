@@ -1,7 +1,7 @@
 # BiasBuster
 # author:  AudioscavengeR
 # license: GPLv2
-# version: 0.9.7 WIP
+# version: 0.9.8 release html_builder
 
 
 # Object: Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast.
@@ -47,10 +47,13 @@
 # python KJZZ-db.py --html 42 --byChunk
 
 # generate all thumbnails for week 42:
-# for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt --output kjzz)
+# for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt --output kjzz\42)
 
 
 
+# TODO: handle same program at differnt time of the day such as Sat: BBC World Service morning and evening - currently we can only generate one same wordCloud for both
+# TODO: heatMap: do we keep stopWords or not, brfore the counting occurs?
+# TODO: https://github.com/auroracramer/language-model-bias
 # TODO: export all configuration into external json files or yaml
 # TODO: explore stopWords from https://github.com/taikuukaits/SimpleWordlists/tree/master
 # TODO: analyse bias
@@ -98,7 +101,7 @@ from   rich.progress import track, Progress
 
 # # example of progress bar:
 # with Progress() as progress:
-  # task = progress.add_task("twiddling thumbs", total=10)
+  # task = progress.add_task("twiddling thumbs...", total=10)
   # inputFiles = [1,2,3,4,5,6,7,8,9,0]
   # for inputFile in inputFiles:
     # progress.console.print(f"Working on job #{inputFile}")
@@ -106,7 +109,7 @@ from   rich.progress import track, Progress
     # progress.advance(task)
 # exit()
 
-verbose = 0
+verbose = 1
 
 importChunks = False
 inputFolder = None
@@ -121,12 +124,12 @@ sqlQuery = None
 pretty = False
 wordCloud = False
 misInformation = False
-mergedText = ""
 gettext = None
-validKeys = ["date", "datetime", "week", "Day", "time", "title", "chunk"]
-condDict = {}
+listTitleWords2Exclude = ["Jazz", "Blues"]
+gettextKeys = ["date", "datetime", "week", "Day", "time", "title", "chunk"]
+gettextDict = {}
 mergeRecords = True
-noStopwords = False
+removeStopwords = True
 showPicture = False
 inputStopWords = []
 outputFolder = Path("./kjzz")
@@ -136,6 +139,12 @@ jsonScheduleFile = os.path.realpath("kjzz/KJZZ-schedule.json")
 byChunk = False
 printOut = False
 listLevel = []
+silent = False
+autoGenerate = False
+dryRun = False
+missingPic = "../missingPic.png"
+missingCloud = "../missingCloud.png"
+voidPic = "../1x1.png"
 
 # busybox sed -E "s/^.{,3}$//g" stopWords.ranks.nl.txt | busybox sort | busybox uniq >stopWords.ranks.nl.txt 
 # https://www.ranks.nl/stopwords
@@ -143,7 +152,7 @@ listLevel = []
 # https://github.com/taikuukaits/SimpleWordlists/blob/master/Wordlist-Adjectives-All.txt
 # wget https://raw.githubusercontent.com/taikuukaits/SimpleWordlists/master/Wordlist-Adjectives-All.txt -OstopWords.Wordlist-Adjectives-All.txt
 
-stopwords = {
+stopwordsDict = {
   0: ["what", "who", "is", "as", "at", "he", "the", "an", "to", "in", "for", "of", "or", "by", "with", "on", "this", "that", "be", "and", "it", "its", "no", "yes"],
   1: ["NPR", "KJZZ", "org", "BBC", "gift", "make", "support", "sustaining", "member", "doubled", "thank", "you", "call", "news", "month", "help", "give", "donation", "contribution", "please", "drive"],
   2: ["let", "say", "says", "said", "new", "one", "re", "not", "but", "are", "from", "become", "still", "way", "went"],
@@ -152,97 +161,97 @@ stopwords = {
   5: ["Israel", "Israeli", "Gaza", "Hamas", "Phoenix"],
 }
 
-stopLevel = 0
+stopLevel = 4
 # after merging 1+2 to what WordCloud has in its own set, we get this:
-# stopwords = {
+# stopwordsDict = {
 # 0: ['up', 'ever', 'yourself', 'therefore', 'cannot', 'could', 'new', "they've", 'theirs', "who's", 'u', 'an', 'am', 'get', 're', 'where', 'herself', 'same', 'was', "you'd", 'www', 'some', 'through', 'each', 'himself', 'once', 'me', 'have', 'our', 'this', 'or', "i'm", 'they', "hasn't", 'which', 'why', 'to', "how's", 'can', 'com', 'we', 'did', 'yours', 'the', "we're", 'more', 'shall', 'about', 'are', 'so', "they're", "he'd", 'otherwise', 'below', 'else', 'further', 'has', 'most', 'ours', 'ourselves', "why's", 'a', 'at', "we'd", 'between', "isn't", 'that', 'one', 'since', "doesn't", 'her', 'into', 'k', "couldn't", 'before', "she'd", "wasn't", 'it', "don't", 'during', 'only', 'hers', "when's", "shouldn't", "she's", 'in', 'my', 'no', 'however', 'r', "they'll", 'above', 'if', 'he', 'of', 'how', 'over', 'say', 'whom', "we've", "here's", 'been', "hadn't", 's', 'be', 'these', 'own', 'both', 'doing', 'itself', 'but', 'against', 'ought', 'http', 'nor', "weren't", "he's", 'does', 'i', 'and', "what's", "wouldn't", 'myself', 'just', 'out', "they'd", 'on', 'than', 'hence', 'themselves', 'then', 'very', "we'll", 'she', "it's", "you'll", 'its', 'is', "let's", 'were', "won't", 'what', 'by', "that's", 'again', 'had', 'too', "mustn't", "i've", "there's", 'as', "she'll", 'few', 'being', 'when', "aren't", 'should', "shan't", 'all', 'under', 'your', 'here', 'down', 'with', 'also', 'after', "you're", 'like', 'you', "where's", 'not', 'any', 'him', 'until', "you've", 'says', "didn't", 'such', "i'd", "i'll", 'them', 'do', 'while', "haven't", 'there', 'their', 'who', 'because', "he'll", "can't", 'from', 'having', 'for', 'off', 'other', 'would', 'those', 'yourselves', 'his'],
 # }
 
-# https://github.com/amueller/word_cloud/blob/master/wordcloud/wordcloud.py
+# build from https://github.com/amueller/word_cloud/blob/master/wordcloud/wordcloud.py
 wordCloudDict = {
   "max_words": {
     "input": True, 
     "default": 200, 
     "value": 1000, 
-    "info": "int (default=200)\n               The maximum number of words in the Cloud.", 
+    "usage": "int (default=1000)\n               The maximum number of words in the Cloud.", 
   },
   "width": {
     "input": True, 
     "default": 400, 
     "value": 2000, 
-    "info": "int (default=400)\n               Width of the canvas.", 
+    "usage": "int (default=2000)\n               Width of the canvas.", 
   },
   "height": {
     "input": True, 
     "default": 200, 
     "value": 1000, 
-    "info": "int (default=400)\n               Height of the canvas.", 
+    "usage": "int (default=1000)\n               Height of the canvas.", 
   },
   "min_word_length": {
     "input": True, 
     "default": 0, 
     "value": 3, 
-    "info": "int, default=0\n               Minimum number of letters a word must have to be included.", 
+    "usage": "int, default=3\n               Minimum number of letters a word must have to be included.", 
   },
   "min_font_size": {
     "input": True, 
     "default": 4, 
     "value": 4, 
-    "info": "int (default=4)\n               Smallest font size to use. Will stop when there is no more room in this size.", 
+    "usage": "int (default=4)\n               Smallest font size to use. Will stop when there is no more room in this size.", 
   },
   "max_font_size": {
     "input": True, 
     "default": 0, 
     "value": 400, 
-    "info": " int or None (default=None)\n               Maximum font size for the largest word. If None, height of the image is used.", 
+    "usage": " int or None (default=400)\n               Maximum font size for the largest word. If None, height of the image is used.", 
   },
   "scale": {
     "input": True, 
     "default": 1.0, 
     "value": 1.0, 
-    "info": "float (default=1)\n               Scaling between computation and drawing. For large word-cloud images,\n               using scale instead of larger canvas size is significantly faster, but\n               might lead to a coarser fit for the words.", 
+    "usage": "float (default=1.0)\n               Scaling between computation and drawing. For large word-cloud images,\n               using scale instead of larger canvas size is significantly faster, but\n               might lead to a coarser fit for the words.", 
   },
   "relative_scaling": {
     "input": True, 
     "default": 0.0, 
     "value": 'auto', 
-    "info": "float (default='auto')\n               Importance of relative word frequencies for font-size.  With\n               relative_scaling=0, only word-ranks are considered.  With\n               relative_scaling=1, a word that is twice as frequent will have twice\n               the size.  If you want to consider the word frequencies and not only\n               their rank, relative_scaling around .5 often looks good.\n               If 'auto' it will be set to 0.5 unless repeat is true, in which\n               case it will be set to 0.", 
+    "usage": "float (default='auto')\n               Importance of relative word frequencies for font-size.  With\n               relative_scaling=0, only word-ranks are considered.  With\n               relative_scaling=1, a word that is twice as frequent will have twice\n               the size.  If you want to consider the word frequencies and not only\n               their rank, relative_scaling around .5 often looks good.\n               If 'auto' it will be set to 0.5 unless repeat is true, in which\n               case it will be set to 0.", 
   },
   "background_color": {
     "input": True, 
     "default": 'black', 
     "value": 'white', 
-    "info": "color value (default='black')\n               Background color for the word cloud image.", 
+    "usage": "color value (default='white')\n               Background color for the word cloud image.", 
   },
   "normalize_plurals": {
     "input": True, 
     "default": True, 
     "value": True, 
-    "info": "bool, default=True\n               Whether to remove trailing 's' from words. If True and a word\n               appears with and without a trailing 's', the one with trailing 's'\n               is removed and its counts are added to the version without\n               trailing 's' -- unless the word ends with 'ss'. Ignored if using\n               generate_from_frequencies.", 
+    "usage": "bool, default=True\n               Whether to remove trailing 's' from words. If True and a word\n               appears with and without a trailing 's', the one with trailing 's'\n               is removed and its counts are added to the version without\n               trailing 's' -- unless the word ends with 'ss'. Ignored if using\n               generate_from_frequencies.", 
   },
   "inputStopWordsFiles": {
     "input": True, 
     "default": [], 
     "value": [], 
-    "info": "file, default=None\n               Text file containing one stopWord per line.\n               You can pass --inputStopWordsFiles multiple times.", 
+    "usage": "file, default=None\n               Text file containing one stopWord per line.\n               You can pass --inputStopWordsFiles multiple times.", 
   },
   "inputStopWords": {
     "input": False, 
     "default": [], 
     "value": [], 
-    "info": "list, default=[]\n               Consolidated list of stopWords from inputStopWordsFiles.", 
+    "usage": "list, default=[]\n               Consolidated list of stopWords from inputStopWordsFiles.", 
   },
   "font_path": {
     "input": True, 
     "default": None, 
     "value": "fonts\\Quicksand-Bold.ttf", 
-    "info": "str, default=None\n               Font path to the font that will be used (OTF or TTF).", 
+    "usage": "str, default='fonts\\Quicksand-Bold.ttf'\n               Font path to the font that will be used (OTF or TTF).", 
   },
   "collocation_threshold": {
     "input": True, 
     "default": 30, 
     "value": 30, 
-    "info": "int, default=30\n               Bigrams must have a Dunning likelihood collocation score greater than this\n               parameter to be counted as bigrams. Default of 30 is arbitrary.\n               See Manning, C.D., Manning, C.D. and Schütze, H., 1999. Foundations of\n               Statistical Natural Language Processing. MIT press, p. 162\n               https://nlp.stanford.edu/fsnlp/promo/colloc.pdf#page=22", 
+    "usage": "int, default=30\n               Bigrams must have a Dunning likelihood collocation score greater than this\n               parameter to be counted as bigrams. Default of 30 is arbitrary.\n               See Manning, C.D., Manning, C.D. and Schütze, H., 1999. Foundations of\n               Statistical Natural Language Processing. MIT press, p. 162\n               https://nlp.stanford.edu/fsnlp/promo/colloc.pdf#page=22", 
   },
 }
 
@@ -349,7 +358,6 @@ class Chunk:
 # If you use the TEXT storage class to store date and time value, you need to use the ISO8601 string format as follows:
 # YYYY-MM-DD HH:MM:SS.SSS
 def db_init(localSqlDb):
-  info("localSqlDb %s" %(localSqlDb), 1)
   localSqlDb.touch()
   # localSqlDb.unlink()
   conn = sqlite3.connect(localSqlDb)
@@ -395,7 +403,7 @@ def db_load(inputFiles, localSqlDb, conn, model):
     conn = sqlite3.connect(localSqlDb)
   
   with Progress() as progress:
-    task = progress.add_task("Loading...", total=len(inputFiles))
+    task = progress.add_task("Loading inputFiles...", total=len(inputFiles))
     # KJZZ_2023-10-08_Sun_2300-2330_BBC World Service.text
     for inputFile in inputFiles:
       if verbose: progress.console.print(("    db_load: reading %s ...") % (inputFile))
@@ -431,24 +439,18 @@ def cursor(localSqlDb, conn, sql, data=None):
   records = []
   try:
     if data:
-      info("cur.execute(%s) ... %s ..." %(sql, data[0]), 1)
+      info("cur.execute(%s) ... %s ..." %(sql, data[0]), 3)
       cur.execute(sql, data)
     else:
-      info("cur.execute(%s) ..." %(sql), 1)
+      info("cur.execute(%s) ..." %(sql), 3)
       cur.execute(sql)
     records = cur.fetchall()
-    info("%s records" %(len(records)), 1)
+    info("%s records" %(len(records)), 3)
   except Exception as error:
     warning("%s" %(error))
   return records
 #
 
-def chunk2condDict(chunkName):
-  # KJZZ_2023-10-13_Fri_1700-1730_All Things Considered
-  # we already defined a class that will gently split the name for us
-  chunk = Chunk(chunkName)
-  # print("ddebug"+chunk.start)
-#
 
 # # this works only with full key replacement
 # subs = { "Houston": "HOU", "L.A. Clippers": "LAC", }
@@ -482,38 +484,165 @@ def replaceNum2Days(record):
 #
 
 
-def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordCloudDict):
-  # https://github.com/amueller/word_cloud/blob/main/examples/simple.py
-  stopWords = title.replace("=", " ").split()
+def getText(gettextDict, progress=""):
+  sqlGettext = "SELECT start, text from schedule where 1=1"
+  title = "KJZZ"
   
-  wordsList = text.split()
-  numWords = len(wordsList)
-  title = "%s words=%s maxw=%s minf=%s maxf=%s scale=%s relscale=%s" % (
-    title, 
-    numWords, 
+  # build the actual query
+  for key in gettextDict.keys():
+    # build the SQL query:
+    sqlGettext += (" and %s = '%s'" % (key, gettextDict[key]))
+    
+    # reformat start time for the fileName: chunk has been build if the key is "chunk"
+    if key == "start":
+      gettextDict[key] = parser.parse(chunk.start).strftime("%Y-%m-%d %H:%M")
+    
+    # build a title that contains the gettextDict: normally that would be "KJZZ week= title= Day="
+    title += " %s=%s" % (key, gettextDict[key])
+  info("sqlGettext: %s" %(sqlGettext), 3, progress)
+  
+  records = cursor(localSqlDb, conn, sqlGettext)
+  if len(records) == 0:
+    info("gettext: 0 records for %s" %(gettextDict), 2, progress)
+  
+  return records
+# gettext
+
+
+def wordCloud(records, title, mergeRecords, showPicture, wordCloudDict, outputFolder=outputFolder, dryRun=False, progress=""):
+  # title = "KJZZ week=43 title=BBC World Service Day=Sat"
+  
+  if len(records) == 0: return []
+  genWordCloudDicts = []
+  mergedText = ''
+  
+  if mergeRecords:
+    for record in records: mergedText += record[1]
+    genWordCloudDicts.append(genWordCloud(mergedText, title, removeStopwords, stopLevel, wordCloudDict, showPicture, outputFolder, dryRun, progress))
+  else:
+    i = 1
+    for record in records:
+      info("wordCloud: image %s" % (i), 1, progress)
+      info("wordCloud: record = \n %s" %(record), 2, progress)
+      genWordCloudDicts += genWordCloud(record[1], title, removeStopwords, stopLevel, wordCloudDict, showPicture, outputFolder, dryRun, progress)
+    i += 1
+  # if showPicture: plt.show()    # somehow plt generated are in a stack and we can show them all from here as well
+  return genWordCloudDicts
+# wordCloud
+
+
+def misInformation(records, mergeRecords, showPicture, dryRun=False):
+  if len(records) == 0: return []
+  genMisinfoDicts = []
+  mergedText = ''
+  
+  if mergeRecords:
+    for record in records: mergedText += record[1]
+    genMisinfoDicts += genMisinfoBarGraph(mergedText, title, wordCloudDict, graph, showPicture, dryRun)
+  else:
+    textArray = []
+    Ylabels = []
+    for record in records:
+      textArray.append(record[1])
+      Ylabels.append(parser.parse(record[0]).strftime("%H:%M"))
+    genMisinfoDicts += genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict, showPicture, dryRun)
+  # if showPicture: plt.show()    # somehow plt generated are in a stack and we can show them all from here as well
+  return genMisinfoDicts
+#
+
+
+def printOutGetText(records, mergeRecords, pretty, dryRun):
+  if mergeRecords:
+    mergedText = ''
+    for record in records: mergedText += record[1]
+    if pretty:
+      print(('"%s"') %(mergedText))
+    else:
+      print(mergedText)
+  else:
+    for record in records:
+      if pretty:
+        print(('"%s"') %(record[1]))
+      else:
+        print(record)
+#
+
+
+
+def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordCloudDict, showPicture=False, outputFolder=outputFolder, dryRun=False, progress=""):
+  # title = "KJZZ week=43 title=BBC World Service Day=Sat"
+  info("Now generating: %s" %(title), 2, progress)
+  
+  import numpy as np
+  import pandas as pd
+  import matplotlib
+  # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
+  matplotlib.use('Agg')
+  import matplotlib.pyplot as plt
+  import matplotlib.dates as mdates
+  from   matplotlib import style
+  from   matplotlib.patches import Rectangle
+  import seaborn
+  import pngquant
+  import pngquant
+  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
+  from wordcloud import WordCloud
+  # from wordcloud import STOPWORDS
+  # print(STOPWORDS)
+
+  genWordCloudDict = {
+    "text": text, 
+    "title": title, 
+    "removeStopwords": removeStopwords, 
+    "level": level, 
+    "wordCloudDict": wordCloudDict, 
+    "stopWords": [], 
+    "wordsList": [], 
+    "numWords": 0, 
+    "wordCloudTitle": "", 
+    "fileName": "", 
+    "outputFile": "", 
+  }
+  
+  # https://github.com/amueller/word_cloud/blob/main/examples/simple.py
+  # we start by removing words from the title of the show itself
+  # for a typical week schedule, normally that would be "KJZZ week= title= Day="
+  genWordCloudDict["stopWords"] = title.replace("=", " ").split()
+  genWordCloudDict["wordsList"] = text.split()
+  genWordCloudDict["numWords"] = len(genWordCloudDict["wordsList"])
+  genWordCloudDict["wordCloudTitle"] = "%s words=%s maxw=%s minf=%s maxf=%s scale=%s relscale=%s" % (
+    genWordCloudDict["title"], 
+    genWordCloudDict["numWords"], 
     wordCloudDict["max_words"]["value"], 
     wordCloudDict["min_font_size"]["value"], 
     wordCloudDict["max_font_size"]["value"], 
     wordCloudDict["scale"]["value"], 
     wordCloudDict["relative_scaling"]["value"], 
   )
+  genWordCloudDict["fileName"] = genWordCloudDict["wordCloudTitle"].replace(": ", "=").replace(":", "") + ".png"
+  genWordCloudDict["outputFile"] = os.path.join(outputFolder, genWordCloudDict["fileName"])
+  genWordCloudDict["cleanWordsList"] = []
+  if dryRun: return genWordCloudDict
   
-  if not noStopwords:
-    for i in range(level + 1): stopWords += stopwords[i]
-    stopWords += wordCloudDict["inputStopWords"]["value"]
+  if removeStopwords:
+    from wordcloud import STOPWORDS
+    info("STOPWORDS: %s" %(STOPWORDS), 4, progress)
+    
+    for i in range(level + 1): genWordCloudDict["stopWords"] += stopwordsDict[i]
+    genWordCloudDict["stopWords"] += wordCloudDict["inputStopWords"]["value"]
     # print(len(STOPWORDS))
-    STOPWORDS.update(stopWords)
+    STOPWORDS.update(genWordCloudDict["stopWords"])
     # print(len(STOPWORDS))
     # print(len(stopWords))
     # print(stopWords)
     # WordCloud can remove stopWords by itself just fine, but we do it just have a count
-    info("genWordCloud: most 10 common words before: %s" % (Counter(wordsList).most_common(10)), 1)
-    cleanWordsList = [word for word in re.split("\W+",text) if word.lower() not in stopWords]
-    if verbose: print("    genWordCloud: most 10 common words after:  %s" % (Counter(cleanWordsList).most_common(10)))
-    info("genWordCloud: %s words - %s stopWords (%s words removed) == %s total words" %(numWords,len(STOPWORDS),numWords - len(cleanWordsList),len(cleanWordsList)), 1)
-    info("    genWordCloud: stopWords = %s" %(str(STOPWORDS)), 2)
+    info("most 10 common words before: \n%s" % (Counter(genWordCloudDict["wordsList"]).most_common(10)), 2, progress)
+    genWordCloudDict["cleanWordsList"] = [word for word in re.split("\W+",text) if word.lower() not in genWordCloudDict["stopWords"]]
+    info("most 10 common words after: \n%s" % (Counter(genWordCloudDict["cleanWordsList"]).most_common(10)), 2, progress)
+    info("%s words - %s stopWords (%s words removed) == %s total words" %(genWordCloudDict["numWords"], len(STOPWORDS), genWordCloudDict["numWords"] - len(genWordCloudDict["cleanWordsList"]), len(genWordCloudDict["cleanWordsList"])), 2, progress)
+    info("stopWords = %s" %(str(STOPWORDS)), 3, progress)
   else:
-    info("    genWordCloud: %s words" %(numWords), 1)
+    info("%s words" %(genWordCloudDict["numWords"]), 1, progress)
   # image 1: Display the generated image:
   # font_path="fonts\\Quicksand-Regular.ttf"
   wordcloud = WordCloud(
@@ -531,7 +660,7 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
                         scale=wordCloudDict["scale"]["value"], 
                         collocation_threshold=wordCloudDict["collocation_threshold"]["value"], 
                         ).generate(text)
-  # wordcloud.generate_from_frequencies(Counter(cleanWordsList))
+  # wordcloud.generate_from_frequencies(Counter(genWordCloudDict["cleanWordsList"]))
                         # stopwords=STOPWORDS, 
                         # background_color=wordCloudDict["background_color"]["value"], 
                         # max_words=wordCloudDict["max_words"]["value"], 
@@ -545,22 +674,22 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
                         # max_font_size=wordCloudDict["max_font_size"]["value"], 
                         # scale=wordCloudDict["scale"]["value"], 
                         # collocation_threshold=wordCloudDict["collocation_threshold"]["value"], 
-                        # ).generate_from_frequencies(Counter(cleanWordsList))
+                        # ).generate_from_frequencies(Counter(genWordCloudDict["cleanWordsList"]))
     
   # # trying to save image + add legend 1
   # plt.figure()
   # plt.imshow(wordcloud, interpolation='bilinear')
   # plt.axis("off")
   # # plt.switch_backend('Agg')
-  # # plt.savefig(title + ".png")
+  # # plt.savefig(genWordCloudDict["wordCloudTitle"] + ".png")
 
   # # trying to save image + add legend 2
   # fig, ax = plt.subplots()
   # ax.imshow(wordcloud, interpolation='bilinear')
   # ax.axis("off")
   # # plt.switch_backend('Agg')
-  # fig.savefig(title + ".png")
-  # plt.title(title)
+  # fig.savefig(genWordCloudDict["wordCloudTitle"] + ".png")
+  # plt.title(genWordCloudDict["wordCloudTitle"])
   # # supported values are 'best', 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'
   # # plt.legend(loc='best', fancybox=True, shadow=True)    # does not show in saved file
   # # fig.legend(fancybox=True, shadow=True)
@@ -568,7 +697,7 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
   # trying to save image + add legend 3 - that one works
   # plt.subplots(figsize=(8, 4))  # 800 x 400
   plt.subplots(figsize=(20, 10))  # 2000 x 1000
-  plt.title(title)
+  plt.title(genWordCloudDict["wordCloudTitle"])
   plt.axis("off")
   # plt.subplots_adjust(
     # top=0.931,
@@ -581,9 +710,8 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
   # plt.tight_layout(pad=1)
   plt.imshow(wordcloud, interpolation='bilinear')
 
-  fileName = title.replace(": ", "=").replace(":", "")
-  plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
-  print("    genWordCloud: file = \"%s\"" % (os.path.join(outputFolder, fileName  + ".png")))
+  plt.savefig(genWordCloudDict["outputFile"], bbox_inches='tight')
+  info('outputFile = "%s"' % (genWordCloudDict["outputFile"]), 2, progress)
 
 
   # # image 2: lower max_font_size
@@ -592,16 +720,32 @@ def genWordCloud(text, title, noStopwords=False, level=0, wordCloudDict=wordClou
   # plt.imshow(wordcloud, interpolation="bilinear")
   # plt.axis("off")
   
-  # plt.show()
-
   # The pil way (if you don't have matplotlib)
   # image = wordcloud.to_image()
   # image.show()
+  
+  if showPicture: plt.show()
+  plt.close()
+  return genWordCloudDict
 # genWordCloud
 
 
-def genMisinfoBarGraph(text, title, wordCloudDict=wordCloudDict, graph="bar"):
-  print("%s" %( title ))
+def genMisinfoBarGraph(text, title, wordCloudDict=wordCloudDict, graph="bar", showPicture=False, dryRun=False):
+  import numpy as np
+  import pandas as pd
+  import matplotlib
+  # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
+  matplotlib.use('Agg')
+  import matplotlib.pyplot as plt
+  import matplotlib.dates as mdates
+  from   matplotlib import style
+  from   matplotlib.patches import Rectangle
+  import seaborn
+  import pngquant
+  import pngquant
+  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
+
+  info("%s" %(title), 2)
   # heatMap = {     "explanatory":{"words":[],"heatCount":0,"heat":0},     "retractors":{"words":[],"heatCount":0,"heat":0},     "sourcing":{"words":[],"heatCount":0,"heat":0},     "uncertainty":{"words":[],"heatCount":0,"heat":0},   }
   heatMap = { 
     "explanatory":{"words":[],"heatCount":0,"heat":0}, 
@@ -638,12 +782,29 @@ def genMisinfoBarGraph(text, title, wordCloudDict=wordCloudDict, graph="bar"):
   if graph == "pie": graph_pie(X, Y, title, fileName)
   if graph == "line": graph_line(X, Y, title, fileName)
     
+  if showPicture: plt.show()
+  plt.close()
+  return []
 # genMisinfoBarGraph
 
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
-def genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict=wordCloudDict, graph="bar"):
+def genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict=wordCloudDict, graph="bar", showPicture=False, dryRun=False):
+  import numpy as np
+  import pandas as pd
+  import matplotlib
+  # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
+  matplotlib.use('Agg')
+  import matplotlib.pyplot as plt
+  import matplotlib.dates as mdates
+  from   matplotlib import style
+  from   matplotlib.patches import Rectangle
+  import seaborn
+  import pngquant
+  import pngquant
+  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
+  info("%s" %(title), 2)
   heatMaps = []
   i=0
   for text in textArray:
@@ -685,7 +846,10 @@ def genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict=wordCloudDict, gr
   
   fileName = "heatMap " + title.replace(": ", "=").replace(":", "")
   graph_heatMap(heatMaps, Xlabels, Ylabels, title, fileName)
-
+  
+  if showPicture: plt.show()
+  plt.close()
+  return []
 # genMisinfoHeatMap
 
 
@@ -736,6 +900,7 @@ def graph_line(X, Y, title="", fileName=""):
     pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
     info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
   # plt.show()
+  # plt.close()
 # graph_line
 
 
@@ -753,6 +918,7 @@ def graph_bar(X, Y, title="", fileName=""):
     pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
     info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
   # plt.show()
+  # plt.close()
 # graph_bar
 
 
@@ -770,7 +936,6 @@ def graph_pie(X, Y, title="", fileName=""):
     plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
     pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
     info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
-  # plt.show()
   
   # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.savefig.html
   # savefig(fname, *, transparent=None, dpi='figure', format=None,
@@ -778,7 +943,9 @@ def graph_pie(X, Y, title="", fileName=""):
         # facecolor='auto', edgecolor='auto', backend=None,
         # **kwargs
        # )
-  
+       
+  # plt.show()
+  # plt.close()
 # graph_pie
 
 
@@ -883,6 +1050,7 @@ def graph_heatMap(arrays, X, Y, title="", fileName=""):
     plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
     pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
   # plt.show()
+  # plt.close()
 
 # graph_heatMap
 
@@ -929,8 +1097,9 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
       # pngList.append(file)
 
   # better school:
-  pngPath = r'%s/KJZZ*week=%s*.png' %(os.path.join(outputFolder, str(weekNumber)), weekNumber)
+  pngPath = '%s/*week=%s*.png' %(os.path.join(outputFolder, str(weekNumber)), weekNumber)
   pngList = glob.glob(pngPath, recursive=False)
+
   # regexp = re.compile(".*week=%s.*title=%s.*Day=%s" %(weekNumber, "The Moth", "Sat"))
   # print(list(filter(regexp.match, pngList)))
   # exit()
@@ -957,6 +1126,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
         color: #434343;
       }
       table {
+        table-layout: fixed;
         border: 1px solid #DDD;
         border-collapse: collapse;
         border-spacing: 0;
@@ -967,16 +1137,18 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
         font-size: 11px;
         line-height: 1.4;
         text-align: center;
+        position: relative;   /* freeze top row */
       }
       tr.title {
         background-color: #666;
         color: white;
         font-weight: bold;
+        text-align: center;
       }
       tr td {
         border: 1px solid #DDD;
       }
-      td.startTime {
+      .startTime {
         font-weight: bold;
       }
       thead {
@@ -984,6 +1156,8 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
         background-color: #EEE;
         color: #666;
         font-weight: bold;
+        top: 0;             /* freeze top row */
+        position: sticky;   /* freeze top row */
       }
       tbody, tfoot {
         border-top: 1px solid #666;
@@ -992,15 +1166,36 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
         max-width: 15vw; /* width divided by 8 */
         width: 100%%;
       }
+      .prevWeek, .nextWeek {
+        color: white;
+        background-color: #777;
+        text-decoration: none;
+        width: 100px;
+        display: block;
+        overflow: auto;
+        height: 50%%;
+        position: absolute;
+        top: 0;
+      }
+      .prevWeek {
+        left: 0;
+      }
+      .nextWeek {
+        right: 0;
+      }
     </style>
   </head>
   <body>
-  ''' %("KJZZ",weekNumber)
+  ''' %("KJZZ", weekNumber)
   
   html += '<table>'
   html += '<tr>'
   html += '  <thead>'
-  html += '<tr class="title"><td colspan="8">%s week %s</td></tr>' %("KJZZ", weekNumber)
+  html += '<tr class="title">'
+  html += '<td><a class="prevWeek" href="../%s/kjzz-week%s.html">&larr; week %s</a></td>' %((weekNumber-1), (weekNumber-1), (weekNumber-1))
+  html += '<td colspan="6">%s week %s</td>' %("KJZZ", weekNumber)
+  html += '<td><a class="nextWeek" href="../%s/kjzz-week%s.html">week %s&rarr;</a></td>' %((weekNumber+1), (weekNumber+1), (weekNumber+1))
+  html += '</tr>'
   html += '<tr><th>Time</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>'
   html += '  </thead>'
   html += '  <tbody>'
@@ -1015,65 +1210,101 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   rowspan  = {}
   for Day in DayList: rowspan[Day] = 1
   
-  # we reverse because that's the only way to increase the rowspan of the first occurance of the same title
-  for key, startTime in enumerate(timeList):
-    rowspanDict[startTime] = {}
-    for Day in DayList:
+  with Progress() as progress:
+    task = progress.add_task("Building schedule...", total=len(timeList)*len(DayList))
+    
+    # we reverse because that's the only way to increase the rowspan of the first occurance of the same title
+    for key, startTime in enumerate(timeList):
+      rowspanDict[startTime] = {}
+      for Day in DayList:
+        info("%s %s %s" %(key, startTime, Day), 3, progress)
 
-      # without +1, jsonSchedule[timeList[key+1]] will error out with IndexError: list index out of range
-      # with +1,    we will not process the last startTime == 23:00
-      # solution:   create a dumb function for if key+1 < len(timeList) == getNextKey
-      
-      # By default we start with a normal, chunked cell of 30mn:
-      # Also we should not have to filter by week anymore since version 0.9.6 
-      # , we generate both html and png under each ./week subfolder
-      cell = ''
-      regexp = re.compile(".*week=%s.*title=%s.*Day=%s" %(weekNumber, jsonSchedule[startTime][Day], Day))
-      thatPngList = list(filter(regexp.match, pngList))
-      if thatPngList:
-        cell = '<img src="%s" alt="%s" class="notByChunk" decoding="async">' %(os.path.basename(thatPngList[0]), os.path.basename(thatPngList[0]))
-      rowspanDict[startTime][Day] = '<td rowspan="%s">%s%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], cell)
-      
-      if not byChunk:
-        # if we are not processing the last key:
-        if getNextKey(timeList, key):
-          info(startTime, 3)
-          if jsonSchedule[startTime][Day] == jsonSchedule[getNextKey(timeList, key)][Day]:
-            rowspanDict[startTime][Day] = ''
-            cell = ''
-            rowspan[Day] += 1
-            info("%s +1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], jsonSchedule[getNextKey(timeList, key)][Day]), 3)
+
+
+
+
+
+
+
+
+                          # 
+                          # add --profile
+                          # add --saveProfile --listProfiles
+                          # add --listProfiles
+                          # add saveProfile() function
+                          # add loadProfile() function
+
+
+
+
+
+
+
+
+
+        # without +1, jsonSchedule[timeList[key+1]] will error out with IndexError: list index out of range
+        # with +1,    we will not process the last startTime == 23:00
+        # solution:   create a dumb function for if key+1 < len(timeList) == getNextKey
+        
+        # notByChunk:
+        if not byChunk:
+          # By default we start with a normal, chunked cell of 30mn:
+          # Also we should not have to filter by week anymore since version 0.9.6 
+          # , we generate both html and png under each ./week subfolder
+          cell = ''
+          regexp = re.compile(".*week=%s.*title=%s.*Day=%s" %(weekNumber, jsonSchedule[startTime][Day], Day))
+          thatWordCloudPngList = list(filter(regexp.match, pngList))
+          if len(thatWordCloudPngList) == 0:
+            # setup an empty src for an img is indeed an error we will get the missingCloud.png for:
+            thatWordCloudPngList = [""]
+            
+            # we will not bother looking for excluded programs such as Jazz Blues etc:
+            if not any(word in jsonSchedule[startTime][Day] for word in listTitleWords2Exclude):
+              gettext = "week=%s+title=%s+Day=%s" %(weekNumber, jsonSchedule[startTime][Day], Day)
+              getTextDict = buildGetTextDict(gettext)
+              records = getText(getTextDict, progress)
+              if len(records) > 0:
+                title = "KJZZ " + gettext.replace("+", " ")
+                # we only print info if we actually generate the wordCloud as i t takes time:
+                if autoGenerate: info('Generate wordCloud "%s" ...' %(title), 1, progress)
+                genWordCloudDicts = wordCloud(records, title, True, showPicture, wordCloudDict, os.path.join(outputFolder, str(weekNumber)), not autoGenerate, progress)
+                if len(genWordCloudDicts) > 0:
+                  thatWordCloudPngList = [os.path.basename(genWordCloudDicts[0]["fileName"])]
+            else:
+              thatWordCloudPngList = [voidPic]
           else:
-            if rowspan[Day] > 1: 
-              cell = ''
-              regexp = re.compile(".*week=%s.*title=%s.*Day=%s" %(weekNumber, jsonSchedule[startTime][Day], Day))
-              thatPngList = list(filter(regexp.match, pngList))
-              if thatPngList:
-                cell = '<img src="%s" alt="%s" class="notByChunk" decoding="async">' %(os.path.basename(thatPngList[0]), os.path.basename(thatPngList[0]))
-              rowspanDict[startTime][Day] = '<td rowspan="%s">%s%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], cell)
-            info("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], jsonSchedule[getNextKey(timeList, key)][Day]), 3)
-            rowspan[Day]  = 1
+            thatWordCloudPngList = [os.path.basename(thatWordCloudPngList[0])]
+          if len(thatWordCloudPngList) > 0: cell = '<img src="%s" alt="%s" class="notByChunk" decoding="async" onerror="this.src=\'../missingCloud.png\'">' %(thatWordCloudPngList[0], thatWordCloudPngList[0])
+          rowspanDict[startTime][Day] = '<td rowspan="%s">%s%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], cell)
+
+          # if we are not processing the last key:
+          if getNextKey(timeList, key):
+            info(startTime, 4, progress)
+            if jsonSchedule[startTime][Day] == jsonSchedule[getNextKey(timeList, key)][Day]:
+              # create a missing td for the rowspan to happen:
+              rowspanDict[startTime][Day] = ''
+              rowspan[Day] += 1
+              info("%s +1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], jsonSchedule[getNextKey(timeList, key)][Day]), 4, progress)
+            else:
+              rowspan[Day]  = 1
+              info("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], jsonSchedule[getNextKey(timeList, key)][Day]), 4, progress)
+          
+          # if we are processing the last key == 00:00 since we loop in reverse:
+          else:
+            info("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], None), 4, progress)
         
-        # if we are processing the last key == 00:00 since we loop in reverse:
+        # byChunk:
         else:
-          if rowspan[Day] > 1: 
-            cell = ''
-            regexp = re.compile(".*week=%s.*title=%s.*Day=%s" %(weekNumber, jsonSchedule[startTime][Day], Day))
-            thatPngList = list(filter(regexp.match, pngList))
-            if thatPngList:
-              cell = '<img src="%s" alt="%s" class="notByChunk" decoding="async">' %(os.path.basename(thatPngList[0]), os.path.basename(thatPngList[0]))
-            rowspanDict[startTime][Day] = '<td rowspan="%s">%s%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], cell)
-          info("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], None), 3)
-      else:
-        cell = ''
-        rowspanDict[startTime][Day] = '<td rowspan="%s">%s%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], cell)
-        info("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], None), 3)
-        
+          cell = ''
+          rowspanDict[startTime][Day] = '<td rowspan="%s">%s%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], cell)
+          info("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], None), 4, progress)
+      
+        progress.advance(task)
   
-  info(rowspanDict, 4)
+  info(rowspanDict, 4, progress)
   for startTime in jsonSchedule.keys():
     # html += '    <tr><td>00:00</td><td>BBC World Service</td><td>Classic Jazz with Chazz Rayburn</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Michele Robins</td><td>Classic Jazz with Michele Robins</td><td>BBC World Service</td></tr>'
-    info('    <tr><td>%s</td>'           %(startTime), 3)
+    info('    <tr><td>%s</td>'           %(startTime), 4, progress)
     html   += '    <tr><td class="startTime">%s</td>'           %(startTime)
     
     for Day in DayList:
@@ -1089,10 +1320,11 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
     outputFileName = "kjzz-week"+str(weekNumber)+"-byChunk.html"
   else:
     outputFileName = "kjzz-week"+str(weekNumber)+".html"
+
   outputFile = os.path.join(outputFolder, str(weekNumber), outputFileName)
   with open(outputFile, 'w') as fd:
     fd.write(html)
-    info("outputFile: %s" %(outputFile), 1)
+    info("outputFile: %s" %(outputFile), 1, progress)
 
 
 
@@ -1110,6 +1342,34 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
 # genHtml
 
 
+def buildGetTextDict(gettext, gettextDict=gettextDict):
+  # gettext = "week=43+title=Classic Jazz with Chazz Rayburn+Day=Mon"
+  
+  if gettext.find("chunk=") > -1:
+    chunkName = re.split(r"[=]",gettext)[1]
+    # KJZZ_2023-10-13_Fri_1700-1730_All Things Considered
+    # we already defined a class that will gently split the name for us
+    # python KJZZ-db.py --gettext chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v
+    chunk = Chunk(chunkName)
+    gettextDict["start"]  = chunk.start
+  else:
+    conditions = re.split(r"[+]",gettext)
+    for condition in conditions:
+      key = re.split(r"[=]",condition)[0]
+      if key in gettextKeys:
+        gettextDict[key] = re.split(r"[=]",condition)[1]
+      else:
+        error("%s is invalid in %s" %(key, condition), 0)
+        info("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"", 0)
+        info("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"", 0)
+        exit(9)
+    # for
+  #
+  return gettextDict  # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
+  # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
+# buildGetTextDict
+
+
 def error(message, RC=1):
   stack = ''
   for i in reversed(range(1, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
@@ -1123,10 +1383,15 @@ def warning(message, RC=0):
   print ("warning: %-30s[yellow]%s%s [/]" %(stack, " ", message), file=sys.stderr)
 #
 
-def info(message, verbosity=0):
+def info(message, verbosity=0, progress=""):
   stack = ''
   for i in reversed(range(1, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
-  if verbose >= verbosity: print ("info   : %-30s[white]%s%s[/]" %(stack, " ", message), file=sys.stderr)
+  # if verbose >= verbosity: print ("info   : %-30s[white]%s%s[/]" %(stack, " ", message), file=sys.stderr)
+  if verbose >= verbosity:
+    if progress:
+      progress.console.print(f"info   : %-30s[white]%s%s[/]" %(stack, " ", message))
+    else:
+      print ("info   : %-30s[white]%s%s[/]" %(stack, " ", message), file=sys.stderr)
 #
 
 
@@ -1138,16 +1403,18 @@ def usage(RC=99):
   usage += ("    -p, --pretty\n                   Convert \\n to carriage returns and does json2text.\n                   Ignored when outputing pictures.")+os.linesep
   usage += ("    --output *%s\n                   Folder where to output pictures.." %(outputFolder))+os.linesep
   usage += ("    --show\n                   Opens the picture upon generation.")+os.linesep
+  usage += ("    --dryRun\n                   Will not generate PICtures, will not import chunks.")+os.linesep
   usage += ("")+os.linesep
   usage += ("  --db *%s    Path to the local SQlite db." %(localSqlDb))+os.linesep
-  usage += ("  -q, --query [ title first last last10 byDay byTitle chunkLast10 ]\n                   Quick and dirty way to see what's in the db.")+os.linesep
+  usage += ("  -q, --query < title | first | last | last10 | byDay | byTitle | chunkLast10 >\n                   Quick and dirty way to see what's in the db.")+os.linesep
   usage += ("")+os.linesep
-  usage += ("  --html [--byChunk --printOut] <week>\n                   Generate week number's schedule as an html table.")+os.linesep
-  usage += ("                   Generates html file %s/week00[-byChunk].html" %(outputFolder))+os.linesep
-  usage += ("                   --byChunk outputs schedule by 30mn chucks, no rowspan.")+os.linesep
-  usage += ("                   --printOut will output html on the prompt, can be used as an API with cgi-bin.")+os.linesep
+  usage += ("  --html [--byChunk --printOut --autoGenerate] <week>\n                   PICture: generate week number's schedule as an html table.")+os.linesep
+  usage += ("                   Outputs html file: %s/week00[-byChunk].html" %(outputFolder))+os.linesep
+  usage += ("                   --byChunk  Outputs schedule by 30mn chucks, no rowspan, no picture.")+os.linesep
+  usage += ("                   --printOut Will output html on the prompt.")+os.linesep
+  usage += ("                   --autoGenerate Will loop generate all wordCloud PICtures to show in html for that week.")+os.linesep
   usage += ("")+os.linesep
-  usage += ("  -g, --gettext  selector=value : chunk= | date= | datetime= | week= | Day= | time= | title=")+os.linesep
+  usage += ("  -g, --gettext < selector=value : chunk= | date= | datetime= | week= | Day= | time= | title= >")+os.linesep
   usage += ("                   Outputs all text from the selector:")+os.linesep
   usage += ("                   chunk=\"KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title\" (run %s -q chunkLast10 to get some values)" % (sys.argv[0]))+os.linesep
   usage += ("                   date=2023-10-08[+time=HH:MM]")+os.linesep
@@ -1157,16 +1424,18 @@ def usage(RC=99):
   usage += ("                   title=\"title of the show\", see https://kjzz.org/kjzz-print-schedule")+os.linesep
   usage += ("          example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"\n                   Will get text from that chunk of programming only. Chunks are 30mn long.")+os.linesep
   usage += ("          example: week=41+Day=Fri+title=\"All Things Considered\"\n                   Same as above but will get text from the entire episode.")+os.linesep
+  usage += ("   *--printOut\n                   Will output selected text on the prompt (default if no other option passed).")+os.linesep
   usage += ("    --noMerge\n                   Do not merge 30mn chunks of the same title within the same timeframe.")+os.linesep
   usage += ("    --misInformation\n                   PICture: generate misInformation graph or heatmap for all 4 factors:\n                   explanatory/retractors/sourcing/uncertainty")+os.linesep
   usage += ("      --graph *bar | pie | line\n                   What graph you want. Ignored with --noMerge: heat map will be generated instead.")+os.linesep
   usage += ("    --wordCloud\n                   PICture: generate word cloud from gettext output. Will not output any text.")+os.linesep
-  usage += ("      --stopLevel  *0 1 2 3 4\n                   add various levels of stopwords")+os.linesep
+  usage += ("      --stopLevel  0 1 2 3 *4\n                   add various levels of stopwords")+os.linesep
   usage += ("        --listLevel <0[,1 ..]> to just show the words in that level(s).")+os.linesep+os.linesep
-  for key,content in wordCloudDict.items():
-    if content["input"]: usage += ("      --%s *%s %s" %(key, content["value"], content["info"]))+os.linesep
+  for key, item in wordCloudDict.items():
+    if item["input"]: usage += ("      --%s *%s %s" %(key, item["value"], item["usage"]))+os.linesep
   usage += ("")+os.linesep
   usage += ("  -v, --verbose\n                   -vv -vvv increase verbosity.")+os.linesep
+  usage += ("  --silent\n                   Not verbose.")+os.linesep
   # usage += ("            --inputStopWordsFiles file.txt (add words from file on top of other levels)")+os.linesep
   # usage += ("            --max_words *4000")+os.linesep
   # usage += ("            --font_path *\"fonts\\Quicksand-Bold.ttf\"")+os.linesep
@@ -1185,7 +1454,7 @@ argumentList = sys.argv[1:]
 # define short Options
 options = "hviq:g:d:t:f:m:p"
 # define Long options
-long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "noStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation", "output=", "graph=", "html=", "byChunk", "printOut", "listLevel="]
+long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "keepStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation", "output=", "graph=", "html=", "byChunk", "printOut", "listLevel=", "silent", "dryRun", "autoGenerate"]
 wordCloudDictToParams = [(lambda x: '--' + x)(x) for x in wordCloudDict.keys()]
 wordCloudDictToOptions = [(lambda x: x + '=')(x) for x in wordCloudDict.keys()]
 long_options += wordCloudDictToOptions
@@ -1201,7 +1470,10 @@ try:
     if currentArgument in ("-h", "--help"):
       usage(0)
     elif currentArgument in ("-v", "--verbose"):
-      verbose += 1
+      if not silent: verbose += 1
+    elif currentArgument in ("--silent"):
+      silent = True
+      verbose  = -1
 
   # checking each argument
   info(("[bright_black]%-20s:[/] %s") % ('argument', 'value'), 2)
@@ -1243,25 +1515,6 @@ try:
         info("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"", 0)
         info("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\" (mutually exclusive to the others)", 0)
         exit(8)
-      if gettext.find("chunk=") > -1:
-        chunkName = re.split(r"[=]",gettext)[1]
-        # chunk2condDict(chunkName)
-        # KJZZ_2023-10-13_Fri_1700-1730_All Things Considered
-        # we already defined a class that will gently split the name for us
-        # python KJZZ-db.py --gettext chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v
-        chunk = Chunk(chunkName)
-        condDict["start"]  = chunk.start
-      else:
-        conditions = re.split(r"[+]",gettext)
-        for condition in conditions:
-          key = re.split(r"[=]",condition)[0]
-          if key in validKeys:
-            condDict[key] = re.split(r"[=]",condition)[1]
-          else:
-            error("%s is invalid in %s" %(key, condition), 0)
-            info("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"", 0)
-            info("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"", 0)
-            exit(9)
 
     elif currentArgument in ("-p", "--pretty"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
@@ -1269,9 +1522,9 @@ try:
     elif currentArgument in ("--noMerge"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, False), 2)
       mergeRecords = False
-    elif currentArgument in ("--noStopwords"):
-      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
-      noStopwords = True
+    elif currentArgument in ("--keepStopwords"):
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, False), 2)
+      removeStopwords = False
     elif currentArgument in ("--show"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       showPicture = True
@@ -1305,9 +1558,19 @@ try:
     elif currentArgument in ("--printOut"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       printOut = True
+    elif currentArgument in ("--dryRun"):
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
+      dryRun = True
+    elif currentArgument in ("--autoGenerate"):
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
+      autoGenerate = True
     elif currentArgument in ("--listLevel"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       listLevel = currentValue.split(',')
+    elif currentArgument in ("--silent"):
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
+      silent = True
+      verbose = -1
     elif currentArgument in ("--wordCloud"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       wordCloud = True
@@ -1345,12 +1608,27 @@ if (not importChunks and not sqlQuery and not gettext and not weekNumber and not
 #################################### help functions
 if listLevel:
   if pretty:
-    for level in listLevel: print(('%s') %(" ".join(stopwords[int(level)])))
+    for level in listLevel: print(('%s') %(" ".join(stopwordsDict[int(level)])))
   else:
-    print("stopwords levels: %s" %(stopwords.keys()))
-    for level in listLevel: print("%s" %(stopwords[int(level)]))
+    print("stopwords levels: %s" %(stopwordsDict.keys()))
+    for level in listLevel: print("%s" %(stopwordsDict[int(level)]))
   exit()
 #
+
+def importInputStopWords(wordCloudDict):
+  if wordCloudDict["inputStopWordsFiles"]["value"]:
+    for inputStopWordsFile in wordCloudDict["inputStopWordsFiles"]["value"]:
+      with open(inputStopWordsFile, 'r') as fd:
+        for line in fd:
+          wordCloudDict["inputStopWords"]["value"].append(line.strip())
+      info("%s stopWords imported from '%s'" %(len(wordCloudDict["inputStopWords"]["value"]), inputStopWordsFile), 2)
+    #
+  #
+  return wordCloudDict
+# importInputStopWords
+
+wordCloudDict = importInputStopWords(wordCloudDict)
+
 #################################### help functions
 
 
@@ -1373,7 +1651,7 @@ else:
 
 
 
-#################################### import of new chunks of radio
+#################################### import of new chunks of broadcast
 if importChunks:
   # first we build inputFiles
   if inputTextFile:
@@ -1391,7 +1669,7 @@ if importChunks:
   else:
     error('No files found to import', 7)
 # importChunks
-#################################### import of new chunks of radio
+#################################### import of new chunks of broadcast
 
 
 
@@ -1428,109 +1706,37 @@ if sqlQuery:
 
 #################################### genHtml
 if weekNumber:
-  html = genHtml(jsonScheduleFile, outputFolder, weekNumber, True)
-  html = genHtml(jsonScheduleFile, outputFolder, weekNumber, False)
+  html = genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk)
 
   if printOut: print(html)
 # weekNumber:
 #################################### genHtml
 
 
-
 # python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v -p
 #################################### gettext
 if gettext:
+
   ################### Process inputStopWordsFiles if any:
-  if len(wordCloudDict["inputStopWordsFiles"]["value"]) > 0:
-    for inputStopWordsFile in wordCloudDict["inputStopWordsFiles"]["value"]:
-      with open(inputStopWordsFile, 'r') as fd:
-        for line in fd:
-          wordCloudDict["inputStopWords"]["value"].append(line.strip())
-      print("  %s stopWords imported from '%s'" %(len(wordCloudDict["inputStopWords"]["value"]), inputStopWordsFile))
-  #
+  # gettext = "week=43+title=Classic Jazz with Chazz Rayburn+Day=Mon"
+  # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
+  gettextDict = buildGetTextDict(gettext)
+  title = "KJZZ" + gettext.replace("+", " ")
+  records = getText(gettextDict)
+  
+  if records:
 
-  sqlGettext = "SELECT start, text from schedule where 1=1"
-  title = "KJZZ"
-  
-  # build the actual query
-  for key in condDict.keys():
-    # build the SQL query:
-    sqlGettext += (" and %s = '%s'" % (key,condDict[key]))
-    
-    # reformat start time for the filename:
-    if key == "start":
-      condDict[key] = parser.parse(chunk.start).strftime("%Y-%m-%d %H:%M")
-    
-    # build a title that contains 
-    title += " %s=%s" % (key, condDict[key])
-  info("sqlGettext: %s" %(sqlGettext), 1)
-  records = cursor(localSqlDb, conn, sqlGettext)
-  if len(records) == 0:
-    info("gettext: 0 records for %s" %(condDict), 1)
-    exit(0)
-  
-  
-  ################## from now on, we may output pictures
-  import numpy as np
-  import pandas as pd
-  import matplotlib.pyplot as plt
-  import matplotlib.dates as mdates
-  from   matplotlib import style
-  from   matplotlib.patches import Rectangle
-  import seaborn
-  import pngquant
-  import pngquant
-  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
+    ################## wordCloud
+    # first we check if a wordCloud is requested:
+    if wordCloud: genWordCloudDicts = wordCloud(records, title, mergeRecords, showPicture, wordCloudDict, outputFolder, dryRun)
 
-  ################## wordCloud
-  # first we check if a wordCloud is requested:
-  if wordCloud:
-    from wordcloud import WordCloud
-    from wordcloud import STOPWORDS
-    # print(STOPWORDS)
+    ################## misInformation
+    # then we check if a misInformation misInformation is requested:
+    elif misInformation: genMisinfoDicts = misInformation(records, mergeRecords, showPicture, dryRun)
+  
+    # Finally, we just output gettext: printOut is purely optional since it's the last option
+    else: printOutGetText(records, mergeRecords, pretty, dryRun)
     
-    if mergeRecords:
-      for record in records: mergedText += record[1]
-      genWordCloud(mergedText, title, noStopwords, stopLevel, wordCloudDict)
-    else:
-      i = 1
-      for record in records:
-        info("wordCloud: image %s" % (i), 1)
-        info("wordCloud: record = \n %s" %(record), 2)
-        genWordCloud(record[1], title, noStopwords, stopLevel, wordCloudDict)
-      i += 1
-    if showPicture: plt.show()
-  
-  
-  ################## misInformation
-  # then we check if a misInformation misInformation is requested:
-  elif misInformation:
-    if mergeRecords:
-      for record in records: mergedText += record[1]
-      genMisinfoBarGraph(mergedText, title, wordCloudDict, graph)
-    else:
-      textArray = []
-      Ylabels = []
-      for record in records:
-        textArray.append(record[1])
-        Ylabels.append(parser.parse(record[0]).strftime("%H:%M"))
-      genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict)
-    if showPicture: plt.show()
-  
-  # Finally, we just output gettext:
-  else:
-    if mergeRecords:
-      for record in records: mergedText += record[1]
-      if pretty:
-        print(('"%s"') %(mergedText))
-      else:
-        print(mergedText)
-    else:
-      for record in records:
-        if pretty:
-          print(('"%s"') %(record[1]))
-        else:
-          print(record)
   # exit(0)
 #
 #################################### gettext

@@ -1,4 +1,4 @@
-# BiasBuster - WIP 0.9.7
+# BiasBuster - release 0.9.8 html_builder
 
 Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast. 
 BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
@@ -99,7 +99,9 @@ This Python script does the following:
   - [x] generate misinformation heatmap
   - [x] generate html week pages
   - [x] generate html week pages that have pictures
-  - [ ] generate html week pages that have links
+  - [x] generate html week pages that have links
+  - [x] generate html week pages that can navigate
+  - [x] generate html week pages and also missing wordCloud pictures
   - [ ] generate html week pages that are useful
   - [ ] generate html week pages that are interactive
   - [ ] generate gender bias analysis
@@ -396,7 +398,7 @@ Simply add --noMerge: --graph will be ignored when treating multiple chunks, and
 `python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge --show`
 ![heatMap KJZZ week=42 title=Morning Edition Day=Mon](assets/heatMap%20KJZZ%20week=42%20title=Morning%20Edition%20Day=Mon.png)
 
-### Generate ALL word cloud picures for each program of a given week
+### Generate ALL word cloud pictures for each program of a given week
 
 The loop below will generate png files for each program of each day of week 42:
 
@@ -416,8 +418,34 @@ If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
 - [ ] 0.9.?   TODO separate KJZZ into its own table to add other broadcasters
 - [ ] 0.9.?   TODO automate mp3 downloads from cloud + process + uploads from/to cloud server
 - [ ] 0.9.?   TODO adding bias_score.py from https://github.com/auroracramer/language-model-bias
+- [x] 0.9.8   release html_builder
+  -           fixed error Tcl_AsyncDelete: async handler deleted by the wrong thread
+  -           updated README.md
+  -           wordCloud() and genWordCloud() can be called from anywhere
+  -           added plt.close() to save memory
+  -           rebuild wordCloud png file title where needed
+  -           updated usage()
+  -           passing progress bar value to relevant info() logger lines
+  -           fixed logging levels almost everywhere
+  -           renamed info to usage in wordCloudDict
+  -           default stopLevel is indeed 4 not 0
+  -           added automatic missing pictures where necessary
+  -           added html progress bar
+  -           added --autoGenerate and --dryRun
+  -           frozen table headers
+  -           added prev/next links
+  -           perfected table generation
 - [x] 0.9.7   standardised logging
+  -           added --silent
+  -           default verbose = 1
+  -           standardised logging
 - [x] 0.9.6   WIP web ui - actually just generates an html page of the week's programing
+  -           added options --html --byChunk
+  -           added home-made html table generator from json schedule
+  -           html table has an okay look and shows existing wordClouds
+  -           html and png are generated under their respective week's folder
+  -           cleaned up usage() and created error() functions
+  -           completed week 46 import
 - [x] 0.9.5   added misInformation heatmap from https://github.com/PDXBek/Misinformation
 - [x] 0.9.4   wordCloudDict parameters are auto-added to script arguments and --help is auto-build
 - [x] 0.9.3   added and played with most of the genWordCloud parameters in wordCloudDict
@@ -469,10 +497,7 @@ If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
 
 👍🏻 If you're using this project & happy with it or you appreciate what I do and wish to support my work, you can consider by
 
-<div align='center'>
 ⭐️ Starring & Sharing the project is also appreciated. Thanks! ❤️
-</div>
-
 [![GitHub Repo stars](https://img.shields.io/badge/share%20on-reddit-red?logo=reddit)](https://reddit.com/submit?url=https://github.com/audioscavenger/BiasBuster&title=Discover%20the%20bias%20and%20the%20agenda%20of%20KJZZ%20radio%20broadcasts)
 [![GitHub Repo stars](https://img.shields.io/badge/share%20on-hacker%20news-orange?logo=ycombinator)](https://news.ycombinator.com/submitlink?u=https://github.com/audioscavenger/BiasBuster)
 [![GitHub Repo stars](https://img.shields.io/badge/share%20on-twitter-03A9F4?logo=twitter)](https://twitter.com/share?url=https://github.com/audioscavenger/BiasBuster&text=Discover%20the%20bias%20and%20the%20agenda%20of%20KJZZ%20radio%20broadcasts)

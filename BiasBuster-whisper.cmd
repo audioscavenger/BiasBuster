@@ -59,8 +59,10 @@ IF "%~1"=="" (
   echo   python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
   echo   python KJZZ-db.py --html 42 --byChunk
 
-  REM generate all thumbnails for week 42:
+  REM generate all thumbnails for week 42 manually:
   REM for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt --output kjzz)
+  REM generate all thumbnails for week 42 automatically:
+  echo python KJZZ-db.py --html 42 --autoGenerate
 
   cmd /k
   exit
