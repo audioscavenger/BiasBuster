@@ -4,6 +4,7 @@ Identify and challenge bias in language wording, primarily directed at KJZZ's ra
 BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
 
 <div align="center"> 
+  <img src="https://img.shields.io/github/releases/audioscavenger/BiasBuster?style=for-the-badge">
   <img src="https://img.shields.io/github/forks/audioscavenger/BiasBuster?style=for-the-badge">
   <img src="https://img.shields.io/github/stars/audioscavenger/BiasBuster?style=for-the-badge">
   <img src="https://img.shields.io/github/issues/audioscavenger/BiasBuster?style=for-the-badge">
@@ -121,21 +122,24 @@ usage: python KJZZ-db.py --help
                    Convert \n to carriage returns and does json2text.
                    Ignored when outputing pictures.
     --output *kjzz
-                   Folder where to output pictures.
+                   Folder where to output pictures..
     --show
                    Opens the picture upon generation.
+    --dryRun
+                   Will not generate PICtures, will not import chunks.
 
   --db *kjzz.db    Path to the local SQlite db.
-  -q, --query [ title first last last10 byDay byTitle chunkLast10 ]
+  -q, --query < title | first | last | last10 | byDay | byTitle | chunkLast10 >
                    Quick and dirty way to see what's in the db.
 
-  --html [--byChunk --printOut] <week>
-                   Generate week number's schedule as an html table.
-                   Generates html file kjzz/week00[-byChunk].html
-                   --byChunk outputs schedule by 30mn chucks, no rowspan.
-                   --printOut will output html on the prompt, can be used as an API with cgi-bin.
+  --html [--byChunk --printOut --autoGenerate] <week>
+                   PICture: generate week number's schedule as an html table.
+                   Outputs html file: kjzz/week00[-byChunk].html
+                   --byChunk  Outputs schedule by 30mn chucks, no rowspan, no picture.
+                   --printOut Will output html on the prompt.
+                   --autoGenerate Will loop generate all wordCloud PICtures to show in html for that week.
 
-  -g, --gettext  selector=value : chunk= | date= | datetime= | week= | Day= | time= | title=
+  -g, --gettext < selector=value : chunk= | date= | datetime= | week= | Day= | time= | title= >
                    Outputs all text from the selector:
                    chunk="KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title" (run KJZZ-db.py -q chunkLast10 to get some values)
                    date=2023-10-08[+time=HH:MM]
@@ -147,6 +151,8 @@ usage: python KJZZ-db.py --help
                    Will get text from that chunk of programming only. Chunks are 30mn long.
           example: week=41+Day=Fri+title="All Things Considered"
                    Same as above but will get text from the entire episode.
+   *--printOut
+                   Will output selected text on the prompt (default if no other option passed).
     --noMerge
                    Do not merge 30mn chunks of the same title within the same timeframe.
     --misInformation
@@ -156,23 +162,23 @@ usage: python KJZZ-db.py --help
                    What graph you want. Ignored with --noMerge: heat map will be generated instead.
     --wordCloud
                    PICture: generate word cloud from gettext output. Will not output any text.
-      --stopLevel  *0 1 2 3 4
+      --stopLevel  0 1 2 3 *4
                    add various levels of stopwords
         --listLevel <0[,1 ..]> to just show the words in that level(s).
 
-      --max_words *1000 int (default=200)
+      --max_words *1000 int (default=1000)
                The maximum number of words in the Cloud.
-      --width *2000 int (default=400)
+      --width *2000 int (default=2000)
                Width of the canvas.
-      --height *1000 int (default=400)
+      --height *1000 int (default=1000)
                Height of the canvas.
-      --min_word_length *3 int, default=0
+      --min_word_length *3 int, default=3
                Minimum number of letters a word must have to be included.
       --min_font_size *4 int (default=4)
                Smallest font size to use. Will stop when there is no more room in this size.
-      --max_font_size *400  int or None (default=None)
+      --max_font_size *400  int or None (default=400)
                Maximum font size for the largest word. If None, height of the image is used.
-      --scale *1.0 float (default=1)
+      --scale *1.0 float (default=1.0)
                Scaling between computation and drawing. For large word-cloud images,
                using scale instead of larger canvas size is significantly faster, but
                might lead to a coarser fit for the words.
@@ -184,7 +190,7 @@ usage: python KJZZ-db.py --help
                their rank, relative_scaling around .5 often looks good.
                If 'auto' it will be set to 0.5 unless repeat is true, in which
                case it will be set to 0.
-      --background_color *white color value (default='black')
+      --background_color *white color value (default='white')
                Background color for the word cloud image.
       --normalize_plurals *True bool, default=True
                Whether to remove trailing 's' from words. If True and a word
@@ -195,7 +201,7 @@ usage: python KJZZ-db.py --help
       --inputStopWordsFiles *[] file, default=None
                Text file containing one stopWord per line.
                You can pass --inputStopWordsFiles multiple times.
-      --font_path *fonts\Quicksand-Bold.ttf str, default=None
+      --font_path *fonts\Quicksand-Bold.ttf str, default='fonts\Quicksand-Bold.ttf'
                Font path to the font that will be used (OTF or TTF).
       --collocation_threshold *30 int, default=30
                Bigrams must have a Dunning likelihood collocation score greater than this
@@ -206,6 +212,8 @@ usage: python KJZZ-db.py --help
 
   -v, --verbose
                    -vv -vvv increase verbosity.
+  --silent
+                   Not verbose.
 ```
 
 ### File naming convention
@@ -411,11 +419,18 @@ The loop above will have them sorted by Title.
 If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
 
 
-### Batch to generate ALL word cloud pictures for each program of a given week
+### Generate html word cloud week
 
 The loop below will generate png files for each program of each day of week 42 along with the html page:
 
-`python KJZZ-db.py --html 42 --autoGenerate`
+`python KJZZ-db.py --html 42`
+
+
+### Generate html word cloud week + all word clouds for each program available in the db
+
+The loop below will generate png files for each program of each day of week 41 along with the html page:
+
+`python KJZZ-db.py --html 41 --autoGenerate`
 ![week41 example](assets/week41%20example.png)
 
 
