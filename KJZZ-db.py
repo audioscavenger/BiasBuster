@@ -51,6 +51,8 @@
 
 
 
+# TODO: somehow find way to always include --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+# TODO: add --force to regenerate existing pictures
 # TODO: handle same program at differnt time of the day such as Sat: BBC World Service morning and evening - currently we can only generate one same wordCloud for both
 # TODO: heatMap: do we keep stopWords or not, brfore the counting occurs?
 # TODO: https://github.com/auroracramer/language-model-bias
@@ -362,7 +364,7 @@ def db_init(localSqlDb):
   # localSqlDb.unlink()
   conn = sqlite3.connect(localSqlDb)
   cur = conn.cursor()
-  queryInit = """
+  queryScheduleTable = """
     CREATE TABLE schedule (
           start     TEXT    PRIMARY KEY
         , stop      TEXT    NOT NULL
@@ -374,16 +376,37 @@ def db_init(localSqlDb):
         );
     """
   try:
-    cur.execute(queryInit)
-    info("db_init %s: success" %(localSqlDb), 1)
-    return conn
+    cur.execute(queryScheduleTable)
+    info("queryScheduleTable %s: success" %(localSqlDb), 1)
   except Exception as error:
     if not str(error).find("already exists"):
-      info("db_init %s: %s" %(localSqlDb, error), 1)
+      info("queryScheduleTable %s: %s" %(localSqlDb, error), 1)
     else:
       records = cursor(localSqlDb, conn, """SELECT count(start) from schedule""")
-      info("%s chunks found in %s" %(records[0][0], localSqlDb), 1)
-      return conn
+      info("%s chunks found in schedule %s" %(records[0][0], localSqlDb), 1)
+  
+  # queryStatsTable = """
+    # CREATE TABLE statistics (
+          # start     TEXT    PRIMARY KEY
+        # , stop      TEXT    NOT NULL
+        # , week      INTEGER
+        # , day       TEXT    NOT NULL
+        # , title     TEXT    NOT NULL
+        # , text      TEXT
+        # , model     TEXT
+        # );
+    # """
+  # try:
+    # cur.execute(queryStatsTable)
+    # info("queryStatsTable %s: success" %(localSqlDb), 1)
+  # except Exception as error:
+    # if not str(error).find("already exists"):
+      # info("queryStatsTable %s: %s" %(localSqlDb, error), 1)
+    # else:
+      # records = cursor(localSqlDb, conn, """SELECT count(*) from statistics""")
+      # info("%s lines found in statistics %s" %(records[0][0], localSqlDb), 1)
+  
+  return conn
   #
 #
 
@@ -398,7 +421,7 @@ def db_init(localSqlDb):
 def db_load(inputFiles, localSqlDb, conn, model):
   loadedFiles = []
   if inputFiles:
-    info("db_load: %s files" %(len(inputFiles)), 1)
+    info("%s files found" %(len(inputFiles)), 1)
   if not conn:
     conn = sqlite3.connect(localSqlDb)
   
@@ -406,14 +429,13 @@ def db_load(inputFiles, localSqlDb, conn, model):
     task = progress.add_task("Loading inputFiles...", total=len(inputFiles))
     # KJZZ_2023-10-08_Sun_2300-2330_BBC World Service.text
     for inputFile in inputFiles:
-      if verbose: progress.console.print(("    db_load: reading %s ...") % (inputFile))
+      info("Reading Chunk %s ..." % (inputFile), 3, progress)
       try:
         chunk = Chunk(inputFile, model)
-        if verbose: progress.console.print(("    db_load: Chunk: loaded %s") % (chunk.basename))
+        info("Chunk read %s" % (chunk.basename), 3, progress)
         # time.sleep(0.2)
       except Exception as error:
-        progress.console.print(("[red]    db_load: Chunk: load error for %s: %s[/]") % (inputFile, error))
-        exit(1)
+        error("Chunk load error for %s: %s" % (inputFile, error), 11)
       # check if exist in db:
       sql = """ SELECT * from schedule where start = ?; """
       records = cursor(localSqlDb, conn, sql, (chunk.start,))
@@ -423,12 +445,12 @@ def db_load(inputFiles, localSqlDb, conn, model):
         sql = """ INSERT INTO schedule(start, stop , week, Day, title, text, model) VALUES(?,?,?,?,?,?,?); """
         records = cursor(localSqlDb, conn, sql, (chunk.start, chunk.stop , chunk.week, chunk.Day, chunk.title, chunk.text, chunk.model))
         loadedFiles += [inputFile]
-        progress.console.print(("[green]    db_load: Chunk added: %s[/]") % (chunk.basename))
+        info("Chunk imported: %s" % (chunk.basename), 1, progress)
       else:
-        progress.console.print(("[bright_black]    db_load: Chunk already exist: %s[/]") % (chunk.basename))
+        info("[bright_black]Chunk already exist: %s[/]" % (chunk.basename), 2, progress)
       progress.advance(task)
   conn.commit()
-  info("db_load: done loading %s/%s files" %(len(loadedFiles), len(inputFiles)), 1)
+  info("Done loading %s/%s files" %(len(loadedFiles), len(inputFiles)), 1, progress)
 #
 
 
@@ -451,6 +473,27 @@ def cursor(localSqlDb, conn, sql, data=None):
   return records
 #
 
+
+def sqlQueryPrintExec(sqlQuery, pretty=pretty):
+  info("sqlQuery: %s" % (sqlQuery), 2)
+  records = cursor(localSqlDb, conn, sqlQuery)
+  # SQLite: %w = day of week 0-6 with Sunday==0
+  # But we want Mon Tue etc so we replace text in each tuple.
+  # Oh yeah, sqlite3 fetchall returns a list of tuples.
+  # Each record is a tuple: ('KJZZ_2023-10-13_5_1630-1700_All Things Considered',),
+  if sqlQuery.find('_%w_') > -1:
+    # replaceNum2Days will output the same input format: str or tuple: 0->Sun 1->Mon etc
+    # What we should do is grab the recursive replace function I wrote 10 years ago, pfff where is it
+    records = [replaceNum2Days(record) for record in records]
+    # records[0] = map(lambda x: str.replace(x, "[br]", "<br/>"), records[0])
+  if pretty:
+    for record in records:
+      print(('"%s"') %(record))
+  else:
+    print(records)
+  #
+  return records
+#
 
 # # this works only with full key replacement
 # subs = { "Houston": "HOU", "L.A. Clippers": "LAC", }
@@ -495,7 +538,7 @@ def getText(gettextDict, progress=""):
     
     # reformat start time for the fileName: chunk has been build if the key is "chunk"
     if key == "start":
-      gettextDict[key] = parser.parse(chunk.start).strftime("%Y-%m-%d %H:%M")
+      gettextDict[key] = parser.parse(gettextDict[key]).strftime("%Y-%m-%d %H:%M")
     
     # build a title that contains the gettextDict: normally that would be "KJZZ week= title= Day="
     title += " %s=%s" % (key, gettextDict[key])
@@ -509,7 +552,25 @@ def getText(gettextDict, progress=""):
 # gettext
 
 
-def wordCloud(records, title, mergeRecords, showPicture, wordCloudDict, outputFolder=outputFolder, dryRun=False, progress=""):
+def printOutGetText(records, mergeRecords, pretty, dryRun):
+  if mergeRecords:
+    mergedText = ''
+    for record in records: mergedText += record[1]
+    if pretty:
+      print(('"%s"') %(mergedText))
+    else:
+      print(mergedText)
+  else:
+    for record in records:
+      if pretty:
+        print(('"%s"') %(record[1]))
+      else:
+        print(record)
+#
+
+
+
+def genWordClouds(records, title, mergeRecords, showPicture, wordCloudDict, outputFolder=outputFolder, dryRun=False, progress=""):
   # title = "KJZZ week=43 title=BBC World Service Day=Sat"
   
   if len(records) == 0: return []
@@ -529,44 +590,6 @@ def wordCloud(records, title, mergeRecords, showPicture, wordCloudDict, outputFo
   # if showPicture: plt.show()    # somehow plt generated are in a stack and we can show them all from here as well
   return genWordCloudDicts
 # wordCloud
-
-
-def misInformation(records, mergeRecords, showPicture, dryRun=False):
-  if len(records) == 0: return []
-  genMisinfoDicts = []
-  mergedText = ''
-  
-  if mergeRecords:
-    for record in records: mergedText += record[1]
-    genMisinfoDicts += genMisinfoBarGraph(mergedText, title, wordCloudDict, graph, showPicture, dryRun)
-  else:
-    textArray = []
-    Ylabels = []
-    for record in records:
-      textArray.append(record[1])
-      Ylabels.append(parser.parse(record[0]).strftime("%H:%M"))
-    genMisinfoDicts += genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict, showPicture, dryRun)
-  # if showPicture: plt.show()    # somehow plt generated are in a stack and we can show them all from here as well
-  return genMisinfoDicts
-#
-
-
-def printOutGetText(records, mergeRecords, pretty, dryRun):
-  if mergeRecords:
-    mergedText = ''
-    for record in records: mergedText += record[1]
-    if pretty:
-      print(('"%s"') %(mergedText))
-    else:
-      print(mergedText)
-  else:
-    for record in records:
-      if pretty:
-        print(('"%s"') %(record[1]))
-      else:
-        print(record)
-#
-
 
 
 def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordCloudDict, showPicture=False, outputFolder=outputFolder, dryRun=False, progress=""):
@@ -602,6 +625,8 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
     "wordCloudTitle": "", 
     "fileName": "", 
     "outputFile": "", 
+    "cleanWordsList": [], 
+    "top100tuples": [], 
   }
   
   # https://github.com/amueller/word_cloud/blob/main/examples/simple.py
@@ -621,7 +646,6 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
   )
   genWordCloudDict["fileName"] = genWordCloudDict["wordCloudTitle"].replace(": ", "=").replace(":", "") + ".png"
   genWordCloudDict["outputFile"] = os.path.join(outputFolder, genWordCloudDict["fileName"])
-  genWordCloudDict["cleanWordsList"] = []
   if dryRun: return genWordCloudDict
   
   if removeStopwords:
@@ -639,6 +663,7 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
     info("most 10 common words before: \n%s" % (Counter(genWordCloudDict["wordsList"]).most_common(10)), 2, progress)
     genWordCloudDict["cleanWordsList"] = [word for word in re.split("\W+",text) if word.lower() not in genWordCloudDict["stopWords"]]
     info("most 10 common words after: \n%s" % (Counter(genWordCloudDict["cleanWordsList"]).most_common(10)), 2, progress)
+    genWordCloudDict["top100tuples"] = Counter(genWordCloudDict["cleanWordsList"]).most_common(100)
     info("%s words - %s stopWords (%s words removed) == %s total words" %(genWordCloudDict["numWords"], len(STOPWORDS), genWordCloudDict["numWords"] - len(genWordCloudDict["cleanWordsList"]), len(genWordCloudDict["cleanWordsList"])), 2, progress)
     info("stopWords = %s" %(str(STOPWORDS)), 3, progress)
   else:
@@ -730,21 +755,27 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
 # genWordCloud
 
 
-def genMisinfoBarGraph(text, title, wordCloudDict=wordCloudDict, graph="bar", showPicture=False, dryRun=False):
-  import numpy as np
-  import pandas as pd
-  import matplotlib
-  # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
-  matplotlib.use('Agg')
-  import matplotlib.pyplot as plt
-  import matplotlib.dates as mdates
-  from   matplotlib import style
-  from   matplotlib.patches import Rectangle
-  import seaborn
-  import pngquant
-  import pngquant
-  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
+def genMisInformation(records, mergeRecords, showPicture, dryRun=False):
+  if len(records) == 0: return []
+  genMisinfoDicts = []
+  mergedText = ''
+  
+  if mergeRecords:
+    for record in records: mergedText += record[1]
+    genMisinfoDicts += genMisinfoBarGraph(mergedText, title, wordCloudDict, graph, showPicture, dryRun)
+  else:
+    textArray = []
+    Ylabels = []
+    for record in records:
+      textArray.append(record[1])
+      Ylabels.append(parser.parse(record[0]).strftime("%H:%M"))
+    genMisinfoDicts += genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict, showPicture, dryRun)
+  # if showPicture: plt.show()    # somehow plt generated are in a stack and we can show them all from here as well
+  return genMisinfoDicts
+#
 
+
+def genMisinfoBarGraph(text, title, wordCloudDict=wordCloudDict, graph="bar", showPicture=False, dryRun=False):
   info("%s" %(title), 2)
   # heatMap = {     "explanatory":{"words":[],"heatCount":0,"heat":0},     "retractors":{"words":[],"heatCount":0,"heat":0},     "sourcing":{"words":[],"heatCount":0,"heat":0},     "uncertainty":{"words":[],"heatCount":0,"heat":0},   }
   heatMap = { 
@@ -888,6 +919,20 @@ def loadInputFile(inputTextFile):
 
 
 def graph_line(X, Y, title="", fileName=""):
+  import numpy as np
+  import pandas as pd
+  import matplotlib
+  # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
+  matplotlib.use('Agg')
+  import matplotlib.pyplot as plt
+  import matplotlib.dates as mdates
+  from   matplotlib import style
+  from   matplotlib.patches import Rectangle
+  import seaborn
+  import pngquant
+  import pngquant
+  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
+
   # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.plot_date.html
   plt.plot_date(X,Y,linestyle='solid')
   plt.xticks(rotation=45)
@@ -906,6 +951,20 @@ def graph_line(X, Y, title="", fileName=""):
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph bar --show
 def graph_bar(X, Y, title="", fileName=""):
+  import numpy as np
+  import pandas as pd
+  import matplotlib
+  # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
+  matplotlib.use('Agg')
+  import matplotlib.pyplot as plt
+  import matplotlib.dates as mdates
+  from   matplotlib import style
+  from   matplotlib.patches import Rectangle
+  import seaborn
+  import pngquant
+  import pngquant
+  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
+
   # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.bar.html
   plt.bar(X,Y)
   plt.xticks(rotation=45)
@@ -924,6 +983,20 @@ def graph_bar(X, Y, title="", fileName=""):
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show
 def graph_pie(X, Y, title="", fileName=""):
+  import numpy as np
+  import pandas as pd
+  import matplotlib
+  # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
+  matplotlib.use('Agg')
+  import matplotlib.pyplot as plt
+  import matplotlib.dates as mdates
+  from   matplotlib import style
+  from   matplotlib.patches import Rectangle
+  import seaborn
+  import pngquant
+  import pngquant
+  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
+
   # https://matplotlib.org/stable/gallery/pie_and_polar_charts/pie_features.html#sphx-glr-gallery-pie-and-polar-charts-pie-features-py
   # fig, ax = plt.subplots(figsize=(20, 10))  # 2000 x 1000
   fig, ax = plt.subplots()
@@ -950,10 +1023,19 @@ def graph_pie(X, Y, title="", fileName=""):
 
 
 def graph_heatMapTestHighlight():
-  from matplotlib import pyplot as plt
-  from matplotlib.patches import Rectangle
-  import seaborn
   import numpy as np
+  import pandas as pd
+  import matplotlib
+  # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
+  matplotlib.use('Agg')
+  import matplotlib.pyplot as plt
+  import matplotlib.dates as mdates
+  from   matplotlib import style
+  from   matplotlib.patches import Rectangle
+  import seaborn
+  import pngquant
+  import pngquant
+  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
   labels = list('abcdef')
   N = len(labels)
@@ -973,6 +1055,20 @@ def graph_heatMapTestHighlight():
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
 def graph_heatMap(arrays, X, Y, title="", fileName=""):
+  import numpy as np
+  import pandas as pd
+  import matplotlib
+  # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
+  matplotlib.use('Agg')
+  import matplotlib.pyplot as plt
+  import matplotlib.dates as mdates
+  from   matplotlib import style
+  from   matplotlib.patches import Rectangle
+  import seaborn
+  import pngquant
+  import pngquant
+  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
+
   # https://matplotlib.org/stable/gallery/images_contours_and_fields/image_annotated_heatmap.html
   # https://seaborn.pydata.org/tutorial/color_palettes.html
   # https://stackoverflow.com/questions/62533046/how-to-add-color-border-or-similar-highlight-to-specifc-element-of-heatmap-in-py
@@ -1126,7 +1222,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
         color: #434343;
       }
       table {
-        table-layout: fixed;
+        width: 100%%;
         border: 1px solid #DDD;
         border-collapse: collapse;
         border-spacing: 0;
@@ -1145,10 +1241,11 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
         font-weight: bold;
         text-align: center;
       }
-      tr td {
+      tr, td {
         border: 1px solid #DDD;
+        vertical-align: middle;
       }
-      .startTime {
+      th.startTime, td.startTime {
         font-weight: bold;
       }
       thead {
@@ -1163,8 +1260,8 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
         border-top: 1px solid #666;
       }
       img.notByChunk {
-        max-width: 15vw; /* width divided by 8 */
         width: 100%%;
+        max-width: 15vw; /* width divided by 8 */
       }
       .prevWeek, .nextWeek {
         color: white;
@@ -1196,7 +1293,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   html += '<td colspan="6">%s week %s</td>' %("KJZZ", weekNumber)
   html += '<td><a class="nextWeek" href="../%s/kjzz-week%s.html">week %s&rarr;</a></td>' %((weekNumber+1), (weekNumber+1), (weekNumber+1))
   html += '</tr>'
-  html += '<tr><th>Time</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>'
+  html += '<tr><th class="startTime">Time</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>'
   html += '  </thead>'
   html += '  <tbody>'
   
@@ -1251,7 +1348,8 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
           # By default we start with a normal, chunked cell of 30mn:
           # Also we should not have to filter by week anymore since version 0.9.6 
           # , we generate both html and png under each ./week subfolder
-          cell = ''
+          img = ''
+          imgClass = ''
           regexp = re.compile(".*week=%s.*title=%s.*Day=%s" %(weekNumber, jsonSchedule[startTime][Day], Day))
           thatWordCloudPngList = list(filter(regexp.match, pngList))
           if len(thatWordCloudPngList) == 0:
@@ -1267,15 +1365,24 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
                 title = "KJZZ " + gettext.replace("+", " ")
                 # we only print info if we actually generate the wordCloud as i t takes time:
                 if autoGenerate: info('Generate wordCloud "%s" ...' %(title), 1, progress)
-                genWordCloudDicts = wordCloud(records, title, True, showPicture, wordCloudDict, os.path.join(outputFolder, str(weekNumber)), not autoGenerate, progress)
+                genWordCloudDicts = genWordClouds(records, title, True, showPicture, wordCloudDict, os.path.join(outputFolder, str(weekNumber)), not autoGenerate, progress)
                 if len(genWordCloudDicts) > 0:
+                  imgClass = 'notByChunk'
                   thatWordCloudPngList = [os.path.basename(genWordCloudDicts[0]["fileName"])]
+              else:
+                # we do not have any record in the db, no use to show a missing image
+                thatWordCloudPngList = [voidPic]
             else:
+              # no use to show a missing image for musical programs
               thatWordCloudPngList = [voidPic]
           else:
+            # all images are inside the html week's folder
+            imgClass = 'notByChunk'
             thatWordCloudPngList = [os.path.basename(thatWordCloudPngList[0])]
-          if len(thatWordCloudPngList) > 0: cell = '<img src="%s" alt="%s" class="notByChunk" decoding="async" onerror="this.src=\'../missingCloud.png\'">' %(thatWordCloudPngList[0], thatWordCloudPngList[0])
-          rowspanDict[startTime][Day] = '<td rowspan="%s">%s%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], cell)
+
+          if len(thatWordCloudPngList) > 0:
+            img = '<img src="%s" alt="%s" class="%s" decoding="async" onerror="this.src=\'../missingCloud.png\'">' %(thatWordCloudPngList[0], thatWordCloudPngList[0], imgClass)
+          rowspanDict[startTime][Day] = '<td rowspan="%s"><p>%s</p>%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], img)
 
           # if we are not processing the last key:
           if getNextKey(timeList, key):
@@ -1295,8 +1402,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
         
         # byChunk:
         else:
-          cell = ''
-          rowspanDict[startTime][Day] = '<td rowspan="%s">%s%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], cell)
+          rowspanDict[startTime][Day] = '<td rowspan="%s"><p>%s</p></td>' %(rowspan[Day], jsonSchedule[startTime][Day])
           info("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], None), 4, progress)
       
         progress.advance(task)
@@ -1370,14 +1476,14 @@ def buildGetTextDict(gettext, gettextDict=gettextDict):
 # buildGetTextDict
 
 
-def error(message, RC=1):
+def error(message, RC=1, progress=""):
   stack = ''
   for i in reversed(range(1, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
   print    ("error  : %-30s[red]%s%s [/]" %(stack, " ", message), file=sys.stderr)
   if RC: exit(RC)
 #
 
-def warning(message, RC=0):
+def warning(message, RC=0, progress=""):
   stack = ''
   for i in reversed(range(1, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
   print ("warning: %-30s[yellow]%s%s [/]" %(stack, " ", message), file=sys.stderr)
@@ -1664,8 +1770,8 @@ if importChunks:
     db_load(inputFiles, localSqlDb, conn, model)
     
     # finally we will also print a summary:
-    info("python KJZZ-db.py -q title", 1)
-    if verbose: sqlQuery = sqlCountsByTitle
+    info("python KJZZ-db.py -q title", 2)
+    if verbose >1: sqlQuery = sqlCountsByTitle
   else:
     error('No files found to import', 7)
 # importChunks
@@ -1679,25 +1785,7 @@ if importChunks:
 #
 # python KJZZ-db.py -q chunkLast10 -v -p
 #
-if sqlQuery:
-  info("sqlQuery: %s" % (sqlQuery), 1)
-  records = cursor(localSqlDb, conn, sqlQuery)
-  # SQLite: %w = day of week 0-6 with Sunday==0
-  # But we want Mon Tue etc so we replace text in each tuple.
-  # Oh yeah, sqlite3 fetchall returns a list of tuples.
-  # Each record is a tuple: ('KJZZ_2023-10-13_5_1630-1700_All Things Considered',),
-  if sqlQuery.find('_%w_') > -1:
-    # replaceNum2Days will output the same input format: str or tuple: 0->Sun 1->Mon etc
-    # What we should do is grab the recursive replace function I wrote 10 years ago, pfff where is it
-    records = [replaceNum2Days(record) for record in records]
-    # records[0] = map(lambda x: str.replace(x, "[br]", "<br/>"), records[0])
-  if pretty:
-    for record in records:
-      print(('"%s"') %(record))
-  else:
-    print(records)
-  # exit(0)
-#
+if sqlQuery: sqlQueryPrintExec(sqlQuery, pretty)
 
 # records = [('2023-10-16 03:00:00.000', "Hi, I'm Phil Latspin..."), ...]
 #################################### sqlQuery
@@ -1728,11 +1816,11 @@ if gettext:
 
     ################## wordCloud
     # first we check if a wordCloud is requested:
-    if wordCloud: genWordCloudDicts = wordCloud(records, title, mergeRecords, showPicture, wordCloudDict, outputFolder, dryRun)
+    if wordCloud: genWordCloudDicts = genWordClouds(records, title, mergeRecords, showPicture, wordCloudDict, outputFolder, dryRun)
 
     ################## misInformation
     # then we check if a misInformation misInformation is requested:
-    elif misInformation: genMisinfoDicts = misInformation(records, mergeRecords, showPicture, dryRun)
+    elif misInformation: genMisinfoDicts = genMisInformation(records, mergeRecords, showPicture, dryRun)
   
     # Finally, we just output gettext: printOut is purely optional since it's the last option
     else: printOutGetText(records, mergeRecords, pretty, dryRun)

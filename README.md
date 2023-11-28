@@ -4,12 +4,12 @@ Identify and challenge bias in language wording, primarily directed at KJZZ's ra
 BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
 
 <div align="center"> 
-  <img src="https://img.shields.io/github/release/audioscavenger/BiasBuster?style=for-the-badge">
   <img src="https://img.shields.io/github/forks/audioscavenger/BiasBuster?style=for-the-badge">
   <img src="https://img.shields.io/github/stars/audioscavenger/BiasBuster?style=for-the-badge">
   <img src="https://img.shields.io/github/issues/audioscavenger/BiasBuster?style=for-the-badge">
   <img src="https://img.shields.io/github/issues-pr/audioscavenger/BiasBuster?style=for-the-badge">
   <img src="https://img.shields.io/github/license/audioscavenger/BiasBuster?style=for-the-badge">
+  <img src="https://img.shields.io/github/release/audioscavenger/BiasBuster?style=for-the-badge">
 </div>
 
 BiasBuster Will provide a UI and option to process+manage other broadcasts very soon.
@@ -20,6 +20,8 @@ Comes in 2 parts:
 
 The meat of the project is currently KJZZ-db.py that works on Windows. 
 It should be portable to Linux as-is.
+
+![week41 example](assets/week41%20example.png)
 
 
 # Under the hood
@@ -97,15 +99,16 @@ This Python script does the following:
   - [x] query statistics on what is stored
   - [x] query words based on schedule
   - [x] generate word cloud
-  - [x] generate misinformation heatmap
-  - [x] generate html week pages
+  - [x] generate misInformation analysis heatmap only for programs
+  - [x] generate html week pages for chunks
+  - [x] generate html week pages for programs
   - [x] generate html week pages that have pictures
   - [x] generate html week pages that have links
   - [x] generate html week pages that can navigate
   - [x] generate html week pages and also missing wordCloud pictures
+  - [ ] generate gender bias analysis
   - [ ] generate html week pages that are useful
   - [ ] generate html week pages that are interactive
-  - [ ] generate gender bias analysis
   - [ ] what else?
 
 
@@ -442,34 +445,57 @@ The loop below will generate png files for each program of each day of week 41 a
 - [ ] 0.9.?   TODO separate KJZZ into its own table to add other broadcasters
 - [ ] 0.9.?   TODO automate mp3 downloads from cloud + process + uploads from/to cloud server
 - [ ] 0.9.?   TODO adding bias_score.py from https://github.com/auroracramer/language-model-bias
+- [ ] 0.9.9   WIP
+  - [x] stopped uploading the db after week 46: `git update-index --assume-unchanged kjzz.db`
+  - [ ] auto-import mp3 to process via ssl batch putty or plink or smth
+  - [ ] auto-upload processed text back to server via ssl batch putty or plink or smth
+    - [ ] add bubble info tip popup full image on hover like 2 seconds? or a button?
+    - [ ] add a modal for statistical analysis of a program
+    - [ ] add social media share buttons for that modal
+    - [ ] integrate buttons under each available image
+    - [ ] integrate (re)generate picture(s)
+    - [ ] integrate (re)generate misInformation heatMaps
+    - [ ] integrate (re)generate biases
+    - [ ] integrate listen to the recording
+    - [ ] integrate mp3 player with queue for that chunk/program
+    - [ ] integrate text display for that chunk/program
+    - [ ] integrate text analysis with keyword search
+    - [ ] color programings by bias/misInformation/etc
+    - [ ] color wordClouds by bias/misInformation/etc
+  - [ ] build an actual front page with Bootstrap or smth
+  - [ ] extract presenters' names
+  - [ ] save some statistics in the db: add more columns
+  - [ ] highlight the top 10 BS of the week or smth
+  - [ ] integrate front page with cgi or smth so we can ajax-build missing pictures or smth
+  - [ ] integrate front page with cgi so we can tap in the database with SQLite worker
 - [x] 0.9.8   release html_builder
-  - fixed error Tcl_AsyncDelete: async handler deleted by the wrong thread
-  - updated README.md
-  - wordCloud() and genWordCloud() can be called from anywhere
-  - added plt.close() to save memory
-  - rebuild wordCloud png file title where needed
-  - updated usage()
-  - passing progress bar value to relevant info() logger lines
-  - fixed logging levels almost everywhere
-  - renamed info to usage in wordCloudDict
-  - default stopLevel is indeed 4 not 0
-  - added automatic missing pictures where necessary
-  - added html progress bar
-  - added --autoGenerate and --dryRun
-  - frozen table headers
-  - added prev/next links
-  - perfected table generation
+  - [x] fixed error Tcl_AsyncDelete: async handler deleted by the wrong thread
+  - [x] updated README.md
+  - [x] wordCloud() and genWordCloud() can be called from anywhere
+  - [x] added plt.close() to save memory
+  - [x] rebuild wordCloud png file title where needed
+  - [x] updated usage()
+  - [x] passing progress bar value to relevant info() logger lines
+  - [x] fixed logging levels almost everywhere
+  - [x] renamed info to usage in wordCloudDict
+  - [x] default stopLevel is indeed 4 not 0
+  - [x] added automatic missing pictures where necessary
+  - [x] added html progress bar
+  - [x] added --autoGenerate and --dryRun
+  - [x] frozen table headers
+  - [x] added prev/next links
+  - [x] perfected table generation
 - [x] 0.9.7   standardised logging
-  - added --silent
-  - default verbose = 1
-  - standardised logging
+  - [x] added --silent
+  - [x] default verbose = 1
+  - [x] standardised logging
 - [x] 0.9.6   WIP web ui - actually just generates an html page of the week's programing
-  - added options --html --byChunk
-  - added home-made html table generator from json schedule
-  - html table has an okay look and shows existing wordClouds
-  - html and png are generated under their respective week's folder
-  - cleaned up usage() and created error() functions
-  - completed week 46 import
+  - [x] added options --html --byChunk
+  - [x] added home-made html table generator from json schedule
+  - [x] html table has an okay look and shows existing wordClouds
+  - [x] html and png are generated under their respective week's folder
+  - [x] cleaned up usage() and created error() functions
+  - [x] completed week 46 import
 - [x] 0.9.5   added misInformation heatmap from https://github.com/PDXBek/Misinformation
 - [x] 0.9.4   wordCloudDict parameters are auto-added to script arguments and --help is auto-build
 - [x] 0.9.3   added and played with most of the genWordCloud parameters in wordCloudDict
