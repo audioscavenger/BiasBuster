@@ -1,4 +1,4 @@
-# BiasBuster - release 0.9.8 html_builder
+# BiasBuster - WIP 0.9.9
 
 Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast. 
 BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
@@ -409,9 +409,9 @@ Simply add --noMerge: --graph will be ignored when treating multiple chunks, and
 `python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge --show`
 ![heatMap KJZZ week=42 title=Morning Edition Day=Mon](assets/heatMap%20KJZZ%20week=42%20title=Morning%20Edition%20Day=Mon.png)
 
-### Batch to generate ALL word cloud pictures for each program of a given week
+### Batch to generate JUST wordCloud pictures for a week
 
-The loop below will generate png files for each program of each day of week 42:
+The loop below will generate png files for each program of each day of week 42, manually:
 
 `for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt --output kjzz)`
 
@@ -421,43 +421,63 @@ this is useful when you want your files sorted a certain way.
 The loop above will have them sorted by Title. 
 If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
 
+Now, there is a much easier way to generate all those wordCloud pictures.
 
-### Generate html word cloud week
+### Generate html page for a week + wordCloud pictures
 
-The loop below will generate png files for each program of each day of week 42 along with the html page:
+Automatically: this command will generate week's 42 schedule html page, linking available wordCloud pictures:
 
-`python KJZZ-db.py --html 42`
-
-
-### Generate html word cloud week + all word clouds for each program available in the db
-
-The loop below will generate png files for each program of each day of week 41 along with the html page:
-
-`python KJZZ-db.py --html 41 --autoGenerate`
+`python KJZZ-db.py --html 42 --autoGenerate --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt`
 ![week41 example](assets/week41%20example.png)
 
+
+Manually: the loop below will generate only the wordCloud files:
+
+```
+REM (re)generate all thumbnails for week 42 manually:
+for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt --output kjzz)
+```
+Notice how the order of --gettext parameters influence the file names: 
+this is useful when you want your files sorted a certain way. 
+
+The loop above will have them sorted by Title. 
+If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
 
 
 
 # Roadmap
+Scope creep ahead...
+
 - [ ] 0.9.?   TODO should the case matter for title?
 - [ ] 0.9.?   TODO include some of the most offensive Hexspeak from https://en.wikipedia.org/wiki/Hexspeak to trigger fools
 - [ ] 0.9.?   TODO separate KJZZ into its own table to add other broadcasters
 - [ ] 0.9.?   TODO automate mp3 downloads from cloud + process + uploads from/to cloud server
 - [ ] 0.9.?   TODO adding bias_score.py from https://github.com/auroracramer/language-model-bias
 - [ ] 0.9.9   WIP
-  - [x] stopped uploading the db after week 46: `git update-index --assume-unchanged kjzz.db`
+  - [x] add link to switch between byChunk and not
+  - [x] generate both byChunk and not schedules html files
+  - [x] color byChunk schedule with available chunks
+  - [x] click to open image
+  - [x] classes to highlight available segments
+  - [ ] add --profile
+  - [ ] add --saveProfile --listProfiles
+  - [ ] add --listProfiles
+  - [ ] add saveProfile() function
+  - [ ] add loadProfile() function
+  - [ ] add statistics table
+  - [ ] start saving wordCloud statistics in db
   - [ ] auto-import mp3 to process via ssl batch putty or plink or smth
   - [ ] auto-upload processed text back to server via ssl batch putty or plink or smth
-    - [ ] add bubble info tip popup full image on hover like 2 seconds? or a button?
     - [ ] add a modal for statistical analysis of a program
     - [ ] add social media share buttons for that modal
-    - [ ] integrate buttons under each available image
+    - [x] integrate buttons under each available image
+    - [ ] integrate (re)generate html(s)
     - [ ] integrate (re)generate picture(s)
-    - [ ] integrate (re)generate misInformation heatMaps
-    - [ ] integrate (re)generate biases
-    - [ ] integrate listen to the recording
-    - [ ] integrate mp3 player with queue for that chunk/program
+    - [ ] integrate (re)generate misInformation heatMap(s)
+    - [ ] integrate (re)generate biase(s)
+    - [x] integrate listen to the recordings
+    - [x] integrate mp3 player with queue for that chunk
+    - [ ] integrate mp3 player with queue for that program
     - [ ] integrate text display for that chunk/program
     - [ ] integrate text analysis with keyword search
     - [ ] color programings by bias/misInformation/etc
@@ -469,6 +489,7 @@ The loop below will generate png files for each program of each day of week 41 a
   - [ ] integrate front page with cgi or smth so we can ajax-build missing pictures or smth
   - [ ] integrate front page with cgi so we can tap in the database with SQLite worker
 - [x] 0.9.8   release html_builder
+  - [x] stopped uploading the db after week 46: `git update-index --assume-unchanged kjzz.db`
   - [x] fixed error Tcl_AsyncDelete: async handler deleted by the wrong thread
   - [x] updated README.md
   - [x] wordCloud() and genWordCloud() can be called from anywhere
@@ -541,6 +562,7 @@ The loop below will generate png files for each program of each day of week 41 a
     - stopWords.ranks.nl.txt
   - Thesaurus and adjectives: https://github.com/taikuukaits/SimpleWordlists/tree/master
     - stopWords.Wordlist-Adjectives-All.txt
+- mp3 player:     OpenPlayer.js https://github.com/openplayerjs/openplayerjs/
 
 
 ## Support

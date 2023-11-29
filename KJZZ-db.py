@@ -1,7 +1,7 @@
 # BiasBuster
 # author:  AudioscavengeR
 # license: GPLv2
-# version: 0.9.8 release html_builder
+# version: 0.9.9 WIP
 
 
 # Object: Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast.
@@ -119,6 +119,7 @@ inputFiles = []
 inputJsonFile = None
 inputTextFile = None
 localSqlDb = Path("kjzz.db")
+# the db connection is global
 conn = None
 
 model = "small"
@@ -369,7 +370,7 @@ def db_init(localSqlDb):
           start     TEXT    PRIMARY KEY
         , stop      TEXT    NOT NULL
         , week      INTEGER
-        , day       TEXT    NOT NULL
+        , Day       TEXT    NOT NULL
         , title     TEXT    NOT NULL
         , text      TEXT
         , model     TEXT
@@ -385,26 +386,24 @@ def db_init(localSqlDb):
       records = cursor(localSqlDb, conn, """SELECT count(start) from schedule""")
       info("%s chunks found in schedule %s" %(records[0][0], localSqlDb), 1)
   
-  # queryStatsTable = """
-    # CREATE TABLE statistics (
-          # start     TEXT    PRIMARY KEY
-        # , stop      TEXT    NOT NULL
-        # , week      INTEGER
-        # , day       TEXT    NOT NULL
-        # , title     TEXT    NOT NULL
-        # , text      TEXT
-        # , model     TEXT
-        # );
-    # """
-  # try:
-    # cur.execute(queryStatsTable)
-    # info("queryStatsTable %s: success" %(localSqlDb), 1)
-  # except Exception as error:
-    # if not str(error).find("already exists"):
-      # info("queryStatsTable %s: %s" %(localSqlDb, error), 1)
-    # else:
-      # records = cursor(localSqlDb, conn, """SELECT count(*) from statistics""")
-      # info("%s lines found in statistics %s" %(records[0][0], localSqlDb), 1)
+  queryStatsTable = """
+    CREATE TABLE statistics (
+          week          INTEGER NOT NULL
+        , Day           TEXT    NOT NULL
+        , title         TEXT    NOT NULL
+        , top100tuples  TEXT
+        , PRIMARY KEY (week, day, title)
+        );
+    """
+  try:
+    cur.execute(queryStatsTable)
+    info("queryStatsTable %s: success" %(localSqlDb), 1)
+  except Exception as error:
+    if not str(error).find("already exists"):
+      info("queryStatsTable %s: %s" %(localSqlDb, error), 1)
+    else:
+      records = cursor(localSqlDb, conn, """SELECT count(*) from statistics""")
+      info("%s lines found in statistics %s" %(records[0][0], localSqlDb), 1)
   
   return conn
   #
@@ -546,9 +545,67 @@ def getText(gettextDict, progress=""):
   
   records = cursor(localSqlDb, conn, sqlGettext)
   if len(records) == 0:
-    info("gettext: 0 records for %s" %(gettextDict), 2, progress)
+    info("0 records for %s" %(gettextDict), 2, progress)
   
   return records
+# gettext
+
+
+def checkChunk(getTextDict, progress=""):
+  # gettextDict = {'week': '40', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
+
+  sqlGettext = "SELECT count(*) from schedule where 1=1"
+  title = "KJZZ"
+  
+  # build the actual query
+  for key in gettextDict.keys():
+    # build the SQL query:
+    sqlGettext += (" and %s = '%s'" % (key, gettextDict[key]))
+    
+    # reformat start time for the fileName: chunk has been build if the key is "chunk"
+    if key == "start":
+      gettextDict[key] = parser.parse(gettextDict[key]).strftime("%Y-%m-%d %H:%M")
+    
+    # build a title that contains the gettextDict: normally that would be "KJZZ week= title= Day="
+    title += " %s=%s" % (key, gettextDict[key])
+  info("sqlGettext: %s" %(sqlGettext), 3, progress)
+  
+  records = cursor(localSqlDb, conn, sqlGettext)
+  if len(records) == 0:
+    info("0 records for %s" %(gettextDict), 4, progress)
+  
+  return records[0][0]
+# gettext
+
+
+
+# the db has:   start stop week day title text model
+# and we want:  KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title
+def getChunkNames(getTextDict, progress=""):
+  # gettextDict = {'week': '40', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
+
+  sqlListChunks = """ SELECT 
+          strftime('%%H:%%M',start)
+        , 'KJZZ_' || strftime('%%Y-%%m-%%d_',start) || Day || strftime('_%%H%%M-',start) || strftime('%%H%%M_',stop) || title
+          from schedule 
+          where 1=1
+          and week = %s
+          and Day = '%s'
+          and title = '%s'
+          ORDER BY start ASC
+          """ %(gettextDict['week'], gettextDict['Day'], gettextDict['title'])
+  
+  info("sqlListChunks: %s" %(sqlListChunks), 3, progress)
+  
+  records = cursor(localSqlDb, conn, sqlListChunks)
+  if len(records) == 0:
+    info("0 records for %s" %(gettextDict), 4, progress)
+  
+  return records
+  # records = [
+    # ('01:00', 'KJZZ_2023-10-14_6_0100-0130_BBC World Service'),
+    # ('01:30', 'KJZZ_2023-10-14_6_0130-0200_BBC World Service'),
+    # ...
 # gettext
 
 
@@ -1211,89 +1268,137 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
     # f.close()
 
   # how do my table compare to https://kjzz.org/kjzz-print-schedule ? let me know in the comments!
+  style  = '''
+  body {
+    color: #434343;
+  }
+  #audio {
+    position: sticky;   /* freeze top row */
+  }
+  i {
+    cursor: pointer;
+  }
+  table {
+    width: 100%;
+    border: 1px solid #DDD;
+    border-collapse: collapse;
+    border-spacing: 0;
+    border-color: 0;
+    font-family: sans-serif;
+    margin: 0;
+    padding: 0;
+    font-size: 11px;
+    line-height: 1.4;
+    text-align: center;
+    position: relative;   /* freeze top row */
+  }
+  tr td {
+    border: 1px solid #DDD;
+    vertical-align: middle;
+    color: #aaa;
+  }
+  tr.title td {
+    background-color: #666;
+    color: white;
+    font-weight: bold;
+    text-align: center;
+  }
+  thead {
+    border: 2px solid #666;
+    background-color: #EEE;
+    color: #666;
+    font-weight: bold;
+    top: 0;             /* freeze top row */
+    position: sticky;   /* freeze top row */
+  }
+  th.startTime, td.startTime {
+    font-weight: bold;
+    color: #434343;
+  }
+  tbody, tfoot {
+    border-top: 1px solid #666;
+  }
+  .chunkExist {
+    background-color: azure;
+    color: #434343;
+  }
+  img.chunkExist {
+    width: 100%;
+    max-width: 15vw; /* width divided by 8 */
+  }
+  a {
+    color: white;
+    text-decoration: none;
+  }
+  a.prevWeek, a.nextWeek {
+    background-color: #777;
+    width: 100px;
+    display: block;
+    overflow: auto;
+    height: 50%;
+    position: absolute;
+    top: 0;
+  }
+  a.prevWeek {
+    left: 0;
+  }
+  a.nextWeek {
+    right: 0;
+  }
+  '''
+  outputFile = os.path.join(outputFolder, str(weekNumber), '../style.css')
+  with open(outputFile, 'w') as fd:
+    fd.write(style)
+
+  
   html  = '''
 <!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8" />
+    <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
     <title data-l10n-id="%s week %s"></title>
-    <style>
-      body {
-        color: #434343;
-      }
-      table {
-        width: 100%%;
-        border: 1px solid #DDD;
-        border-collapse: collapse;
-        border-spacing: 0;
-        border-color: 0;
-        font-family: sans-serif;
-        margin: 0;
-        padding: 0;
-        font-size: 11px;
-        line-height: 1.4;
-        text-align: center;
-        position: relative;   /* freeze top row */
-      }
-      tr.title {
-        background-color: #666;
-        color: white;
-        font-weight: bold;
-        text-align: center;
-      }
-      tr, td {
-        border: 1px solid #DDD;
-        vertical-align: middle;
-      }
-      th.startTime, td.startTime {
-        font-weight: bold;
-      }
-      thead {
-        border: 2px solid #666;
-        background-color: #EEE;
-        color: #666;
-        font-weight: bold;
-        top: 0;             /* freeze top row */
-        position: sticky;   /* freeze top row */
-      }
-      tbody, tfoot {
-        border-top: 1px solid #666;
-      }
-      img.notByChunk {
-        width: 100%%;
-        max-width: 15vw; /* width divided by 8 */
-      }
-      .prevWeek, .nextWeek {
-        color: white;
-        background-color: #777;
-        text-decoration: none;
-        width: 100px;
-        display: block;
-        overflow: auto;
-        height: 50%%;
-        position: absolute;
-        top: 0;
-      }
-      .prevWeek {
-        left: 0;
-      }
-      .nextWeek {
-        right: 0;
-      }
-    </style>
+
+    <link rel="stylesheet" href="../fontawesome.all.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/openplayerjs@1.12.1/dist/openplayer.min.css">
+    <link rel="stylesheet" href="../style.css">
+
   </head>
   <body>
   ''' %("KJZZ", weekNumber)
   
+  outputFileName = "index.html"
+  addByChunk = '-byChunk'
+  addNotByChunk = ''
+  switchTo = 'byChunk'
+  if byChunk:
+    outputFileName = "index-byChunk.html"
+    addByChunk = ''
+    addNotByChunk = '-byChunk'
+    switchTo = 'bySchedule'
+  
+  # https://github.com/openplayerjs/openplayerjs/blob/master/docs/api.md
+  # https://github.com/openplayerjs/openplayerjs/blob/master/docs/usage.md
+  
   html += '<table>'
-  html += '<tr>'
   html += '  <thead>'
+
+      # <source src='file.mp3' type="audio/mp3" />
+      # <track src="file.vtt" kind="subtitles" srclang="en" label="English" />
+  html += '''
+  <tr class="audio">
+    <audio id="audio" class="op-player__media">
+    </audio>
+  </tr>\n'''
+  
   html += '<tr class="title">'
-  html += '<td><a class="prevWeek" href="../%s/kjzz-week%s.html">&larr; week %s</a></td>' %((weekNumber-1), (weekNumber-1), (weekNumber-1))
-  html += '<td colspan="6">%s week %s</td>' %("KJZZ", weekNumber)
-  html += '<td><a class="nextWeek" href="../%s/kjzz-week%s.html">week %s&rarr;</a></td>' %((weekNumber+1), (weekNumber+1), (weekNumber+1))
-  html += '</tr>'
-  html += '<tr><th class="startTime">Time</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>'
+  html += '<td><a class="prevWeek" href="../%s/index%s.html">&larr; week %s</a></td>' %((weekNumber-1), addNotByChunk, (weekNumber-1))
+  html += '<td colspan="6"><span>%s week %s<a href="index%s.html">&nbsp;&nbsp;&nbsp;%s</a></span></td>' %("KJZZ", weekNumber, addByChunk, switchTo)
+  html += '<td><a class="nextWeek" href="../%s/index%s.html">week %s&rarr;</a></td>' %((weekNumber+1), addNotByChunk, (weekNumber+1))
+  html += '</tr>\n'
+  html += '<tr><th class="startTime">Time</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>\n'
   html += '  </thead>'
   html += '  <tbody>'
   
@@ -1308,7 +1413,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   for Day in DayList: rowspan[Day] = 1
   
   with Progress() as progress:
-    task = progress.add_task("Building schedule...", total=len(timeList)*len(DayList))
+    task = progress.add_task("Building %s ..." %(outputFileName), total=len(timeList)*len(DayList))
     
     # we reverse because that's the only way to increase the rowspan of the first occurance of the same title
     for key, startTime in enumerate(timeList):
@@ -1349,12 +1454,13 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
           # Also we should not have to filter by week anymore since version 0.9.6 
           # , we generate both html and png under each ./week subfolder
           img = ''
+          play = ''
           imgClass = ''
           regexp = re.compile(".*week=%s.*title=%s.*Day=%s" %(weekNumber, jsonSchedule[startTime][Day], Day))
           thatWordCloudPngList = list(filter(regexp.match, pngList))
           if len(thatWordCloudPngList) == 0:
             # setup an empty src for an img is indeed an error we will get the missingCloud.png for:
-            thatWordCloudPngList = [""]
+            thatWordCloudPngList = []
             
             # we will not bother looking for excluded programs such as Jazz Blues etc:
             if not any(word in jsonSchedule[startTime][Day] for word in listTitleWords2Exclude):
@@ -1367,24 +1473,28 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
                 if autoGenerate: info('Generate wordCloud "%s" ...' %(title), 1, progress)
                 genWordCloudDicts = genWordClouds(records, title, True, showPicture, wordCloudDict, os.path.join(outputFolder, str(weekNumber)), not autoGenerate, progress)
                 if len(genWordCloudDicts) > 0:
-                  imgClass = 'notByChunk'
+                  imgClass = 'chunkExist'
                   thatWordCloudPngList = [os.path.basename(genWordCloudDicts[0]["fileName"])]
-              else:
-                # we do not have any record in the db, no use to show a missing image
-                thatWordCloudPngList = [voidPic]
-            else:
-              # no use to show a missing image for musical programs
-              thatWordCloudPngList = [voidPic]
+              # else:
+                # # we do not have any record in the db, no use to show a missing image
+                # thatWordCloudPngList = [voidPic]
+            # else:
+              # # no use to show a missing image for musical programs
+              # thatWordCloudPngList = [voidPic]
           else:
             # all images are inside the html week's folder
-            imgClass = 'notByChunk'
+            imgClass = 'chunkExist'
             thatWordCloudPngList = [os.path.basename(thatWordCloudPngList[0])]
 
           if len(thatWordCloudPngList) > 0:
-            img = '<img src="%s" alt="%s" class="%s" decoding="async" onerror="this.src=\'../missingCloud.png\'">' %(thatWordCloudPngList[0], thatWordCloudPngList[0], imgClass)
-          rowspanDict[startTime][Day] = '<td rowspan="%s"><p>%s</p>%s</td>' %(rowspan[Day], jsonSchedule[startTime][Day], img)
+            img = '<a href="%s"><img src="%s" alt="%s" class="%s" decoding="async" onerror="this.src=\'../missingCloud.png\'"></a>' %(thatWordCloudPngList[0], thatWordCloudPngList[0], thatWordCloudPngList[0], imgClass)
+            play = '<i class="fa-regular fa-circle-play" onclick="play(\'%s.mp3\');"></i>' %(Path(thatWordCloudPngList[0]).stem)
+            # print(thatWordCloudPngList)
+            # print(play)
+            # exit()
+          rowspanDict[startTime][Day] = '<td rowspan="%s" class="%s"><p>%s%s</p>%s</td>' %(rowspan[Day], imgClass, jsonSchedule[startTime][Day], play, img)
 
-          # if we are not processing the last key:
+          # if we are not processing the last time key of the day:
           if getNextKey(timeList, key):
             info(startTime, 4, progress)
             if jsonSchedule[startTime][Day] == jsonSchedule[getNextKey(timeList, key)][Day]:
@@ -1402,7 +1512,27 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
         
         # byChunk:
         else:
-          rowspanDict[startTime][Day] = '<td rowspan="%s"><p>%s</p></td>' %(rowspan[Day], jsonSchedule[startTime][Day])
+          classChunkExist = ''
+          play = ''
+          if not any(word in jsonSchedule[startTime][Day] for word in listTitleWords2Exclude):
+            gettext = "week=%s+title=%s+Day=%s" %(weekNumber, jsonSchedule[startTime][Day], Day)
+            getTextDict = buildGetTextDict(gettext)
+            listChunks = getChunkNames(getTextDict, progress)
+          # listChunks = [
+            # ('01:00', 'KJZZ_2023-10-14_6_0100-0130_BBC World Service'),
+            # ('01:30', 'KJZZ_2023-10-14_6_0130-0200_BBC World Service'),
+            # ...
+            
+            # if checkChunk(getTextDict, progress):
+            for row in listChunks:
+              # Our schedule is by the hour but the db is by chuk of 30mn so we have certainly 2 chunks per hour:
+              # And do not forget we process timeList in reverse!
+              # There is a simple trick to simplify our lives: just compare the hour
+              if startTime[:2] == row[0][:2]:
+                classChunkExist = 'class="chunkExist"'
+                play += '<i class="fa-regular fa-circle-play" onclick="play(\'%s.mp3\');"></i>' %(row[1])
+            
+          rowspanDict[startTime][Day] = '<td rowspan="%s" %s><p>%s%s</p></td>' %(rowspan[Day], classChunkExist, jsonSchedule[startTime][Day], play)
           info("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], None), 4, progress)
       
         progress.advance(task)
@@ -1418,15 +1548,13 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
     html   +=     '</tr>\n'
   
   html += '  </tbody>'
-  html += '</tr>'
-  html += '</table>'
-  html += '</body></html>'
+  html += '</tr>\n'
+  html += '</table>\n'
+  html += '<script src="https://cdn.jsdelivr.net/npm/openplayerjs@latest/dist/openplayer.min.js"></script>\n'
+  html += '<script src="../OpenPlayerJS.js"></script>\n'
+  html += '</body>\n'
+  html += '</html>'
   
-  if byChunk:
-    outputFileName = "kjzz-week"+str(weekNumber)+"-byChunk.html"
-  else:
-    outputFileName = "kjzz-week"+str(weekNumber)+".html"
-
   outputFile = os.path.join(outputFolder, str(weekNumber), outputFileName)
   with open(outputFile, 'w') as fd:
     fd.write(html)
@@ -1795,6 +1923,8 @@ if sqlQuery: sqlQueryPrintExec(sqlQuery, pretty)
 #################################### genHtml
 if weekNumber:
   html = genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk)
+  # also generate the other one but do not return its value
+  genHtml(jsonScheduleFile, outputFolder, weekNumber, not byChunk)
 
   if printOut: print(html)
 # weekNumber:
