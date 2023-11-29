@@ -586,6 +586,7 @@ def getChunkNames(getTextDict, progress=""):
 
   sqlListChunks = """ SELECT 
           strftime('%%H:%%M',start)
+        , strftime('%%H:%%M',stop)
         , 'KJZZ_' || strftime('%%Y-%%m-%%d_',start) || Day || strftime('_%%H%%M-',start) || strftime('%%H%%M_',stop) || title
           from schedule 
           where 1=1
@@ -603,8 +604,8 @@ def getChunkNames(getTextDict, progress=""):
   
   return records
   # records = [
-    # ('01:00', 'KJZZ_2023-10-14_6_0100-0130_BBC World Service'),
-    # ('01:30', 'KJZZ_2023-10-14_6_0130-0200_BBC World Service'),
+    # ('01:00', '01:30', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service'),
+    # ('01:30', '02:00', 'KJZZ_2023-10-14_Sat_0130-0200_BBC World Service'),
     # ...
 # gettext
 
@@ -644,7 +645,7 @@ def genWordClouds(records, title, mergeRecords, showPicture, wordCloudDict, outp
       info("wordCloud: record = \n %s" %(record), 2, progress)
       genWordCloudDicts += genWordCloud(record[1], title, removeStopwords, stopLevel, wordCloudDict, showPicture, outputFolder, dryRun, progress)
     i += 1
-  # if showPicture: plt.show()    # somehow plt generated are in a stack and we can show them all from here as well
+
   return genWordCloudDicts
 # wordCloud
 
@@ -663,7 +664,6 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
   from   matplotlib import style
   from   matplotlib.patches import Rectangle
   import seaborn
-  import pngquant
   import pngquant
   pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
   from wordcloud import WordCloud
@@ -701,8 +701,8 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
     wordCloudDict["scale"]["value"], 
     wordCloudDict["relative_scaling"]["value"], 
   )
-  genWordCloudDict["fileName"] = genWordCloudDict["wordCloudTitle"].replace(": ", "=").replace(":", "") + ".png"
-  genWordCloudDict["outputFile"] = os.path.join(outputFolder, genWordCloudDict["fileName"])
+  genWordCloudDict["fileName"] = genWordCloudDict["wordCloudTitle"].replace(": ", "=").replace(":", "")
+  genWordCloudDict["outputFile"] = os.path.join(outputFolder, genWordCloudDict["fileName"] + ".png")
   if dryRun: return genWordCloudDict
   
   if removeStopwords:
@@ -792,10 +792,6 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
   # plt.tight_layout(pad=1)
   plt.imshow(wordcloud, interpolation='bilinear')
 
-  plt.savefig(genWordCloudDict["outputFile"], bbox_inches='tight')
-  info('outputFile = "%s"' % (genWordCloudDict["outputFile"]), 2, progress)
-
-
   # # image 2: lower max_font_size
   # wordcloud = WordCloud(max_font_size=40).generate(text)
   # plt.figure()
@@ -806,6 +802,13 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
   # image = wordcloud.to_image()
   # image.show()
   
+  fileName = genWordCloudDict["fileName"]
+  # always save BEFORE show
+  if fileName:
+    plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
+    pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
+    info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
+
   if showPicture: plt.show()
   plt.close()
   return genWordCloudDict
@@ -827,7 +830,7 @@ def genMisInformation(records, mergeRecords, showPicture, dryRun=False):
       textArray.append(record[1])
       Ylabels.append(parser.parse(record[0]).strftime("%H:%M"))
     genMisinfoDicts += genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict, showPicture, dryRun)
-  # if showPicture: plt.show()    # somehow plt generated are in a stack and we can show them all from here as well
+  
   return genMisinfoDicts
 #
 
@@ -869,9 +872,7 @@ def genMisinfoBarGraph(text, title, wordCloudDict=wordCloudDict, graph="bar", sh
   if graph == "bar": graph_bar(X, Y, title, fileName)
   if graph == "pie": graph_pie(X, Y, title, fileName)
   if graph == "line": graph_line(X, Y, title, fileName)
-    
-  if showPicture: plt.show()
-  plt.close()
+
   return []
 # genMisinfoBarGraph
 
@@ -888,7 +889,6 @@ def genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict=wordCloudDict, gr
   from   matplotlib import style
   from   matplotlib.patches import Rectangle
   import seaborn
-  import pngquant
   import pngquant
   pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
@@ -935,8 +935,6 @@ def genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict=wordCloudDict, gr
   fileName = "heatMap " + title.replace(": ", "=").replace(":", "")
   graph_heatMap(heatMaps, Xlabels, Ylabels, title, fileName)
   
-  if showPicture: plt.show()
-  plt.close()
   return []
 # genMisinfoHeatMap
 
@@ -987,7 +985,6 @@ def graph_line(X, Y, title="", fileName=""):
   from   matplotlib.patches import Rectangle
   import seaborn
   import pngquant
-  import pngquant
   pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
   # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.plot_date.html
@@ -1001,8 +998,9 @@ def graph_line(X, Y, title="", fileName=""):
     plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
     pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
     info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
-  # plt.show()
-  # plt.close()
+
+  if showPicture: plt.show()
+  plt.close()
 # graph_line
 
 
@@ -1019,7 +1017,6 @@ def graph_bar(X, Y, title="", fileName=""):
   from   matplotlib.patches import Rectangle
   import seaborn
   import pngquant
-  import pngquant
   pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
   # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.bar.html
@@ -1033,8 +1030,9 @@ def graph_bar(X, Y, title="", fileName=""):
     plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
     pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
     info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
-  # plt.show()
-  # plt.close()
+
+  if showPicture: plt.show()
+  plt.close()
 # graph_bar
 
 
@@ -1051,7 +1049,6 @@ def graph_pie(X, Y, title="", fileName=""):
   from   matplotlib.patches import Rectangle
   import seaborn
   import pngquant
-  import pngquant
   pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
   # https://matplotlib.org/stable/gallery/pie_and_polar_charts/pie_features.html#sphx-glr-gallery-pie-and-polar-charts-pie-features-py
@@ -1061,12 +1058,6 @@ def graph_pie(X, Y, title="", fileName=""):
   ax.set_title(title)
   ax.axis("off")
 
-  # always save BEFORE show
-  if fileName:
-    plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
-    pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
-    info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
-  
   # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.savefig.html
   # savefig(fname, *, transparent=None, dpi='figure', format=None,
         # metadata=None, bbox_inches=None, pad_inches=0.1,
@@ -1074,8 +1065,14 @@ def graph_pie(X, Y, title="", fileName=""):
         # **kwargs
        # )
        
-  # plt.show()
-  # plt.close()
+  # always save BEFORE show
+  if fileName:
+    plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
+    pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
+    info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
+
+  if showPicture: plt.show()
+  plt.close()
 # graph_pie
 
 
@@ -1091,7 +1088,6 @@ def graph_heatMapTestHighlight():
   from   matplotlib.patches import Rectangle
   import seaborn
   import pngquant
-  import pngquant
   pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
   labels = list('abcdef')
@@ -1106,7 +1102,15 @@ def graph_heatMapTestHighlight():
       x, y = y, x # exchange the roles of x and y
       w, h = h, w # exchange the roles of w and h
   ax.tick_params(length=0)
-  plt.show()
+
+  # always save BEFORE show
+  if fileName:
+    plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
+    pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
+    info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
+
+  if showPicture: plt.show()
+  plt.close()
 # graph_heatMapTestHighlight
 
 
@@ -1122,7 +1126,6 @@ def graph_heatMap(arrays, X, Y, title="", fileName=""):
   from   matplotlib import style
   from   matplotlib.patches import Rectangle
   import seaborn
-  import pngquant
   import pngquant
   pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
@@ -1202,8 +1205,10 @@ def graph_heatMap(arrays, X, Y, title="", fileName=""):
   if fileName:
     plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
     pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
-  # plt.show()
-  # plt.close()
+    info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
+
+  if showPicture: plt.show()
+  plt.close()
 
 # graph_heatMap
 
@@ -1268,88 +1273,6 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
     # f.close()
 
   # how do my table compare to https://kjzz.org/kjzz-print-schedule ? let me know in the comments!
-  style  = '''
-  body {
-    color: #434343;
-  }
-  #audio {
-    position: sticky;   /* freeze top row */
-  }
-  i {
-    cursor: pointer;
-  }
-  table {
-    width: 100%;
-    border: 1px solid #DDD;
-    border-collapse: collapse;
-    border-spacing: 0;
-    border-color: 0;
-    font-family: sans-serif;
-    margin: 0;
-    padding: 0;
-    font-size: 11px;
-    line-height: 1.4;
-    text-align: center;
-    position: relative;   /* freeze top row */
-  }
-  tr td {
-    border: 1px solid #DDD;
-    vertical-align: middle;
-    color: #aaa;
-  }
-  tr.title td {
-    background-color: #666;
-    color: white;
-    font-weight: bold;
-    text-align: center;
-  }
-  thead {
-    border: 2px solid #666;
-    background-color: #EEE;
-    color: #666;
-    font-weight: bold;
-    top: 0;             /* freeze top row */
-    position: sticky;   /* freeze top row */
-  }
-  th.startTime, td.startTime {
-    font-weight: bold;
-    color: #434343;
-  }
-  tbody, tfoot {
-    border-top: 1px solid #666;
-  }
-  .chunkExist {
-    background-color: azure;
-    color: #434343;
-  }
-  img.chunkExist {
-    width: 100%;
-    max-width: 15vw; /* width divided by 8 */
-  }
-  a {
-    color: white;
-    text-decoration: none;
-  }
-  a.prevWeek, a.nextWeek {
-    background-color: #777;
-    width: 100px;
-    display: block;
-    overflow: auto;
-    height: 50%;
-    position: absolute;
-    top: 0;
-  }
-  a.prevWeek {
-    left: 0;
-  }
-  a.nextWeek {
-    right: 0;
-  }
-  '''
-  outputFile = os.path.join(outputFolder, str(weekNumber), '../style.css')
-  with open(outputFile, 'w') as fd:
-    fd.write(style)
-
   
   html  = '''
 <!DOCTYPE html>
@@ -1405,75 +1328,59 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   # loop json
   # html += '    <tr><td>00:00</td><td>BBC World Service</td><td>Classic Jazz with Chazz Rayburn</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Michele Robins</td><td>Classic Jazz with Michele Robins</td><td>BBC World Service</td></tr>'
 
-  rowspanDict = {}
-  timeList    = list(reversed(list(jsonSchedule.keys())))
-  DayList     = list(jsonSchedule[timeList[0]].keys())
+  rowspanDict       = {}
+  timeList          = list(jsonSchedule.keys())
+  reversedTimeList  = list(reversed(timeList))
+  DayList           = list(jsonSchedule[reversedTimeList[0]].keys())
+  rowspan           = {}
+
   info("DayList: %s" %(DayList), 2)
-  rowspan  = {}
   for Day in DayList: rowspan[Day] = 1
   
   with Progress() as progress:
-    task = progress.add_task("Building %s ..." %(outputFileName), total=len(timeList)*len(DayList))
+    task = progress.add_task("Building %s ..." %(outputFileName), total=len(reversedTimeList)*len(DayList))
     
     # we reverse because that's the only way to increase the rowspan of the first occurance of the same title
-    for key, startTime in enumerate(timeList):
+    for key, startTime in enumerate(reversedTimeList):
       rowspanDict[startTime] = {}
       for Day in DayList:
-        info("%s %s %s" %(key, startTime, Day), 3, progress)
+        title = jsonSchedule[startTime][Day]
+        classChunkExist = ''
+        play = ''
+        img = ''
+        classTooltipPosition = 'tooltipBottomLeft'
+        if Day in ['Mon', 'Tue']: classTooltipPosition = 'tooltipBottomRight'
+        info("Processing: %s %s %s %s" %(key, startTime, Day, title), 2, progress)
 
+        # we need getTextDict to get chunk names for the play buttons, and to build the missing wordClouds
+        gettext = "week=%s+title=%s+Day=%s" %(weekNumber, title, Day)
+        getTextDict = buildGetTextDict(gettext)
 
-
-
-
-
-
-
-
-                          # 
-                          # add --profile
-                          # add --saveProfile --listProfiles
-                          # add --listProfiles
-                          # add saveProfile() function
-                          # add loadProfile() function
-
-
-
-
-
-
-
-
-
-        # without +1, jsonSchedule[timeList[key+1]] will error out with IndexError: list index out of range
+        # without +1, jsonSchedule[reversedTimeList[key+1]] will error out with IndexError: list index out of range
         # with +1,    we will not process the last startTime == 23:00
-        # solution:   create a dumb function for if key+1 < len(timeList) == getNextKey
+        # solution:   create a dumb function for if key+1 < len(reversedTimeList) == getNextKey
         
         # notByChunk:
         if not byChunk:
           # By default we start with a normal, chunked cell of 30mn:
           # Also we should not have to filter by week anymore since version 0.9.6 
           # , we generate both html and png under each ./week subfolder
-          img = ''
-          play = ''
-          imgClass = ''
-          regexp = re.compile(".*week=%s.*title=%s.*Day=%s" %(weekNumber, jsonSchedule[startTime][Day], Day))
+          regexp = re.compile(".*week=%s.*title=%s.*Day=%s" %(weekNumber, title, Day))
           thatWordCloudPngList = list(filter(regexp.match, pngList))
           if len(thatWordCloudPngList) == 0:
             # setup an empty src for an img is indeed an error we will get the missingCloud.png for:
             thatWordCloudPngList = []
             
             # we will not bother looking for excluded programs such as Jazz Blues etc:
-            if not any(word in jsonSchedule[startTime][Day] for word in listTitleWords2Exclude):
-              gettext = "week=%s+title=%s+Day=%s" %(weekNumber, jsonSchedule[startTime][Day], Day)
-              getTextDict = buildGetTextDict(gettext)
+            if not any(word in title for word in listTitleWords2Exclude):
               records = getText(getTextDict, progress)
               if len(records) > 0:
-                title = "KJZZ " + gettext.replace("+", " ")
+                wordCloudTitle = "KJZZ " + gettext.replace("+", " ")
                 # we only print info if we actually generate the wordCloud as i t takes time:
-                if autoGenerate: info('Generate wordCloud "%s" ...' %(title), 1, progress)
-                genWordCloudDicts = genWordClouds(records, title, True, showPicture, wordCloudDict, os.path.join(outputFolder, str(weekNumber)), not autoGenerate, progress)
+                if autoGenerate: info('Generate wordCloud "%s" ...' %(wordCloudTitle), 1, progress)
+                genWordCloudDicts = genWordClouds(records, wordCloudTitle, True, showPicture, wordCloudDict, os.path.join(outputFolder, str(weekNumber)), not autoGenerate, progress)
                 if len(genWordCloudDicts) > 0:
-                  imgClass = 'chunkExist'
+                  classChunkExist = 'class="chunkExist"'
                   thatWordCloudPngList = [os.path.basename(genWordCloudDicts[0]["fileName"])]
               # else:
                 # # we do not have any record in the db, no use to show a missing image
@@ -1483,62 +1390,70 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
               # thatWordCloudPngList = [voidPic]
           else:
             # all images are inside the html week's folder
-            imgClass = 'chunkExist'
+            classChunkExist = 'class="chunkExist"'
             thatWordCloudPngList = [os.path.basename(thatWordCloudPngList[0])]
 
           if len(thatWordCloudPngList) > 0:
-            img = '<a href="%s"><img src="%s" alt="%s" class="%s" decoding="async" onerror="this.src=\'../missingCloud.png\'"></a>' %(thatWordCloudPngList[0], thatWordCloudPngList[0], thatWordCloudPngList[0], imgClass)
-            play = '<i class="fa-regular fa-circle-play" onclick="play(\'%s.mp3\');"></i>' %(Path(thatWordCloudPngList[0]).stem)
-            # print(thatWordCloudPngList)
-            # print(play)
-            # exit()
-          rowspanDict[startTime][Day] = '<td rowspan="%s" class="%s"><p>%s%s</p>%s</td>' %(rowspan[Day], imgClass, jsonSchedule[startTime][Day], play, img)
+            img = '<a href="%s"><img src="%s" alt="%s" %s decoding="async" onerror="this.src=\'../missingCloud.png\'"></a>' %(thatWordCloudPngList[0], thatWordCloudPngList[0], thatWordCloudPngList[0], classChunkExist)
+
+            listChunks = getChunkNames(getTextDict, progress)
+            # print(getTextDict)
+            # print(listChunks)
+            # listChunks = [
+              # ('01:00', '01:30', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service'),
+              # ('01:30', '02:00', 'KJZZ_2023-10-14_Sat_0130-0200_BBC World Service'),
+              # ...
+              # ('23:30', '00:00', 'KJZZ_2023-10-14_Sat_2330-0000_BBC World Service')
+
+            for row in listChunks:
+              # this is by programming, not byChunk: we therefore list all chunks
+              play += '<i class="fa-regular fa-circle-play tooltip" onclick="play(\'%s.mp3\');"><span class="tooltiptext %s"><div>%s - %s<br>%s</div></span></i>' %(row[2], classTooltipPosition, row[0], row[1], row[2])
+
+          rowspanDict[startTime][Day] = '<td rowspan="%s" %s><div>%s<span>%s</span></div>%s</td>' %(rowspan[Day], classChunkExist, title, play, img)
 
           # if we are not processing the last time key of the day:
-          if getNextKey(timeList, key):
+          if getNextKey(reversedTimeList, key):
             info(startTime, 4, progress)
-            if jsonSchedule[startTime][Day] == jsonSchedule[getNextKey(timeList, key)][Day]:
+            if title == jsonSchedule[getNextKey(reversedTimeList, key)][Day]:
               # create a missing td for the rowspan to happen:
               rowspanDict[startTime][Day] = ''
               rowspan[Day] += 1
-              info("%s +1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], jsonSchedule[getNextKey(timeList, key)][Day]), 4, progress)
+              info("%s +1 %s %s - %s" %(startTime, rowspan[Day], title, jsonSchedule[getNextKey(reversedTimeList, key)][Day]), 4, progress)
             else:
               rowspan[Day]  = 1
-              info("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], jsonSchedule[getNextKey(timeList, key)][Day]), 4, progress)
+              info("%s =1 %s %s - %s" %(startTime, rowspan[Day], title, jsonSchedule[getNextKey(reversedTimeList, key)][Day]), 4, progress)
           
           # if we are processing the last key == 00:00 since we loop in reverse:
           else:
-            info("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], None), 4, progress)
+            info("%s =1 %s %s - %s" %(startTime, rowspan[Day], title, None), 4, progress)
         
         # byChunk:
         else:
-          classChunkExist = ''
-          play = ''
-          if not any(word in jsonSchedule[startTime][Day] for word in listTitleWords2Exclude):
-            gettext = "week=%s+title=%s+Day=%s" %(weekNumber, jsonSchedule[startTime][Day], Day)
-            getTextDict = buildGetTextDict(gettext)
+          if not any(word in title for word in listTitleWords2Exclude):
             listChunks = getChunkNames(getTextDict, progress)
-          # listChunks = [
-            # ('01:00', 'KJZZ_2023-10-14_6_0100-0130_BBC World Service'),
-            # ('01:30', 'KJZZ_2023-10-14_6_0130-0200_BBC World Service'),
-            # ...
+            # listChunks = [
+              # ('01:00', '01:30', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service'),
+              # ('01:30', '02:00', 'KJZZ_2023-10-14_Sat_0130-0200_BBC World Service'),
+              # ...
             
             # if checkChunk(getTextDict, progress):
+            # print(getTextDict)
+            # print(listChunks)
             for row in listChunks:
               # Our schedule is by the hour but the db is by chuk of 30mn so we have certainly 2 chunks per hour:
               # And do not forget we process timeList in reverse!
               # There is a simple trick to simplify our lives: just compare the hour
               if startTime[:2] == row[0][:2]:
                 classChunkExist = 'class="chunkExist"'
-                play += '<i class="fa-regular fa-circle-play" onclick="play(\'%s.mp3\');"></i>' %(row[1])
+                play += '<i class="fa-regular fa-circle-play" onclick="play(\'%s.mp3\');"></i>' %(row[2])
             
-          rowspanDict[startTime][Day] = '<td rowspan="%s" %s><p>%s%s</p></td>' %(rowspan[Day], classChunkExist, jsonSchedule[startTime][Day], play)
-          info("%s =1 %s %s - %s" %(startTime, rowspan[Day], jsonSchedule[startTime][Day], None), 4, progress)
+          rowspanDict[startTime][Day] = '<td rowspan="%s" %s><div>%s<span>%s</span></div></td>' %(rowspan[Day], classChunkExist, title, play)
+          info("%s =1 %s %s - %s" %(startTime, rowspan[Day], title, None), 4, progress)
       
         progress.advance(task)
   
   info(rowspanDict, 4, progress)
-  for startTime in jsonSchedule.keys():
+  for startTime in timeList:
     # html += '    <tr><td>00:00</td><td>BBC World Service</td><td>Classic Jazz with Chazz Rayburn</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Michele Robins</td><td>Classic Jazz with Michele Robins</td><td>BBC World Service</td></tr>'
     info('    <tr><td>%s</td>'           %(startTime), 4, progress)
     html   += '    <tr><td class="startTime">%s</td>'           %(startTime)
@@ -1552,6 +1467,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   html += '</table>\n'
   html += '<script src="https://cdn.jsdelivr.net/npm/openplayerjs@latest/dist/openplayer.min.js"></script>\n'
   html += '<script src="../OpenPlayerJS.js"></script>\n'
+  # html += '<script src="../ui.js"></script>\n'
   html += '</body>\n'
   html += '</html>'
   

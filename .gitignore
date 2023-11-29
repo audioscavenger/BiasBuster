@@ -36,6 +36,8 @@ gitsync*
 !assets/*
 !fonts/*
 
+!kjzz/*css
+!kjzz/*js
 !kjzz/*png
 !kjzz/kjzz.sh
 !kjzz/KJZZ-schedule.json

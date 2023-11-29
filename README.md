@@ -459,6 +459,9 @@ Scope creep ahead...
   - [x] color byChunk schedule with available chunks
   - [x] click to open image
   - [x] classes to highlight available segments
+  - [x] integrate listen to available recordings
+  - [x] add tooltips for play buttons
+  - [x] fix semi-transparant header and OpenPlayer look
   - [ ] add --profile
   - [ ] add --saveProfile --listProfiles
   - [ ] add --listProfiles
@@ -470,13 +473,10 @@ Scope creep ahead...
   - [ ] auto-upload processed text back to server via ssl batch putty or plink or smth
     - [ ] add a modal for statistical analysis of a program
     - [ ] add social media share buttons for that modal
-    - [x] integrate buttons under each available image
     - [ ] integrate (re)generate html(s)
     - [ ] integrate (re)generate picture(s)
     - [ ] integrate (re)generate misInformation heatMap(s)
     - [ ] integrate (re)generate biase(s)
-    - [x] integrate listen to the recordings
-    - [x] integrate mp3 player with queue for that chunk
     - [ ] integrate mp3 player with queue for that program
     - [ ] integrate text display for that chunk/program
     - [ ] integrate text analysis with keyword search
