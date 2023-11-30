@@ -128,6 +128,8 @@ usage: python KJZZ-db.py --help
                    Folder where to output pictures..
     --show
                    Opens the picture upon generation.
+    --rebuildThumbnails <week>
+                   Will (re)generate PICtures thumbnails only for that week.
     --dryRun
                    Will not generate PICtures, will not import chunks.
 
@@ -461,8 +463,15 @@ Scope creep ahead...
   - [x] classes to highlight available segments
   - [x] integrate listen to available recordings
   - [x] add tooltips for play buttons
-  - [x] fix semi-transparant header and OpenPlayer look
-  - [ ] add --profile
+  - [x] fix semi-transparent header and OpenPlayer look
+  - [x] optimize schedule pictures with thumbnails
+  - [x] bugfix in genHtml where same program image was generated multiple times (1 per startTime withing the segment)
+  - [x] add --rebuildThumbnails to (re)generate only thumbnails by week
+  - [x] XHR check previous and next week's folder to avoid invalid links
+  - [x] add lazy load images
+  - [x] integrate mp3 player: OpenPlayerJS
+  - [x] integrate closed-captions
+  - [ ] enable closed-captions by default: nothing works, asked on stackoverflow
   - [ ] add --saveProfile --listProfiles
   - [ ] add --listProfiles
   - [ ] add saveProfile() function
@@ -477,8 +486,6 @@ Scope creep ahead...
     - [ ] integrate (re)generate picture(s)
     - [ ] integrate (re)generate misInformation heatMap(s)
     - [ ] integrate (re)generate biase(s)
-    - [ ] integrate mp3 player with queue for that program
-    - [ ] integrate text display for that chunk/program
     - [ ] integrate text analysis with keyword search
     - [ ] color programings by bias/misInformation/etc
     - [ ] color wordClouds by bias/misInformation/etc

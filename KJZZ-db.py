@@ -45,9 +45,8 @@
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
 # python KJZZ-db.py --html 42 --byChunk
-
-# generate all thumbnails for week 42:
-# for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt --output kjzz\42)
+# python KJZZ-db.py --rebuildThumbnails 41
+# for /l %a in (40,1,47) DO python KJZZ-db.py --html %a --autoGenerate --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
 
 
 
@@ -58,11 +57,10 @@
 # TODO: https://github.com/auroracramer/language-model-bias
 # TODO: export all configuration into external json files or yaml
 # TODO: explore stopWords from https://github.com/taikuukaits/SimpleWordlists/tree/master
-# TODO: analyse bias
-# egrep -i "trans[gsv]" *text
-# egrep -i "\bgay\b|\blesb|\bbisex|\btransg|\bqueer|gender|LGBT" *text
+# TODO: analyse gender bias
+# TODO: analyse language bias
+# egrep -i "trans[gsv]|\bgay\b|\blesb|\bbisex|\btransg|\bqueer|gender|LGBT" *text
 # egrep -i "diversity|equity|inclusion" *text
-# egrep -i "Soros" *text
 
 
 
@@ -148,6 +146,7 @@ dryRun = False
 missingPic = "../missingPic.png"
 missingCloud = "../missingCloud.png"
 voidPic = "../1x1.png"
+rebuildThumbnail = False
 
 # busybox sed -E "s/^.{,3}$//g" stopWords.ranks.nl.txt | busybox sort | busybox uniq >stopWords.ranks.nl.txt 
 # https://www.ranks.nl/stopwords
@@ -664,6 +663,7 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
   from   matplotlib import style
   from   matplotlib.patches import Rectangle
   import seaborn
+  import PIL
   import pngquant
   pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
   from wordcloud import WordCloud
@@ -807,6 +807,14 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
   if fileName:
     plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
     pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
+    # thumbnail = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+    
+    thumbnail = PIL.Image.open(os.path.join(outputFolder, fileName  + ".png"))
+    thumbnail.thumbnail((256, 256), PIL.Image.Resampling.LANCZOS)
+    # thumbnail = thumbnail.resize((256,256), PIL.Image.LANCZOS)
+    thumbnail.save(os.path.join(outputFolder, "thumbnail-" + fileName  + ".png"))
+    pngquant.quant_image(image=os.path.join(outputFolder, "thumbnail-" + fileName  + ".png"))
+    # print(thumbnail.size)
     info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
 
   if showPicture: plt.show()
@@ -889,6 +897,7 @@ def genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict=wordCloudDict, gr
   from   matplotlib import style
   from   matplotlib.patches import Rectangle
   import seaborn
+  import PIL
   import pngquant
   pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
@@ -984,6 +993,7 @@ def graph_line(X, Y, title="", fileName=""):
   from   matplotlib import style
   from   matplotlib.patches import Rectangle
   import seaborn
+  import PIL
   import pngquant
   pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
@@ -1016,6 +1026,7 @@ def graph_bar(X, Y, title="", fileName=""):
   from   matplotlib import style
   from   matplotlib.patches import Rectangle
   import seaborn
+  import PIL
   import pngquant
   pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
@@ -1048,6 +1059,7 @@ def graph_pie(X, Y, title="", fileName=""):
   from   matplotlib import style
   from   matplotlib.patches import Rectangle
   import seaborn
+  import PIL
   import pngquant
   pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
@@ -1087,6 +1099,7 @@ def graph_heatMapTestHighlight():
   from   matplotlib import style
   from   matplotlib.patches import Rectangle
   import seaborn
+  import PIL
   import pngquant
   pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
@@ -1126,6 +1139,7 @@ def graph_heatMap(arrays, X, Y, title="", fileName=""):
   from   matplotlib import style
   from   matplotlib.patches import Rectangle
   import seaborn
+  import PIL
   import pngquant
   pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
@@ -1246,6 +1260,31 @@ def getPrevKey(timeList, key):
     return None
 
 
+def rebuildThumbnails(inputFolder, outputFolder, dryRun=False, progress=""):
+  import PIL
+  import pngquant
+  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
+  
+  pngPath = '%s/KJZZ*.png' %(inputFolder)
+  pngList = glob.glob(pngPath, recursive=False)
+  # print(pngList)
+
+  with Progress() as progress:
+    task = progress.add_task("Thumbnail gen ...", total=len(pngList))
+    for png in pngList:
+      thumbnail = PIL.Image.open(png)
+      thumbnail.thumbnail((256, 256), PIL.Image.Resampling.LANCZOS)
+      outputFile = os.path.join(outputFolder, "thumbnail-" + os.path.basename(png))
+      if not dryRun:
+        thumbnail.save(outputFile)
+        pngquant.quant_image(image=outputFile)
+      
+      info("thumbnail saved: %s" %(outputFile), 2, progress)
+      progress.advance(task)
+  
+# rebuildThumbnails
+
+
 def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   
   # old school:
@@ -1255,10 +1294,10 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
       # pngList.append(file)
 
   # better school:
-  pngPath = '%s/*week=%s*.png' %(os.path.join(outputFolder, str(weekNumber)), weekNumber)
+  pngPath = '%s/KJZZ week=%s*.png' %(os.path.join(outputFolder, str(weekNumber)), weekNumber)
   pngList = glob.glob(pngPath, recursive=False)
 
-  # regexp = re.compile(".*week=%s.*title=%s.*Day=%s" %(weekNumber, "The Moth", "Sat"))
+  # regexp = re.compile("^KJZZ week=%s.*title=%s.*Day=%s" %(weekNumber, "The Moth", "Sat"))
   # print(list(filter(regexp.match, pngList)))
   # exit()
 
@@ -1308,14 +1347,6 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   html += '<table>'
   html += '  <thead>'
 
-      # <source src='file.mp3' type="audio/mp3" />
-      # <track src="file.vtt" kind="subtitles" srclang="en" label="English" />
-  html += '''
-  <tr class="audio">
-    <audio id="audio" class="op-player__media">
-    </audio>
-  </tr>\n'''
-  
   html += '<tr class="title">'
   html += '<td><a class="prevWeek" href="../%s/index%s.html">&larr; week %s</a></td>' %((weekNumber-1), addNotByChunk, (weekNumber-1))
   html += '<td colspan="6"><span>%s week %s<a href="index%s.html">&nbsp;&nbsp;&nbsp;%s</a></span></td>' %("KJZZ", weekNumber, addByChunk, switchTo)
@@ -1340,10 +1371,16 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   with Progress() as progress:
     task = progress.add_task("Building %s ..." %(outputFileName), total=len(reversedTimeList)*len(DayList))
     
-    # we reverse because that's the only way to increase the rowspan of the first occurance of the same title
+    # We reverse because that's the only way to increase the rowspan of the first occurance of the same title.
+    # Also we read each startTime and may end up regenerating the same wordClouds, 
+    #   so we need to check if it was not generated at some point. This is inefficient.
+    # Maybe we should work with startTime and stopTime instead? but how?
+    # Also we still cannot process multiple segments of same title on the same day.
+    # Also some segments can start at the last hour of Sat and pursue next day. We cannot treat those cases yet.
     for key, startTime in enumerate(reversedTimeList):
       rowspanDict[startTime] = {}
       for Day in DayList:
+        # title should be renamed "segment", really.
         title = jsonSchedule[startTime][Day]
         classChunkExist = ''
         play = ''
@@ -1365,8 +1402,17 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
           # By default we start with a normal, chunked cell of 30mn:
           # Also we should not have to filter by week anymore since version 0.9.6 
           # , we generate both html and png under each ./week subfolder
-          regexp = re.compile(".*week=%s.*title=%s.*Day=%s" %(weekNumber, title, Day))
+          regexp = re.compile(".*KJZZ week=%s.*title=%s.*Day=%s" %(weekNumber, title, Day))
+          
+          # 1. Is it in the list we build at the beginning?
           thatWordCloudPngList = list(filter(regexp.match, pngList))
+          # 2. Was it generated at some point?
+          #    Remember, we process every startTime in reversedTimeList, so we may have already generated it
+          if len(thatWordCloudPngList) == 0:
+            thisPngPath = '%s/KJZZ week=%s title=%s Day=%s*.png' %(os.path.join(outputFolder, str(weekNumber)), weekNumber, title, Day)
+            thatWordCloudPngList = glob.glob(thisPngPath, recursive=False)
+
+          # now we are certain that we need to generate the wordCloud
           if len(thatWordCloudPngList) == 0:
             # setup an empty src for an img is indeed an error we will get the missingCloud.png for:
             thatWordCloudPngList = []
@@ -1374,11 +1420,14 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
             # we will not bother looking for excluded programs such as Jazz Blues etc:
             if not any(word in title for word in listTitleWords2Exclude):
               records = getText(getTextDict, progress)
+              # each record is a 30mn chunk of a segment
               if len(records) > 0:
                 wordCloudTitle = "KJZZ " + gettext.replace("+", " ")
                 # we only print info if we actually generate the wordCloud as i t takes time:
                 if autoGenerate: info('Generate wordCloud "%s" ...' %(wordCloudTitle), 1, progress)
+                                  # genWordClouds(records, title, mergeRecords, showPicture, wordCloudDict, outputFolder=outputFolder, dryRun=False, progress="")
                 genWordCloudDicts = genWordClouds(records, wordCloudTitle, True, showPicture, wordCloudDict, os.path.join(outputFolder, str(weekNumber)), not autoGenerate, progress)
+                # we should only have 1 item since we mergeRecords
                 if len(genWordCloudDicts) > 0:
                   classChunkExist = 'class="chunkExist"'
                   thatWordCloudPngList = [os.path.basename(genWordCloudDicts[0]["fileName"])]
@@ -1394,7 +1443,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
             thatWordCloudPngList = [os.path.basename(thatWordCloudPngList[0])]
 
           if len(thatWordCloudPngList) > 0:
-            img = '<a href="%s"><img src="%s" alt="%s" %s decoding="async" onerror="this.src=\'../missingCloud.png\'"></a>' %(thatWordCloudPngList[0], thatWordCloudPngList[0], thatWordCloudPngList[0], classChunkExist)
+            img = '<a href="%s"><img src="thumbnail-%s" alt="%s" %s decoding="async" onerror="this.src=\'../missingCloud.png\'" loading="lazy" width="256" height="133"></a>' %(thatWordCloudPngList[0], thatWordCloudPngList[0], thatWordCloudPngList[0], classChunkExist)
 
             listChunks = getChunkNames(getTextDict, progress)
             # print(getTextDict)
@@ -1465,9 +1514,22 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   html += '  </tbody>'
   html += '</tr>\n'
   html += '</table>\n'
+
+  # https://github.com/openplayerjs/openplayerjs/blob/master/docs/
+  # for simplicity of switching tracks when you click play buttons, 
+  # track is pre-added so we can find it with a simple document.querySelector("track").track
+  html += '''\n
+<div class="audio">
+  <audio id="player" class="op-player__media">
+    <track kind="subtitles" src="changeme.vtt" srclang="en" label="English" />
+  </audio>
+</div>\n'''
+  # <source src="KJZZ_2023-10-08_Sun_2300-2330_BBC World Service.mp3" type="audio/mp3" />
+  # <track src="KJZZ_2023-10-08_Sun_2300-2330_BBC World Service.vtt" kind="subtitles" srclang="en" label="English" />
+
   html += '<script src="https://cdn.jsdelivr.net/npm/openplayerjs@latest/dist/openplayer.min.js"></script>\n'
   html += '<script src="../OpenPlayerJS.js"></script>\n'
-  # html += '<script src="../ui.js"></script>\n'
+  html += '<script src="../ui.js"></script>\n'
   html += '</body>\n'
   html += '</html>'
   
@@ -1553,6 +1615,7 @@ def usage(RC=99):
   usage += ("    -p, --pretty\n                   Convert \\n to carriage returns and does json2text.\n                   Ignored when outputing pictures.")+os.linesep
   usage += ("    --output *%s\n                   Folder where to output pictures.." %(outputFolder))+os.linesep
   usage += ("    --show\n                   Opens the picture upon generation.")+os.linesep
+  usage += ("    --rebuildThumbnails <week>\n                   Will (re)generate PICtures thumbnails only for that week.")+os.linesep
   usage += ("    --dryRun\n                   Will not generate PICtures, will not import chunks.")+os.linesep
   usage += ("")+os.linesep
   usage += ("  --db *%s    Path to the local SQlite db." %(localSqlDb))+os.linesep
@@ -1604,7 +1667,7 @@ argumentList = sys.argv[1:]
 # define short Options
 options = "hviq:g:d:t:f:m:p"
 # define Long options
-long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "keepStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation", "output=", "graph=", "html=", "byChunk", "printOut", "listLevel=", "silent", "dryRun", "autoGenerate"]
+long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "keepStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation", "output=", "graph=", "html=", "byChunk", "printOut", "listLevel=", "silent", "dryRun", "autoGenerate", "rebuildThumbnails="]
 wordCloudDictToParams = [(lambda x: '--' + x)(x) for x in wordCloudDict.keys()]
 wordCloudDictToOptions = [(lambda x: x + '=')(x) for x in wordCloudDict.keys()]
 long_options += wordCloudDictToOptions
@@ -1717,6 +1780,10 @@ try:
     elif currentArgument in ("--listLevel"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       listLevel = currentValue.split(',')
+    elif currentArgument in ("--rebuildThumbnails"):
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
+      rebuildThumbnail = True
+      weekNumber = int(currentValue)
     elif currentArgument in ("--silent"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       silent = True
@@ -1764,6 +1831,10 @@ if listLevel:
     for level in listLevel: print("%s" %(stopwordsDict[int(level)]))
   exit()
 #
+
+if rebuildThumbnail:
+  rebuildThumbnails(os.path.join(outputFolder, str(weekNumber)), os.path.join(outputFolder, str(weekNumber)), dryRun)
+  exit()
 
 def importInputStopWords(wordCloudDict):
   if wordCloudDict["inputStopWordsFiles"]["value"]:

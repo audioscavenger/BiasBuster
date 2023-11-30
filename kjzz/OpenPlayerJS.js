@@ -1,4 +1,4 @@
-const player = new OpenPlayerJS('audio', {
+const player = new OpenPlayerJS('player', {
   controls: {
       alwaysVisible: false,
       layers: {
@@ -9,6 +9,8 @@ const player = new OpenPlayerJS('audio', {
   },
   detachMenus: false,
   forceNative: true,
+  // mode: 'fill',
+  // mode: 'fit',
   mode: 'responsive',
   hidePlayBtnTimer: 350,
   step: 0,
@@ -47,11 +49,34 @@ const player = new OpenPlayerJS('audio', {
 player.init();
 
 
+function stem(file) {
+  return file.substr(0, file.lastIndexOf('.'));
+}
+
+// https://github.com/openplayerjs/openplayerjs/blob/master/docs/
+// https://www.npmjs.com/package/openplayerjs
+// https://developer.mozilla.org/en-US/docs/Web/Events#media
 function play(sound) {
-  var id = document.querySelector('.op-player').id;
-  console.log('id',id);
-  var player = OpenPlayerJS.instances[id];
-  console.log('player',player);
+  // console.log('captions',captions);
+  let id = document.querySelector('.op-player').id;
+  // console.log('id',id);
+  let player = OpenPlayerJS.instances[id];
+  // console.log('player',player);
+  let captions = stem(sound) + '.vtt';
+
   player.src = { src: sound };
+  player.addCaptions({ src: captions, kind: "subtitles", srclang: "en", label: "English" });
+  // https://developer.mozilla.org/en-US/docs/Web/Events#media
+  let track = document.querySelector("track").track;
+  // console.log('track',track);
+
+  // https://developer.mozilla.org/en-US/docs/Web/API/TextTrack/mode
+  // cannot get this CC enabled no matter what so here is the question: https://stackoverflow.com/questions/77581173/openplayerjs-how-to-enable-track-captions-on-event
+  track.mode = "showing";
+  
   player.play();
+  // console.log('player',player);
+
+  // <source src='file.mp3' type="audio/mp3" />
+  // <track src="file.vtt" kind="subtitles" srclang="en" label="English" />
 }
