@@ -15,14 +15,14 @@ body {
   left:0;
   bottom:0;
 }
-i {
+i.tooltip {
   cursor: pointer;
+  width: 11px;
 }
 table div, table span {
   display: block;
 }
-table a {
-  color: white;
+a {
   text-decoration: none;
 }
 table {
@@ -46,7 +46,7 @@ tr td {
   vertical-align: middle;
   color: #aaa;
 }
-tr.title td {
+.title td, .title a {
   background-color: #666;
   color: white;
   font-weight: bold;
@@ -75,10 +75,12 @@ tbody, tfoot {
 img.chunkExist {
   width: 100%;
   max-width: 15vw; /* width divided by 8 */
+  cursor: pointer;
 }
 
 /* Navigation */
 a.prevWeek, a.nextWeek {
+  color: white;
   background-color: #777;
   width: 100px;
   display: block;
@@ -100,7 +102,8 @@ a.nextWeek {
 .tooltip {
   position: relative;
   display: inline-block;
-  border-bottom: 1px dotted black; /* If you want dots under the hoverable text */
+  /* If you want dots under the hoverable text: */
+  /* border-bottom: 1px dotted black; */
 }
 
 /* Tooltip text */
@@ -159,4 +162,72 @@ a.nextWeek {
 }
 /********************* Tooltip *********************/
 
+/* https://stackoverflow.com/questions/37573608/how-to-make-modal-close-on-click-outside */
+#modal-root {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1;
+  display: none;
+}
+
+#modal-bg {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+#modal {
+  padding: 1em;
+  background-color: #e0e0e0;
+  position: relative;
+  margin: 1em;
+  overflow: hidden;
+}
+
+#modal img {
+  width: 100%;
+}
+
+#modal-close-btn {
+  position: absolute;
+  /* background-color: #d1d1d1; */
+  right: 0.5em;
+  top: 0.5em;
+  cursor: pointer;
+  font-size: 46px;
+  font-weight: bold;
+  /* border: 1px solid #a8a8a8; */
+  color: #666;
+  /* padding: 4px 8px; */
+  z-index: 2;
+}
+
+#modal-close-btn:hover {
+  color: #333;
+  /* background-color: #c0c0c0; */
+  border-color: #959595;
+}
+/* https://stackoverflow.com/questions/37573608/how-to-make-modal-close-on-click-outside */
+
+
+/* https://dev.to/stackfindover/zoom-image-point-with-mouse-wheel-11n3 */
+#zoom {
+  width: 100%;
+  height: 100%;
+  transform-origin: 0px 0px;
+  transform: scale(1) translate(0px, 0px);
+  cursor: grab;
+}
+div#zoom > img {
+  width: 100%;
+  height: auto;
+}
+/* https://dev.to/stackfindover/zoom-image-point-with-mouse-wheel-11n3 */
 

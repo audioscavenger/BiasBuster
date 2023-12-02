@@ -36,6 +36,7 @@ gitsync*
 !assets/*
 !fonts/*
 
+!kjzz/fonts
 !kjzz/*css
 !kjzz/*js
 !kjzz/*png

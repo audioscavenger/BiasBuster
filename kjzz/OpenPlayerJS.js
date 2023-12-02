@@ -53,9 +53,9 @@ function stem(file) {
   return file.substr(0, file.lastIndexOf('.'));
 }
 
+// OpenPlayerJS
 // https://github.com/openplayerjs/openplayerjs/blob/master/docs/
 // https://www.npmjs.com/package/openplayerjs
-// https://developer.mozilla.org/en-US/docs/Web/Events#media
 function play(sound) {
   // console.log('captions',captions);
   let id = document.querySelector('.op-player').id;
@@ -67,6 +67,7 @@ function play(sound) {
   player.src = { src: sound };
   player.addCaptions({ src: captions, kind: "subtitles", srclang: "en", label: "English" });
   // https://developer.mozilla.org/en-US/docs/Web/Events#media
+// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/track
   let track = document.querySelector("track").track;
   // console.log('track',track);
 

@@ -1,4 +1,4 @@
-# BiasBuster - WIP 0.9.9
+# BiasBuster - release 0.9.9
 
 Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast. 
 BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
@@ -455,46 +455,64 @@ Scope creep ahead...
 - [ ] 0.9.?   TODO separate KJZZ into its own table to add other broadcasters
 - [ ] 0.9.?   TODO automate mp3 downloads from cloud + process + uploads from/to cloud server
 - [ ] 0.9.?   TODO adding bias_score.py from https://github.com/auroracramer/language-model-bias
-- [ ] 0.9.9   WIP
-  - [x] add link to switch between byChunk and not
-  - [x] generate both byChunk and not schedules html files
-  - [x] color byChunk schedule with available chunks
-  - [x] click to open image
-  - [x] classes to highlight available segments
-  - [x] integrate listen to available recordings
-  - [x] add tooltips for play buttons
-  - [x] fix semi-transparent header and OpenPlayer look
-  - [x] optimize schedule pictures with thumbnails
-  - [x] bugfix in genHtml where same program image was generated multiple times (1 per startTime withing the segment)
-  - [x] add --rebuildThumbnails to (re)generate only thumbnails by week
-  - [x] XHR check previous and next week's folder to avoid invalid links
-  - [x] add lazy load images
-  - [x] integrate mp3 player: OpenPlayerJS
-  - [x] integrate closed-captions
-  - [ ] enable closed-captions by default: nothing works, asked on stackoverflow
-  - [ ] add --saveProfile --listProfiles
-  - [ ] add --listProfiles
-  - [ ] add saveProfile() function
-  - [ ] add loadProfile() function
-  - [ ] add statistics table
-  - [ ] start saving wordCloud statistics in db
-  - [ ] auto-import mp3 to process via ssl batch putty or plink or smth
-  - [ ] auto-upload processed text back to server via ssl batch putty or plink or smth
+- [ ] 0.9.?   WIP
+  - [ ] db
+    - [ ] store statistics but what statistics?
+    - [ ] add statistics table or more columns for each chunk?
+    - [ ] how to store statistics for segments rather then chunks?
+  - [ ] ui
+    - [ ] fix table header that's transparent when scrolling down
+    - [ ] build an actual front page with Bootstrap or smth
+    - [ ] enable closed-captions by default: nothing works, asked on stackoverflow
     - [ ] add a modal for statistical analysis of a program
     - [ ] add social media share buttons for that modal
+    - [ ] highlight the top 10 BS of the week or smth
+    - [ ] integrate front page with cgi or smth so we can ajax-build missing pictures or smth
+    - [ ] integrate front page with cgi so we can tap in the database with SQLite worker
+    - [ ] integrate text analysis with keyword search
+    - [ ] keep player playing while navigating, like yt or plex
+    - [ ] player handles playlist
+    - [ ] segments have only 1 play button that loads a playlist? how about the texts?
+  - [ ] python
+    - [ ] rename title to segment or show? they seem to call their programmings "shows"
+    - [ ] color segments by bias/misInformation/etc
+    - [ ] color wordClouds by bias/misInformation/etc
+    - [ ] add --saveProfile --listProfiles
+    - [ ] add --listProfiles
+    - [ ] add saveProfile() function
+    - [ ] add loadProfile() function
+    - [ ] extract presenters' names
+  - [ ] misc
     - [ ] integrate (re)generate html(s)
     - [ ] integrate (re)generate picture(s)
     - [ ] integrate (re)generate misInformation heatMap(s)
     - [ ] integrate (re)generate biase(s)
-    - [ ] integrate text analysis with keyword search
-    - [ ] color programings by bias/misInformation/etc
-    - [ ] color wordClouds by bias/misInformation/etc
-  - [ ] build an actual front page with Bootstrap or smth
-  - [ ] extract presenters' names
-  - [ ] save some statistics in the db: add more columns
-  - [ ] highlight the top 10 BS of the week or smth
-  - [ ] integrate front page with cgi or smth so we can ajax-build missing pictures or smth
-  - [ ] integrate front page with cgi so we can tap in the database with SQLite worker
+    - [ ] automate transcription and server updates
+    - [ ] auto-import mp3 to process via ssl batch putty or plink or smth
+    - [ ] auto-upload processed text back to server via ssl batch putty or plink or smth
+- [x] 0.9.9   release better_ui
+  - [x] ui
+    - [x] add link to switch between byChunk and not
+    - [x] generate both byChunk and bySegment schedules html files
+    - [x] click to open image
+    - [x] classes to highlight available segments
+    - [x] integrate listen to available recordings
+    - [x] add tooltips for play buttons
+    - [x] fix semi-transparent header and OpenPlayer look
+    - [x] optimize schedule pictures with thumbnails
+    - [x] XHR check previous and next week's folder to avoid invalid links
+    - [x] add lazy load images
+    - [x] integrate mp3 player: OpenPlayerJS
+    - [x] integrate closed-captions with OpenPlayerJS
+    - [x] integrate fontAwesome6
+    - [x] add view captioning text buttons
+    - [x] add random ?value to custom css and js because of server caching
+    - [x] display image in modal + zoom and drag
+    - [x] close image modal onclick anywhere outside image
+    - [x] cleanup genHtml() code by exporting stuff in sub functions
+  - [x] python
+    - [x] bugfix in genHtml where same program image was generated multiple times (1 per startTime withing the segment)
+    - [x] add --rebuildThumbnails to (re)generate only thumbnails by week
 - [x] 0.9.8   release html_builder
   - [x] stopped uploading the db after week 46: `git update-index --assume-unchanged kjzz.db`
   - [x] fixed error Tcl_AsyncDelete: async handler deleted by the wrong thread

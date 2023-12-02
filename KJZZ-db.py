@@ -1,7 +1,7 @@
 # BiasBuster
 # author:  AudioscavengeR
 # license: GPLv2
-# version: 0.9.9 WIP
+# version: 0.9.9 release better_ui
 
 
 # Object: Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast.
@@ -1285,6 +1285,120 @@ def rebuildThumbnails(inputFolder, outputFolder, dryRun=False, progress=""):
 # rebuildThumbnails
 
 
+def genHtmlHead(pageTitle):
+  return '''
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+  
+  <title data-l10n-id="%s"></title>
+
+  <link rel="stylesheet" href="../fonts/css/fontawesome.min.css">
+  <link rel="stylesheet" href="../fonts/css/regular.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/openplayerjs@1.12.1/dist/openplayer.min.css">
+  <link rel="stylesheet" href="../style.css?%s">
+
+</head>\n
+''' %(pageTitle, random.randint(0,99))
+
+# genHtmlModal
+
+
+def genHtmlModal():
+  return '''
+<div id="modal-root">
+  <div id="modal-bg" onclick="onClickModalBackdrop(this)"></div>
+  <div id="modal" class="zoom_outer" onclick="onClickModalBackdrop(this)">
+    <i id="modal-close-btn" onclick="onClickModalCloseBtn(this)" class="fa-regular fa-window-close"></i>
+    <div id="zoom">
+      <img id="modal-img" decoding="async" loading="lazy" onclick="onClickImgPrevent(event);" />
+    </div>
+  </div>
+</div>\n
+'''
+# genHtmlModal
+
+def genHtmlThead(weekNumber, byChunk):
+  addByChunk = '-byChunk'
+  addNotByChunk = ''
+  switchTo = 'byChunk'
+  if byChunk:
+    addByChunk = ''
+    addNotByChunk = '-byChunk'
+    switchTo = 'bySchedule'
+
+  html  = '  <thead>'
+  html += '<tr class="title">'
+  html += '<td><a class="prevWeek" href="../%s/index%s.html">&larr; week %s</a></td>' %((weekNumber-1), addNotByChunk, (weekNumber-1))
+  html += '<td colspan="6"><span>%s week %s<a href="index%s.html">&nbsp;&nbsp;&nbsp;%s</a></span></td>' %("KJZZ", weekNumber, addByChunk, switchTo)
+  html += '<td><a class="nextWeek" href="../%s/index%s.html">week %s&rarr;</a></td>' %((weekNumber+1), addNotByChunk, (weekNumber+1))
+  html += '</tr>\n'
+  html += '<tr><th class="startTime">Time</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>\n'
+  html += '  </thead>\n'
+  
+  return html
+# genHtmlThead
+
+
+def genHtmlChunk(rowspan, classChunkExist, title, play, texts, segmentImg=""):
+  return '''
+<td rowspan="%s" %s>
+  <div>
+    <span>%s</span>
+    <span>%s</span>
+    <span>%s</span>
+  </div>
+  %s
+</td>\n
+''' %(rowspan, classChunkExist, title, play, texts, segmentImg)
+
+# <td rowspan="5" class="chunkExist">
+  # <div>
+    # <span>BBC World Service</span>
+    # <span>
+      # <i class="fa-regular fa-circle-play tooltip" onclick="play('KJZZ_2023-10-08_Sun_2300-2330_BBC World Service.mp3');"><span class="tooltiptext tooltipBottomLeft"><div>23:00 - 23:30<br>KJZZ_2023-10-08_Sun_2300-2330_BBC World Service</div></span></i>
+      # <i class="fa-regular fa-circle-play tooltip" onclick="play('KJZZ_2023-10-08_Sun_2330-0000_BBC World Service.mp3');"><span class="tooltiptext tooltipBottomLeft"><div>23:30 - 00:00<br>KJZZ_2023-10-08_Sun_2330-0000_BBC World Service</div></span></i>
+    # </span>
+    # <span>
+      # <a href="KJZZ_2023-10-08_Sun_2300-2330_BBC World Service.text"><i class="fa-regular fa-file-lines" ></i></a>
+      # <a href="KJZZ_2023-10-08_Sun_2330-0000_BBC World Service.text"><i class="fa-regular fa-file-lines" ></i></a>
+    # </span>
+  # </div>
+  # <div onclick="showModal('KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png');">
+    # <img src="thumbnail-KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" alt="KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" class="chunkExist" decoding="async" onerror="this.src='../missingCloud.png'" loading="lazy" />
+  # </div>
+# </td>
+
+# genHtmlChunk
+
+
+def genHtmlFooter():
+  return '''
+<script src="https://cdn.jsdelivr.net/npm/openplayerjs@latest/dist/openplayer.min.js"></script>\n
+<script src="../OpenPlayerJS.js"></script>\n
+<script src="../ui.js?%s"></script>\n
+''' %(random.randint(0,99))
+# genHtmlFooter
+
+
+def genSegmentImg(imgFileName, classChunkExist):
+  thumbnailFileName = "thumbnail-%s" %(imgFileName)
+  return '''
+<div onclick="showModal('%s');">
+  <img src="%s" alt="%s" %s decoding="async" onerror="this.src='../missingCloud.png';" loading="lazy" />
+</div>\n
+''' %(imgFileName, thumbnailFileName, imgFileName, classChunkExist)
+
+# <div onclick="showModal('KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png');">
+  # <img src="thumbnail-KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" alt="KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" class="chunkExist" decoding="async" onerror="this.src='../missingCloud.png'" loading="lazy" />
+# </div>
+# genSegmentImg
+
+
 def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   
   # old school:
@@ -1313,57 +1427,26 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
 
   # how do my table compare to https://kjzz.org/kjzz-print-schedule ? let me know in the comments!
   
-  html  = '''
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-    <title data-l10n-id="%s week %s"></title>
-
-    <link rel="stylesheet" href="../fontawesome.all.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/openplayerjs@1.12.1/dist/openplayer.min.css">
-    <link rel="stylesheet" href="../style.css">
-
-  </head>
-  <body>
-  ''' %("KJZZ", weekNumber)
-  
-  outputFileName = "index.html"
-  addByChunk = '-byChunk'
-  addNotByChunk = ''
-  switchTo = 'byChunk'
-  if byChunk:
-    outputFileName = "index-byChunk.html"
-    addByChunk = ''
-    addNotByChunk = '-byChunk'
-    switchTo = 'bySchedule'
+  html  = genHtmlHead("%s week %s" %("KJZZ", weekNumber))
+  html += '<body>\n'
+  html += genHtmlModal()
   
   # https://github.com/openplayerjs/openplayerjs/blob/master/docs/api.md
   # https://github.com/openplayerjs/openplayerjs/blob/master/docs/usage.md
   
-  html += '<table>'
-  html += '  <thead>'
-
-  html += '<tr class="title">'
-  html += '<td><a class="prevWeek" href="../%s/index%s.html">&larr; week %s</a></td>' %((weekNumber-1), addNotByChunk, (weekNumber-1))
-  html += '<td colspan="6"><span>%s week %s<a href="index%s.html">&nbsp;&nbsp;&nbsp;%s</a></span></td>' %("KJZZ", weekNumber, addByChunk, switchTo)
-  html += '<td><a class="nextWeek" href="../%s/index%s.html">week %s&rarr;</a></td>' %((weekNumber+1), addNotByChunk, (weekNumber+1))
-  html += '</tr>\n'
-  html += '<tr><th class="startTime">Time</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>\n'
-  html += '  </thead>'
-  html += '  <tbody>'
+  html += '<table>\n'
+  html += genHtmlThead(weekNumber, byChunk)
+  html += '<tbody>\n'
   
-  # loop json
-  # html += '    <tr><td>00:00</td><td>BBC World Service</td><td>Classic Jazz with Chazz Rayburn</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Michele Robins</td><td>Classic Jazz with Michele Robins</td><td>BBC World Service</td></tr>'
-
   rowspanDict       = {}
   timeList          = list(jsonSchedule.keys())
   reversedTimeList  = list(reversed(timeList))
   DayList           = list(jsonSchedule[reversedTimeList[0]].keys())
   rowspan           = {}
+  if byChunk:
+    outputFileName = "index-byChunk.html"
+  else:
+    outputFileName = "index.html"
 
   info("DayList: %s" %(DayList), 2)
   for Day in DayList: rowspan[Day] = 1
@@ -1384,7 +1467,8 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
         title = jsonSchedule[startTime][Day]
         classChunkExist = ''
         play = ''
-        img = ''
+        texts = ''
+        segmentImg = ''
         classTooltipPosition = 'tooltipBottomLeft'
         if Day in ['Mon', 'Tue']: classTooltipPosition = 'tooltipBottomRight'
         info("Processing: %s %s %s %s" %(key, startTime, Day, title), 2, progress)
@@ -1443,8 +1527,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
             thatWordCloudPngList = [os.path.basename(thatWordCloudPngList[0])]
 
           if len(thatWordCloudPngList) > 0:
-            img = '<a href="%s"><img src="thumbnail-%s" alt="%s" %s decoding="async" onerror="this.src=\'../missingCloud.png\'" loading="lazy" width="256" height="133"></a>' %(thatWordCloudPngList[0], thatWordCloudPngList[0], thatWordCloudPngList[0], classChunkExist)
-
+            segmentImg = genSegmentImg(thatWordCloudPngList[0], classChunkExist)
             listChunks = getChunkNames(getTextDict, progress)
             # print(getTextDict)
             # print(listChunks)
@@ -1454,11 +1537,14 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
               # ...
               # ('23:30', '00:00', 'KJZZ_2023-10-14_Sat_2330-0000_BBC World Service')
 
+            # fontawesome incons: https://fontawesome.com/search?m=free&o=r
             for row in listChunks:
-              # this is by programming, not byChunk: we therefore list all chunks
+              # This is by segment (title), not byChunk: we therefore list all chunks for that segment.
+              # Also, no \n between them or it will translate into a white space
               play += '<i class="fa-regular fa-circle-play tooltip" onclick="play(\'%s.mp3\');"><span class="tooltiptext %s"><div>%s - %s<br>%s</div></span></i>' %(row[2], classTooltipPosition, row[0], row[1], row[2])
+              texts += '<a href="%s"><i class="fa-regular fa-file-lines tooltip" ></i></a>' %(row[2] + ".text")
 
-          rowspanDict[startTime][Day] = '<td rowspan="%s" %s><div>%s<span>%s</span></div>%s</td>' %(rowspan[Day], classChunkExist, title, play, img)
+          rowspanDict[startTime][Day] = genHtmlChunk(rowspan[Day], classChunkExist, title, play, texts, segmentImg)
 
           # if we are not processing the last time key of the day:
           if getNextKey(reversedTimeList, key):
@@ -1489,14 +1575,16 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
             # print(getTextDict)
             # print(listChunks)
             for row in listChunks:
-              # Our schedule is by the hour but the db is by chuk of 30mn so we have certainly 2 chunks per hour:
+              # Our schedule is by the hour but the db is by chunk of 30mn so we have certainly 2 chunks per hour:
               # And do not forget we process timeList in reverse!
               # There is a simple trick to simplify our lives: just compare the hour
+              # Also, no \n between them or it will translate into a white space
               if startTime[:2] == row[0][:2]:
                 classChunkExist = 'class="chunkExist"'
-                play += '<i class="fa-regular fa-circle-play" onclick="play(\'%s.mp3\');"></i>' %(row[2])
-            
-          rowspanDict[startTime][Day] = '<td rowspan="%s" %s><div>%s<span>%s</span></div></td>' %(rowspan[Day], classChunkExist, title, play)
+                play += '<i class="fa-regular fa-circle-play tooltip" onclick="play(\'%s.mp3\');"><span class="tooltiptext %s"><div>%s - %s<br>%s</div></span></i>' %(row[2], classTooltipPosition, row[0], row[1], row[2])
+                texts += '<a href="%s"><i class="fa-regular fa-file-lines tooltip" ></i></a>' %(row[2] + ".text")
+          # rowspanDict[startTime][Day] = '<td rowspan="%s" %s><div>%s<span>%s</span><span>%s</span></div></td>\n' %(rowspan[Day], classChunkExist, title, play, texts)
+          rowspanDict[startTime][Day] = genHtmlChunk(rowspan[Day], classChunkExist, title, play, texts)
           info("%s =1 %s %s - %s" %(startTime, rowspan[Day], title, None), 4, progress)
       
         progress.advance(task)
@@ -1511,8 +1599,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
       html   +=     '%s'  %(rowspanDict[startTime][Day])
     html   +=     '</tr>\n'
   
-  html += '  </tbody>'
-  html += '</tr>\n'
+  html += '</tbody>\n'
   html += '</table>\n'
 
   # https://github.com/openplayerjs/openplayerjs/blob/master/docs/
@@ -1521,15 +1608,13 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   html += '''\n
 <div class="audio">
   <audio id="player" class="op-player__media">
-    <track kind="subtitles" src="changeme.vtt" srclang="en" label="English" />
+    <track kind="subtitles" srclang="en" label="English" />
   </audio>
 </div>\n'''
   # <source src="KJZZ_2023-10-08_Sun_2300-2330_BBC World Service.mp3" type="audio/mp3" />
   # <track src="KJZZ_2023-10-08_Sun_2300-2330_BBC World Service.vtt" kind="subtitles" srclang="en" label="English" />
 
-  html += '<script src="https://cdn.jsdelivr.net/npm/openplayerjs@latest/dist/openplayer.min.js"></script>\n'
-  html += '<script src="../OpenPlayerJS.js"></script>\n'
-  html += '<script src="../ui.js"></script>\n'
+  html += genHtmlFooter()
   html += '</body>\n'
   html += '</html>'
   
@@ -1537,18 +1622,6 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   with open(outputFile, 'w') as fd:
     fd.write(html)
     info("outputFile: %s" %(outputFile), 1, progress)
-
-
-
-  # <table border="1">
-  # <tr>
-    # <thead><tr><th>Time</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr></thead>
-    # <tbody>
-      # <tr><td>00:00</td><td>BBC World Service</td><td>Classic Jazz with Chazz Rayburn</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Michele Robins</td><td>Classic Jazz with Michele Robins</td><td>BBC World Service</td></tr>
-      # <tr><td>01:00</td><td>BBC World Service</td><td>BBC World Service</td><td>BBC World Service</td><td>BBC World Service</td><td>BBC World Service</td><td>BBC World Service</td><td>BBC World Service</td></tr>
-    # </tbody>
-  # </tr>
-  # </table>
 
   return html
 # genHtml
