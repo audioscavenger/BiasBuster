@@ -15,6 +15,7 @@ and a Python script to output visual statistics and html schedules to present al
   <img src="https://img.shields.io/github/license/audioscavenger/BiasBuster?style=for-the-badge">
   <img src="https://img.shields.io/github/release/audioscavenger/BiasBuster?style=for-the-badge">
 </div>
+
 ![BiasBuster overview](assets/BiasBuster.svg)
 
 The transcription is done on GPU and produces text files and captions in various formats.
@@ -361,8 +362,15 @@ You can also combine the keys with *+*, examples:
 `python KJZZ-db.py --gettext chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -p`
 
 
-### Get the text for a particular program, ALL dates
+### Get the text for a particular program, ALL dates (slow)
 `python KJZZ-db.py --gettext title="All Things Considered" -p`
+
+
+### Generate a word Cloud for a program, on a specific week and Day
+`python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud`--stopLevel 4 --show --max_words=1000
+
+Same but If you know the actual date:
+`python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud`--stopLevel 4 --show --max_words=1000
 
 
 ### Generate a word Cloud for a particular chunk of program
@@ -503,6 +511,7 @@ Scope creep ahead...
     - [ ] player handles playlist
     - [ ] segments have only 1 play button that loads a playlist? how about the texts?
   - [ ] python
+    - [ ] change gettext time= to start=|stop= instead, so we can generate same segments as by week+title+Day
     - [x] add --useJpeg and --jpegQuality but it's actually worse
     - [x] enable string.Template instead of those %s everywhere
     - [x] tried to improve import speed with BEGIN+COMMIT but error: You can only execute one statement at a time.
@@ -639,7 +648,7 @@ Scope creep ahead...
 ## Contribution
 
 I will be open to any contribution. If you have any idea, please let me know. 
-I am by no means an expert in English language or statistics. Any idea to help reveal the agenda of the programmings is welcome.
+I am by no means an expert in English language or statistics. Any idea to help reveal the agenda of the programmings are welcome.
 
 ## License
 

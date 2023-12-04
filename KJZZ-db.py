@@ -38,10 +38,10 @@
 # python KJZZ-db.py -g week=43 --wordCloud --stopLevel 4 --show --max_words=10000
 # python KJZZ-db.py -g week=44 --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
 # python KJZZ-db.py -g week=43+title="TED Radio Hour" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
-#   example: week=42+title="Freakonomics" is about men/women
-# python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+#   example: week=42+title="Freakonomics"+Day=Sun is about men/women
+# python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
 # for /l %a in (40,1,45) DO python KJZZ-db.py -g week=%a+title="TED Radio Hour" --wordCloud --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
-# python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+# python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
