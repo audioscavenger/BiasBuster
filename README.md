@@ -3,14 +3,9 @@
 A set of tools which ultimate goal is to analyze biases in English. 
 Currently only handles KJZZ's radio broadcast. 
 Under active developement since 10/1/2023.
-![BiasBuster overview](assets/BiasBuster.svg)
 
 BiasBuster provides an cron 24/7 stream downloader, a SQLite database, 
 and a Python script to output visual statistics and html schedules to present all that.
-
-The transcription is done on GPU and produces text files and captions in various formats.
-They are then crunched by a python script that fills a database, and outputs html files and word clouds, etc.
-PNG files are compressed by pngquant to saqve space.
 
 <div align="center"> 
   <img src="https://img.shields.io/github/forks/audioscavenger/BiasBuster?style=for-the-badge">
@@ -20,17 +15,21 @@ PNG files are compressed by pngquant to saqve space.
   <img src="https://img.shields.io/github/license/audioscavenger/BiasBuster?style=for-the-badge">
   <img src="https://img.shields.io/github/release/audioscavenger/BiasBuster?style=for-the-badge">
 </div>
+![BiasBuster overview](assets/BiasBuster.svg)
+
+The transcription is done on GPU and produces text files and captions in various formats.
+They are then crunched by a python script that fills a database, and outputs html files and word clouds, etc.
+PNG files are compressed by pngquant to saqve space.
 
 This project comes in 2 parts: 
-- A bash script that rune every 30mn to download the mp3 chunks
+- A bash script that runs every 30mn to download mp3 chunks of, well, 30mn each
 - A Windows part:
   - A batch that calls whisper-faster to transcribe mp3 to text
   - A python script that loads transcriptions into a SQLite database, and outputs html, statistics, word clouds etc
 
-The Windows part could run on Linux as well, just the processing batch should be rewritten in bash.
+The Windows part could run on Linux as well, whisper also can use CPU (slower), and the processing batch should be rewritten in bash.
 
-![week41 example](assets/week41%20example.png)
-
+![week46 example](assets/week46%20example.png)
 
 # Under the hood
 
