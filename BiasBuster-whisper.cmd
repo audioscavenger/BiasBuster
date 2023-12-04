@@ -23,9 +23,13 @@ set PythonVenv=E:\GPT\stable-diffusion-webui\venv\Scripts
 :: model small gives the best results for radio broadcasts
 set model=small
 :: delete mp3 processed
-set delete=y
+set deleteMp3=y
+:: delete logs
+set deleteLogs=y
 :: do not reprocess same mp3
 set reprocess=n
+:: import text files created
+set import=y
 :: build the html schedule page at the end
 set html=y
 ::::::::::::::::::::::::::::::::::::::::::::::::::::::::
@@ -37,10 +41,12 @@ set existingModels=tiny tiny.en base base.en small small.en medium medium.en lar
 :defaults
 set LOG="%~dpn0.log"
 set htmlGen=
+set busybox=
 
 :prechecks
 IF NOT EXIST "%WhisperFasterPath%"  echo ERROR: update WhisperFasterPath in this script & pause & exit 1
 IF NOT EXIST "%PythonVenv%"         echo ERROR: update PythonVenv in this script & pause & exit 1
+where busybox.exe >NUL 2>&1 && set busybox=busybox.exe
 
 IF "%~1"=="" (
   call %PythonVenv%\activate
@@ -62,20 +68,21 @@ IF "%~1"=="" (
   echo   python KJZZ-db.py --gettext week=42+Day=Mon+title="All Things Considered" --wordCloud --stopLevel 3 --show
   echo   python KJZZ-db.py --gettext week=42 --wordCloud --stopLevel 3 --show --max_words=10000
   echo   python KJZZ-db.py --gettext week=44 --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles  stopWords.Wordlist-Adjectives-All.txt
-  echo   python KJZZ-db.py --gettext week=43+title="TED Radio Hour" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles  stopWords.Wordlist-Adjectives-All.txt
+  echo   python KJZZ-db.py --gettext week=43+title="TED Radio Hour" --wordCloud --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles  stopWords.Wordlist-Adjectives-All.txt
   echo   python KJZZ-db.py --gettext week=42+title="Freakonomics" --misInformation --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
   echo   python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show
   echo   python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
   echo   python KJZZ-db.py --html 42 --byChunk
   echo   python KJZZ-db.py --rebuildThumbnails 41
-  REM    for /l %a in (42,1,47) DO python KJZZ-db.py --rebuildThumbnails %a
+  REM    for /l %a in (42,1,48) DO @python KJZZ-db.py --rebuildThumbnails %a
+  echo   python KJZZ-db.py --gettext week=43+title="TED Radio Hour"+Day=Sun --wordCloud  --useJpeg --jpegQuality 50 --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles  stopWords.Wordlist-Adjectives-All.txt
 
   REM (re)generate all thumbnails for week 42 manually:
-  REM for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt --output kjzz)
+  REM for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO @python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt --output kjzz)
   REM (re)generate all thumbnails for week 42 automatically along with an html page:
   echo python KJZZ-db.py --html 42 --autoGenerate --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
   REM (re)generate all wordClouds and html for some weeks:
-  REM for /l %a in (40,1,47) DO python KJZZ-db.py --html %a --autoGenerate --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+  REM for /l %a in (40,1,48) DO @python KJZZ-db.py --html %a --autoGenerate --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
   
   cmd /k
   exit
@@ -101,18 +108,22 @@ echo existingModels:      %existingModels%
 IF NOT "%~1"=="" (
   echo availableModels:    %models%
   set /P     model=model?              [%model%] 
-  set /P    delete=delete after?       [%delete%] 
+  set /P deleteMp3=deleteMp3 after?    [%deleteMp3%] 
   set /P reprocess=reprocess existing? [%reprocess%] 
   set /P      html=generate html?      [%html%] 
 )
-if /I "%html%"=="y" set "htmlGen=--html %~n1 --autoGenerate --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt"
+if /I NOT "%html%"=="y" (
+  set /P    import=import texts?       [%import%] 
+)
+if /I "%import%"=="y" set importTexts=--import --folder "%~1"
+if /I "%html%"=="y"   set htmlGen=--html %~n1 --autoGenerate --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
 
 IF EXIST "%~1\*" (
   REM :: first, address reprocess by deleting processed files, in case the batch was interrupted for instance
   IF /I "%reprocess%"=="n" (
     for %%a in ("%~1\*.mp3") DO (
       IF EXIST "%%~dpna.text" (
-        IF /I "%delete%"=="y" (
+        IF /I "%deleteMp3%"=="y" (
           echo deleting "%%~a" 1>&2
           del /f /q "%%~a"
         ) ELSE (
@@ -129,13 +140,20 @@ IF EXIST "%~1\*" (
   REM :: process files in folder one by one (overhead induced as whisper will reload the model each time):
   REM for %%a in ("%~1\*.mp3") DO (
     REM echo busybox time whisper-faster "%%~a" --language en --model %model% --output_format all --device cuda --output_dir %%~sdpa | busybox tee -a %LOG%
-    REM busybox time whisper-faster "%%~a" --language en --model %model% --output_format all --device cuda --output_dir %%~sdpa 2>"%%~a.%model%.log" && IF /I "%delete%"=="y" del /q "%%~a"
+    REM busybox time whisper-faster "%%~a" --language en --model %model% --output_format all --device cuda --output_dir %%~sdpa 2>"%%~a.%model%.log" && IF /I "%deleteMp3%"=="y" del /q "%%~a"
   REM )
 
   REM :: process folder recursively (faster):
-  whisper-faster "%~1" --batch_recursive --language=en --model=%model% --output_format=all --device=cuda --output_dir="%~1"
+  IF DEFINED busybox (
+    echo busybox time whisper-faster "%~1" --batch_recursive --language=en --model=%model% --output_format=all --device=cuda --output_dir="%~1" | busybox tee -a %LOG%
+    busybox time whisper-faster "%~1" --batch_recursive --language=en --model=%model% --output_format=all --device=cuda --output_dir="%~1"
+  ) ELSE (
+    echo whisper-faster "%~1" --batch_recursive --language=en --model=%model% --output_format=all --device=cuda --output_dir="%~1" >>%LOG%
+    echo whisper-faster "%~1" --batch_recursive --language=en --model=%model% --output_format=all --device=cuda --output_dir="%~1"
+    whisper-faster "%~1" --batch_recursive --language=en --model=%model% --output_format=all --device=cuda --output_dir="%~1"
+  )
 
-  IF /I %delete%==y (
+  IF /I %deleteMp3%==y (
     for %%a in ("%~1\*.mp3") DO (
       IF EXIST "%%~dpna.text" (
         echo deleting "%%~a" 1>&2
@@ -148,8 +166,14 @@ IF EXIST "%~1\*" (
 ) ELSE (
   REM :: list:
   for %%a in (%*) DO (
-    echo busybox time whisper-faster %%a --language en --model %model% --output_format all --device cuda --output_dir %%~sdpa | busybox tee -a %LOG%
-    busybox time whisper-faster %%a --language en --model %model% --output_format all --device cuda --output_dir %%~sdpa 2>"%%~a.%model%.log" && IF /I "%delete%"=="y" del /q "%%~a"
+    IF DEFINED busybox (
+      echo busybox time whisper-faster %%a --language en --model %model% --output_format all --device cuda --output_dir %%~sdpa | busybox tee -a %LOG%
+      busybox time whisper-faster %%a --language en --model %model% --output_format all --device cuda --output_dir %%~sdpa 2>"%%~a.%model%.log" && IF /I "%deleteMp3%"=="y" del /q "%%~a"
+    ) ELSE (
+      echo whisper-faster %%a --language en --model %model% --output_format all --device cuda --output_dir %%~sdpa >>%LOG%
+      echo whisper-faster %%a --language en --model %model% --output_format all --device cuda --output_dir %%~sdpa
+      whisper-faster %%a --language en --model %model% --output_format all --device cuda --output_dir %%~sdpa 2>"%%~a.%model%.log" && IF /I "%deleteMp3%"=="y" del /q "%%~a"
+    )
   )
 )
 
@@ -158,14 +182,23 @@ IF     "%~1"=="" cmd /k
 
 
 :import
+if /I NOT "%import%"=="y" (
+  echo:
+  echo IMPORT DISABLED!
+  echo to import:                 python KJZZ-db.py --import --folder "%~1"
+  echo to import + generate html: python KJZZ-db.py --import --folder "%~1" --html %~n1 --autoGenerate --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+  goto :end
+)
 
 IF NOT "%~1"=="" (
   IF EXIST "%~1\*.text" (
-    echo deleting %~1\*.log" 1>&2
-    del /f /q "%~1\*.log"
+    IF /I "%deleteLogs%=="y" (
+      echo deleting %~1\*.log" 1>&2
+      del /f /q "%~1\*.log"
+    )
     call %PythonVenv%\activate
-    echo python KJZZ-db.py --import --folder "%~1" %htmlGen%
-    python KJZZ-db.py --import --folder "%~1" %htmlGen%
+    echo python KJZZ-db.py %importTexts% %htmlGen%
+    python KJZZ-db.py %importTexts% %htmlGen%
   )
 )
 

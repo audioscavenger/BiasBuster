@@ -34,6 +34,7 @@ gitsync*
 !stopWords.Wordlist-Adjectives-All.txt
 
 !assets/*
+assets/*.vsdx
 !fonts/*
 
 !kjzz/fonts

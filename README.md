@@ -1,7 +1,16 @@
-# BiasBuster - release 0.9.9
+# BiasBuster - WIP 0.9.10
 
-Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast. 
-BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
+A set of tools which ultimate goal is to analyze biases in English. 
+Currently only handles KJZZ's radio broadcast. 
+Under active developement since 10/1/2023.
+![BiasBuster overview](assets/BiasBuster.svg)
+
+BiasBuster provides an cron 24/7 stream downloader, a SQLite database, 
+and a Python script to output visual statistics and html schedules to present all that.
+
+The transcription is done on GPU and produces text files and captions in various formats.
+They are then crunched by a python script that fills a database, and outputs html files and word clouds, etc.
+PNG files are compressed by pngquant to saqve space.
 
 <div align="center"> 
   <img src="https://img.shields.io/github/forks/audioscavenger/BiasBuster?style=for-the-badge">
@@ -12,14 +21,13 @@ BiasBuster provides an automated stream downloader, a SQLite database, and Pytho
   <img src="https://img.shields.io/github/release/audioscavenger/BiasBuster?style=for-the-badge">
 </div>
 
-BiasBuster Will provide a UI and option to process+manage other broadcasts very soon.
+This project comes in 2 parts: 
+- A bash script that rune every 30mn to download the mp3 chunks
+- A Windows part:
+  - A batch that calls whisper-faster to transcribe mp3 to text
+  - A python script that loads transcriptions into a SQLite database, and outputs html, statistics, word clouds etc
 
-Comes in 2 parts: 
-- Linux part for a Cloud server, to download the mp3 (bash)
-- Windows part, to transcribe mp3 to text, SQLite database management, and word analysis
-
-The meat of the project is currently KJZZ-db.py that works on Windows. 
-It should be portable to Linux as-is.
+The Windows part could run on Linux as well, just the processing batch should be rewritten in bash.
 
 ![week41 example](assets/week41%20example.png)
 
@@ -50,7 +58,7 @@ kjzzDownloader 1859415 is appending "KJZZ_2023-10-20_Fri_1600-1630_All Things Co
 ### KJZZ schedule: KJZZ-schedule.json
 This schedule comes from their official website at https://kjzz.org/kjzz-print-schedule
 
-The structure is pretty simple, and simply lists by hour and by Day, what the program name is:
+The structure is pretty simple, and simply lists by hour then by Day, the title of the program/segment/show:
 ```
 {
   "00:00": {
@@ -65,13 +73,14 @@ The structure is pretty simple, and simply lists by hour and by Day, what the pr
   ...
 ```
 
-The schedule does not look like it's going to change until next year.
+The schedule does not look like it's going to change until next year. No handling of various schedules yet.
 
 
 ## Windows part 1: BiasBuster-whisper.cmd
 - Transcribe the mp3 to text with Purfview/whisper-standalone-win and CUDA.
 The whole point of using Windows is to put this GTX 3090 to good use. 
 Whisper-Faster is compiled and ready to use. 
+
 I tried my best to compile whisper, whisper-bin-x64, and whisper-cpp, but failed miserably. 
 Compiling it apparently requires you to install 6GB of CUDA SDK on Windows. My C: drive is full, sorry.
 
@@ -84,9 +93,18 @@ Here is how to transcribe the mp3 downloaded:
 5. copy `BiasBuster-whisper.cmd` as a shortcut in the sendTo folder (access by typing `shell:sendTo`)
 6. download mp3 from your Cloud server
 7. right-click the folder and select _BiasBuster-whisper_
-8. watch the magic of IA transcription
+8. watch the magic of AI transcription - JK it's machine learning.
 
-The script as it is, will produce multiple text file formats, but this project only uses `.text` extensions at the moment: pure text, no timestamps.
+![BiasBuster-whisper.cmd](assets/BiasBuster-whisper.cmd)
+
+The script as it is, will produce all text and caption files whisper-faster cam produce.
+This this project only uses `.text` extensions to load into the database, 
+and `.vtt` when playing the chunks.
+
+- vtt + text account for rougly 15MB per week.
+- OpenPlayerJS is integrated within the html pages (created by kjzz-db.py), and will load those `vtt` caption files.
+- In the future we could simply save only the vtt into the database, to save space. But a dynamic page would be necessary.
+
 
 
 ## Windows part 2: KJZZ-db.py
@@ -108,8 +126,8 @@ This Python script does the following:
   - [x] generate html week pages and also missing wordCloud pictures
   - [ ] generate gender bias analysis
   - [ ] generate html week pages that are useful
-  - [ ] generate html week pages that are interactive
-  - [ ] what else?
+  - [x] generate html week pages that are interactive
+  - [ ] see roadmap ...
 
 
 ### Usage
@@ -167,6 +185,12 @@ usage: python KJZZ-db.py --help
                    What graph you want. Ignored with --noMerge: heat map will be generated instead.
     --wordCloud
                    PICture: generate word cloud from gettext output. Will not output any text.
+      --noPngquant
+                   Disable pngquant compression
+      --useJpeg
+                   Produces jpeg instead of png
+      --jpegQuality <*50>
+                   0-100 jpeg quality
       --stopLevel  0 1 2 3 *4
                    add various levels of stopwords
         --listLevel <0[,1 ..]> to just show the words in that level(s).
@@ -379,6 +403,7 @@ wordCloud generated: Notice how it makes no sense as onlt the stop words are hig
 ![KJZZ start=2023-10-19 1500 words=4952 max=4000 scale=0](assets/wordCloud_example1.png)
 
 
+
 ### Generate a cloud a an episode of "Freakonomics" on week 42
 `python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt`
 
@@ -455,12 +480,17 @@ Scope creep ahead...
 - [ ] 0.9.?   TODO separate KJZZ into its own table to add other broadcasters
 - [ ] 0.9.?   TODO automate mp3 downloads from cloud + process + uploads from/to cloud server
 - [ ] 0.9.?   TODO adding bias_score.py from https://github.com/auroracramer/language-model-bias
-- [ ] 0.9.?   WIP
+- [ ] 0.9.10  WIP
   - [ ] db
+    - [x] PRAGMA temp_store = 2 | MEMORY
+    - [x] created indexes and tested them: they work
     - [ ] store statistics but what statistics?
     - [ ] add statistics table or more columns for each chunk?
     - [ ] how to store statistics for segments rather then chunks?
   - [ ] ui
+    - [ ] start to think about how to access the misInformation heatmaps
+    - [ ] also compute a wordCloud per chunk and show it in the tooltip?
+    - [ ] make text icons also a modal
     - [ ] fix table header that's transparent when scrolling down
     - [ ] build an actual front page with Bootstrap or smth
     - [ ] enable closed-captions by default: nothing works, asked on stackoverflow
@@ -470,10 +500,14 @@ Scope creep ahead...
     - [ ] integrate front page with cgi or smth so we can ajax-build missing pictures or smth
     - [ ] integrate front page with cgi so we can tap in the database with SQLite worker
     - [ ] integrate text analysis with keyword search
-    - [ ] keep player playing while navigating, like yt or plex
+    - [ ] keep player playing while navigating like plex => iframe
     - [ ] player handles playlist
     - [ ] segments have only 1 play button that loads a playlist? how about the texts?
   - [ ] python
+    - [x] add --useJpeg and --jpegQuality but it's actually worse
+    - [x] enable string.Template instead of those %s everywhere
+    - [x] tried to improve import speed with BEGIN+COMMIT but error: You can only execute one statement at a time.
+    - [x] added jpeg output but for same size, quality is attrocious
     - [ ] rename title to segment or show? they seem to call their programmings "shows"
     - [ ] color segments by bias/misInformation/etc
     - [ ] color wordClouds by bias/misInformation/etc
@@ -568,10 +602,12 @@ Scope creep ahead...
   - wordcloud
   - pngquant
 - Windows software:
+  - busybox.exe
   - whisper-faster from https://github.com/Purfview/whisper-standalone-win
 
 
 ## Acknowledgements
+- busybox:        https://busybox.net/
 - rich print:     https://github.com/Textualize/rich
 - pngquant:       https://github.com/kornelski/pngquant
 - wordCloud:      https://github.com/amueller/word_cloud

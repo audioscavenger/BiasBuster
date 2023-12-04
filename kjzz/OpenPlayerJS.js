@@ -1,3 +1,5 @@
+// console.log('start', history.state);
+
 const player = new OpenPlayerJS('player', {
   controls: {
       alwaysVisible: false,
@@ -66,6 +68,7 @@ function play(sound) {
 
   player.src = { src: sound };
   player.addCaptions({ src: captions, kind: "subtitles", srclang: "en", label: "English" });
+  
   // https://developer.mozilla.org/en-US/docs/Web/Events#media
 // https://developer.mozilla.org/en-US/docs/Web/HTML/Element/track
   let track = document.querySelector("track").track;
@@ -73,11 +76,20 @@ function play(sound) {
 
   // https://developer.mozilla.org/en-US/docs/Web/API/TextTrack/mode
   // cannot get this CC enabled no matter what so here is the question: https://stackoverflow.com/questions/77581173/openplayerjs-how-to-enable-track-captions-on-event
-  track.mode = "showing";
-  
+  // track.mode = "showing";
+  // temporary solution: simulate click by the user...
+  document.querySelector('.op-controls__captions').click();
+
   player.play();
-  // console.log('player',player);
+  
+  // https://developer.mozilla.org/en-US/docs/Web/API/History/pushState
+  // history.pushState({ url: document.URL, playing: true }, "", "index.html");
+  // console.log('before', history.state);
+  // location.reload();
+  // console.log('after', history.state);
 
   // <source src='file.mp3' type="audio/mp3" />
   // <track src="file.vtt" kind="subtitles" srclang="en" label="English" />
 }
+
+// console.log('end', history.state);

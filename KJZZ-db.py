@@ -1,8 +1,9 @@
 # BiasBuster
 # author:  AudioscavengeR
 # license: GPLv2
-# version: 0.9.9 release better_ui
+# version: 0.9.10 WIP
 
+# BUG: jpeg produced by plt.savefig have a wide border
 
 # Object: Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast.
 # BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
@@ -49,7 +50,11 @@
 # for /l %a in (40,1,47) DO python KJZZ-db.py --html %a --autoGenerate --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
 
 
+# TODO: enable closed-captions by default: nothing works, asked on stackoverflow
+# similar question: https://stackoverflow.com/questions/17247931/video-js-how-do-i-make-subtitle-visible-by-default
+# my question: https://stackoverflow.com/questions/77581173/how-to-enable-closed-captions-by-default-with-openplayerjs-video-js
 
+# TODO: improve file read fd with list = set(map(str.strip, open(os.path.join(inputFolder, fileName)).readlines()))
 # TODO: somehow find way to always include --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
 # TODO: add --force to regenerate existing pictures
 # TODO: handle same program at differnt time of the day such as Sat: BBC World Service morning and evening - currently we can only generate one same wordCloud for both
@@ -65,7 +70,7 @@
 
 
 
-import getopt, sys, os, re, regex, io, inspect
+import getopt, sys, os, re, regex, io, inspect, string
 import glob, time, datetime, json, urllib, random, sqlite3
 from dateutil import parser
 from pathlib import Path
@@ -147,8 +152,12 @@ missingPic = "../missingPic.png"
 missingCloud = "../missingCloud.png"
 voidPic = "../1x1.png"
 rebuildThumbnail = False
+usePngquant = True
+useJpeg = False
+jpegQuality = 50
 
 # busybox sed -E "s/^.{,3}$//g" stopWords.ranks.nl.txt | busybox sort | busybox uniq >stopWords.ranks.nl.txt 
+# wordcloud internal STOPWORDS: https://github.com/amueller/word_cloud/blob/main/wordcloud/stopwords
 # https://www.ranks.nl/stopwords
 # https://gist.github.com/sebleier/554280
 # https://github.com/taikuukaits/SimpleWordlists/blob/master/Wordlist-Adjectives-All.txt
@@ -357,6 +366,31 @@ class Chunk:
 #
 
 
+# TODO: update table for missing columns when this script is updated
+# TODO: defind columns in a dict and compare to records from this command:
+# pragma table_info('schedule')
+  # 0	start	TEXT	0		1
+  # 1	stop	TEXT	1		0
+  # 2	week	INTEGER	0		0
+  # 3	day	TEXT	1		0
+  # 4	title	TEXT	1		0
+  # 5	text	TEXT	0		0
+  # 6	model	TEXT	0		0
+
+# TODO: check indexes exist and create them if not:
+# SELECT * FROM sqlite_master WHERE type= 'index' and tbl_name = 'schedule' and name = 'IFK_ScheduleStartStop';
+  # index	IFK_ScheduleStartStop	schedule	13436	CREATE UNIQUE INDEX "IFK_ScheduleStartStop" ON "schedule" (
+    # "start",
+    # "stop"
+  # )
+
+# TEST if index is used: https://stackoverflow.com/questions/35625812/sqlite-use-autoindex-instead-my-own-index
+# analyze schedule;
+# explain query plan SELECT start, text from schedule where 1=1 and week = 40 and title = 'Classic Jazz with Chazz Rayburn' and Day = 'Mon';
+  # 4	0	0	SEARCH TABLE schedule USING INDEX IFK_ScheduleWeekTitleDay (week=? AND title=? AND day=?)
+  # yes it is!!!
+
+
 # If you use the TEXT storage class to store date and time value, you need to use the ISO8601 string format as follows:
 # YYYY-MM-DD HH:MM:SS.SSS
 def db_init(localSqlDb):
@@ -374,6 +408,8 @@ def db_init(localSqlDb):
         , text      TEXT
         , model     TEXT
         );
+    CREATE UNIQUE INDEX [IFK_ScheduleStartStop]    ON "schedule" ([start],[stop]);
+    CREATE        INDEX [IFK_ScheduleWeekTitleDay] ON "schedule" ([week],[title],[Day]);
     """
   try:
     cur.execute(queryScheduleTable)
@@ -382,6 +418,8 @@ def db_init(localSqlDb):
     if not str(error).find("already exists"):
       info("queryScheduleTable %s: %s" %(localSqlDb, error), 1)
     else:
+      records = cursor(localSqlDb, conn, """SELECT count(start) from schedule""")
+      info("COLUMNS: %s" %(records[0]), 1)
       records = cursor(localSqlDb, conn, """SELECT count(start) from schedule""")
       info("%s chunks found in schedule %s" %(records[0][0], localSqlDb), 1)
   
@@ -417,11 +455,14 @@ def db_init(localSqlDb):
     # progress.advance(task)
 
 def db_load(inputFiles, localSqlDb, conn, model):
-  loadedFiles = []
+  importedFiles = []
   if inputFiles:
     info("%s files found" %(len(inputFiles)), 1)
   if not conn:
     conn = sqlite3.connect(localSqlDb)
+  
+  # tentative to use BEGIN+COMMIT to speed up loading at the expense of memory
+  # sqlLoad = """ BEGIN; """
   
   with Progress() as progress:
     task = progress.add_task("Loading inputFiles...", total=len(inputFiles))
@@ -434,21 +475,27 @@ def db_load(inputFiles, localSqlDb, conn, model):
         # time.sleep(0.2)
       except Exception as error:
         error("Chunk load error for %s: %s" % (inputFile, error), 11)
+      
       # check if exist in db:
-      sql = """ SELECT * from schedule where start = ?; """
-      records = cursor(localSqlDb, conn, sql, (chunk.start,))
+      sqlCheck = """ SELECT * from schedule where start = ?; """
+      records = cursor(localSqlDb, conn, sqlCheck, (chunk.start,))
       # exit()
       if len(records) == 0:
         # load in db:
-        sql = """ INSERT INTO schedule(start, stop , week, Day, title, text, model) VALUES(?,?,?,?,?,?,?); """
-        records = cursor(localSqlDb, conn, sql, (chunk.start, chunk.stop , chunk.week, chunk.Day, chunk.title, chunk.text, chunk.model))
-        loadedFiles += [inputFile]
+        # tentative to use BEGIN+COMMIT to speed up loading at the expense of memory
+        # sqlLoad += """ INSERT INTO schedule(start, stop , week, Day, title, text, model) VALUES(%s,%s,%s,%s,%s,%s,%s); """ %((chunk.start, chunk.stop , chunk.week, chunk.Day, chunk.title, chunk.text, chunk.model))
+        sqlLoad = """ INSERT INTO schedule(start, stop , week, Day, title, text, model) VALUES(?,?,?,?,?,?,?); """
+        records = cursor(localSqlDb, conn, sqlLoad, (chunk.start, chunk.stop , chunk.week, chunk.Day, chunk.title, chunk.text, chunk.model))
+        importedFiles += [inputFile]
         info("Chunk imported: %s" % (chunk.basename), 1, progress)
       else:
         info("[bright_black]Chunk already exist: %s[/]" % (chunk.basename), 2, progress)
       progress.advance(task)
+  
+  # BEGIN+COMMIT cannot work like this unfortunately: You can only execute one statement at a time.
+  # records = cursor(localSqlDb, conn, sqlLoad)
   conn.commit()
-  info("Done loading %s/%s files" %(len(loadedFiles), len(inputFiles)), 1, progress)
+  info("Done loading %s/%s files" %(len(importedFiles), len(inputFiles)), 1, progress)
 #
 
 
@@ -467,7 +514,7 @@ def cursor(localSqlDb, conn, sql, data=None):
     records = cur.fetchall()
     info("%s records" %(len(records)), 3)
   except Exception as error:
-    warning("%s" %(error))
+    error("%s" %(error))
   return records
 #
 
@@ -526,6 +573,7 @@ def replaceNum2Days(record):
 
 
 def getText(gettextDict, progress=""):
+  # gettextDict = {'week': '40', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
   sqlGettext = "SELECT start, text from schedule where 1=1"
   title = "KJZZ"
   
@@ -657,7 +705,7 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
   import pandas as pd
   import matplotlib
   # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
-  matplotlib.use('Agg')
+  if not showPicture: matplotlib.use('Agg')
   import matplotlib.pyplot as plt
   import matplotlib.dates as mdates
   from   matplotlib import style
@@ -727,6 +775,7 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
     info("%s words" %(genWordCloudDict["numWords"]), 1, progress)
   # image 1: Display the generated image:
   # font_path="fonts\\Quicksand-Regular.ttf"
+  # class WordCloud: https://github.com/amueller/word_cloud/blob/fa7ac29c6c96c713f51585818e289e8f99c0f211/wordcloud/wordcloud.py#L154C25-L154C25
   wordcloud = WordCloud(
                         stopwords=STOPWORDS, 
                         background_color=wordCloudDict["background_color"]["value"], 
@@ -790,6 +839,39 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
     # wspace=0.2
   # )
   # plt.tight_layout(pad=1)
+  
+  
+  # self.layout_ = list(zip(frequencies, font_sizes, positions, orientations, colors))
+  # print(wordcloud.layout_)
+# [
+    # (('museum', 1.0), 399, (594, 254), None, 'rgb(69, 55, 129)'),
+    # (('women', 0.92), 383, (32, 286), None, 'rgb(72, 37, 118)'),
+    # (('stories', 0.88), 375, (247, 345), None, 'rgb(41, 121, 142)'),
+    # (('history', 0.76), 197, (812, 8), None, 'rgb(54, 92, 141)'),
+    # (('music', 0.68), 187, (844, 1189), None, 'rgb(59, 82, 139)'),
+    # (('tree', 0.68), 187, (37, 1611), None, 'rgb(58, 83, 139)'),
+    # (('find', 0.56), 171, (364, 1672), None, 'rgb(239, 229, 28)'),
+    # (('hand', 0.56), 171, (820, 781), None, 'rgb(189, 223, 38)'),
+    # (('project', 0.56), 171, (4, 131), 2, 'rgb(54, 92, 141)'),
+    # (('records', 0.56), 123, (498, 1539), None, 'rgb(152, 216, 62)'),
+    # ...
+
+  # self.words_ = dict(frequencies)
+  # print(wordcloud.words_)
+  # {
+    # 'museum': 1.0,
+    # 'women': 0.92,
+    # 'stories': 0.88,
+    # 'history': 0.76,
+    # 'music': 0.68,
+    # 'tree': 0.68,
+    # 'find': 0.56,
+    # 'hand': 0.56,
+    # 'project': 0.56,
+    # 'records': 0.56,
+    # ...
+  
+  
   plt.imshow(wordcloud, interpolation='bilinear')
 
   # # image 2: lower max_font_size
@@ -805,17 +887,34 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
   fileName = genWordCloudDict["fileName"]
   # always save BEFORE show
   if fileName:
-    plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
-    pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
-    # thumbnail = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+    if not useJpeg:
+      genWordCloudDict["outputFileName"] = fileName  + ".png"
+      genWordCloudDict["outputFile"] = os.path.join(outputFolder, genWordCloudDict["outputFileName"])
+      plt.savefig(outputFile, bbox_inches='tight')
+      if usePngquant: pngquant.quant_image(image=genWordCloudDict["outputFile"])
+    else:
+      genWordCloudDict["outputFileName"] = fileName  + ".jpg"
+      genWordCloudDict["outputFile"] = os.path.join(outputFolder, genWordCloudDict["outputFileName"])
+      plt.savefig(genWordCloudDict["outputFile"], pil_kwargs={
+                              'quality': 50,
+                              'subsampling': 10
+                              })
+    info('image saved: "%s"' %(genWordCloudDict["outputFileName"]), 1, progress)
     
-    thumbnail = PIL.Image.open(os.path.join(outputFolder, fileName  + ".png"))
-    thumbnail.thumbnail((256, 256), PIL.Image.Resampling.LANCZOS)
-    # thumbnail = thumbnail.resize((256,256), PIL.Image.LANCZOS)
-    thumbnail.save(os.path.join(outputFolder, "thumbnail-" + fileName  + ".png"))
-    pngquant.quant_image(image=os.path.join(outputFolder, "thumbnail-" + fileName  + ".png"))
-    # print(thumbnail.size)
-    info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
+    # I would love this to work instead of reloading the file we just produced:
+    # PILoutputFile = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+    PILoutputFile = PIL.Image.open(genWordCloudDict["outputFile"])
+    PILoutputFile.thumbnail((256, 256), PIL.Image.Resampling.LANCZOS)   # looks okay
+    # PILoutputFile = thumbnail.resize((256,256), PIL.Image.LANCZOS)    # does not look good
+    
+    thumbnail = os.path.join(outputFolder, "thumbnail-" + genWordCloudDict["outputFileName"])
+    if not useJpeg:
+      PILoutputFile.save(thumbnail)
+      if usePngquant: pngquant.quant_image(image=thumbnail)
+    else:
+      PILoutputFile.save(thumbnail , "JPEG", quality=80, optimize=True)
+    # print(PILoutputFile.size)
+    info('thumbnail saved: "%s"' %(thumbnail), 2, progress)
 
   if showPicture: plt.show()
   plt.close()
@@ -891,7 +990,7 @@ def genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict=wordCloudDict, gr
   import pandas as pd
   import matplotlib
   # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
-  matplotlib.use('Agg')
+  if not showPicture: matplotlib.use('Agg')
   import matplotlib.pyplot as plt
   import matplotlib.dates as mdates
   from   matplotlib import style
@@ -949,7 +1048,7 @@ def genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict=wordCloudDict, gr
 
 
 
-def loadInputFolder(inputFolder):
+def readInputFolder(inputFolder):
   if os.path.isdir(inputFolder):
     info(("  listing folder %s ...") % (inputFolder), 1)
     # inputFiles = sorted([os.fsdecode(file) for file in os.listdir(inputFolder) if os.fsdecode(file).endswith(".text")])
@@ -965,10 +1064,10 @@ def loadInputFolder(inputFolder):
   else:
     error("%s not found" % (inputFolder))
   #
-# loadInputFolder
+# readInputFolder
 
 
-def loadInputFile(inputTextFile):
+def readInputFile(inputTextFile):
   if os.path.isfile(inputTextFile):
     if (os.path.getsize(inputFile) > 0):
       info("inputTextFile %s passed" % (inputTextFile), 1)
@@ -978,7 +1077,7 @@ def loadInputFile(inputTextFile):
   else:
     error("%s not found" % (inputTextFile))
   #
-# loadInputFile
+# readInputFile
 
 
 
@@ -987,7 +1086,7 @@ def graph_line(X, Y, title="", fileName=""):
   import pandas as pd
   import matplotlib
   # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
-  matplotlib.use('Agg')
+  if not showPicture: matplotlib.use('Agg')
   import matplotlib.pyplot as plt
   import matplotlib.dates as mdates
   from   matplotlib import style
@@ -1006,7 +1105,7 @@ def graph_line(X, Y, title="", fileName=""):
   # always save BEFORE show
   if fileName:
     plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
-    pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
+    if usePngquant: pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
     info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
 
   if showPicture: plt.show()
@@ -1020,7 +1119,7 @@ def graph_bar(X, Y, title="", fileName=""):
   import pandas as pd
   import matplotlib
   # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
-  matplotlib.use('Agg')
+  if not showPicture: matplotlib.use('Agg')
   import matplotlib.pyplot as plt
   import matplotlib.dates as mdates
   from   matplotlib import style
@@ -1039,7 +1138,7 @@ def graph_bar(X, Y, title="", fileName=""):
   # always save BEFORE show
   if fileName:
     plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
-    pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
+    if usePngquant: pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
     info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
 
   if showPicture: plt.show()
@@ -1053,7 +1152,7 @@ def graph_pie(X, Y, title="", fileName=""):
   import pandas as pd
   import matplotlib
   # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
-  matplotlib.use('Agg')
+  if not showPicture: matplotlib.use('Agg')
   import matplotlib.pyplot as plt
   import matplotlib.dates as mdates
   from   matplotlib import style
@@ -1080,7 +1179,7 @@ def graph_pie(X, Y, title="", fileName=""):
   # always save BEFORE show
   if fileName:
     plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
-    pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
+    if usePngquant: pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
     info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
 
   if showPicture: plt.show()
@@ -1093,7 +1192,7 @@ def graph_heatMapTestHighlight():
   import pandas as pd
   import matplotlib
   # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
-  matplotlib.use('Agg')
+  if not showPicture: matplotlib.use('Agg')
   import matplotlib.pyplot as plt
   import matplotlib.dates as mdates
   from   matplotlib import style
@@ -1119,7 +1218,7 @@ def graph_heatMapTestHighlight():
   # always save BEFORE show
   if fileName:
     plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
-    pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
+    if usePngquant: pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
     info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
 
   if showPicture: plt.show()
@@ -1133,7 +1232,7 @@ def graph_heatMap(arrays, X, Y, title="", fileName=""):
   import pandas as pd
   import matplotlib
   # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
-  matplotlib.use('Agg')
+  if not showPicture: matplotlib.use('Agg')
   import matplotlib.pyplot as plt
   import matplotlib.dates as mdates
   from   matplotlib import style
@@ -1218,7 +1317,7 @@ def graph_heatMap(arrays, X, Y, title="", fileName=""):
   # always save BEFORE show
   if fileName:
     plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
-    pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
+    if usePngquant: pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
     info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
 
   if showPicture: plt.show()
@@ -1277,7 +1376,7 @@ def rebuildThumbnails(inputFolder, outputFolder, dryRun=False, progress=""):
       outputFile = os.path.join(outputFolder, "thumbnail-" + os.path.basename(png))
       if not dryRun:
         thumbnail.save(outputFile)
-        pngquant.quant_image(image=outputFile)
+        if usePngquant: pngquant.quant_image(image=outputFile)
       
       info("thumbnail saved: %s" %(outputFile), 2, progress)
       progress.advance(task)
@@ -1286,7 +1385,8 @@ def rebuildThumbnails(inputFolder, outputFolder, dryRun=False, progress=""):
 
 
 def genHtmlHead(pageTitle):
-  return '''
+  dictTemplate = dict(pageTitle=pageTitle, rand1=random.randint(0,99))
+  template = string.Template(('''
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1295,15 +1395,16 @@ def genHtmlHead(pageTitle):
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="ie=edge" />
   
-  <title data-l10n-id="%s"></title>
+  <title data-l10n-id="${pageTitle}"></title>
 
   <link rel="stylesheet" href="../fonts/css/fontawesome.min.css">
   <link rel="stylesheet" href="../fonts/css/regular.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/openplayerjs@1.12.1/dist/openplayer.min.css">
-  <link rel="stylesheet" href="../style.css?%s">
+  <link rel="stylesheet" href="../style.css?${rand1}">
 
-</head>\n
-''' %(pageTitle, random.randint(0,99))
+</head>
+'''))
+  return template.substitute(dictTemplate)
 
 # genHtmlModal
 
@@ -1318,7 +1419,7 @@ def genHtmlModal():
       <img id="modal-img" decoding="async" loading="lazy" onclick="onClickImgPrevent(event);" />
     </div>
   </div>
-</div>\n
+</div>
 '''
 # genHtmlModal
 
@@ -1331,30 +1432,37 @@ def genHtmlThead(weekNumber, byChunk):
     addNotByChunk = '-byChunk'
     switchTo = 'bySchedule'
 
-  html  = '  <thead>'
-  html += '<tr class="title">'
-  html += '<td><a class="prevWeek" href="../%s/index%s.html">&larr; week %s</a></td>' %((weekNumber-1), addNotByChunk, (weekNumber-1))
-  html += '<td colspan="6"><span>%s week %s<a href="index%s.html">&nbsp;&nbsp;&nbsp;%s</a></span></td>' %("KJZZ", weekNumber, addByChunk, switchTo)
-  html += '<td><a class="nextWeek" href="../%s/index%s.html">week %s&rarr;</a></td>' %((weekNumber+1), addNotByChunk, (weekNumber+1))
-  html += '</tr>\n'
-  html += '<tr><th class="startTime">Time</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>\n'
-  html += '  </thead>\n'
-  
-  return html
+  dictTemplate = dict(weekNumber=weekNumber, prevWeekNumber=(weekNumber-1), nextWeekNumber=(weekNumber+1), addNotByChunk=addNotByChunk, addByChunk=addByChunk, switchTo=switchTo)
+  template = string.Template(('''
+<thead>
+  <tr class="title">
+    <td><span><a class="prevWeek" href="../${prevWeekNumber}/index${addNotByChunk}.html">&larr; week ${prevWeekNumber}</a></span></td>
+    <td colspan="6"><span>KJZZ week ${weekNumber}<a href="index${addByChunk}.html">&nbsp;&nbsp;&nbsp;${switchTo}</a></span></td>
+    <td><span><a class="nextWeek" href="../${nextWeekNumber}/index${addNotByChunk}.html">week ${nextWeekNumber}&rarr;</a></span></td>
+  </tr>
+  <tr>
+    <th class="startTime">Time</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
+  </tr>
+</thead>
+'''))
+  return template.substitute(dictTemplate)
+
 # genHtmlThead
 
 
-def genHtmlChunk(rowspan, classChunkExist, title, play, texts, segmentImg=""):
-  return '''
-<td rowspan="%s" %s>
+def genHtmlChunk(rowspan, classChunkExist, title, plays, texts, segmentImg=""):
+  dictTemplate = dict(rowspan=rowspan, classChunkExist=classChunkExist, title=title, plays=plays, texts=texts, segmentImg=segmentImg)
+  template = string.Template(('''
+<td rowspan="${rowspan}" ${classChunkExist}>
   <div>
-    <span>%s</span>
-    <span>%s</span>
-    <span>%s</span>
+    <span>${title}</span>
+    <span class="block">${plays}</span>
+    <span class="block">${texts}</span>
   </div>
-  %s
-</td>\n
-''' %(rowspan, classChunkExist, title, play, texts, segmentImg)
+  ${segmentImg}
+</td>
+'''))
+  return template.substitute(dictTemplate)
 
 # <td rowspan="5" class="chunkExist">
   # <div>
@@ -1377,26 +1485,58 @@ def genHtmlChunk(rowspan, classChunkExist, title, play, texts, segmentImg=""):
 
 
 def genHtmlFooter():
-  return '''
-<script src="https://cdn.jsdelivr.net/npm/openplayerjs@latest/dist/openplayer.min.js"></script>\n
-<script src="../OpenPlayerJS.js"></script>\n
-<script src="../ui.js?%s"></script>\n
-''' %(random.randint(0,99))
+  dictTemplate = dict(rand1=random.randint(0,99), rand2=random.randint(0,99))
+  template = string.Template(('''
+<script src="https://cdn.jsdelivr.net/npm/openplayerjs@latest/dist/openplayer.min.js"></script>
+<script src="../OpenPlayerJS.js?${rand1}"></script>
+<script src="../ui.js?${rand2}"></script>
+'''))
+  return template.substitute(dictTemplate)
+
 # genHtmlFooter
 
 
 def genSegmentImg(imgFileName, classChunkExist):
   thumbnailFileName = "thumbnail-%s" %(imgFileName)
-  return '''
-<div onclick="showModal('%s');">
-  <img src="%s" alt="%s" %s decoding="async" onerror="this.src='../missingCloud.png';" loading="lazy" />
-</div>\n
-''' %(imgFileName, thumbnailFileName, imgFileName, classChunkExist)
+
+  dictTemplate = dict(imgFileName=imgFileName, thumbnailFileName=thumbnailFileName, classChunkExist=classChunkExist)
+  template = string.Template(('''
+    <div onclick="showModal('${imgFileName}');">
+      <img width="256" src="${thumbnailFileName}" alt="${imgFileName}" ${classChunkExist} decoding="async" onerror="this.src='../missingCloud.png';" loading="lazy" />
+    </div>
+'''))
+  return template.substitute(dictTemplate)
 
 # <div onclick="showModal('KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png');">
   # <img src="thumbnail-KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" alt="KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" class="chunkExist" decoding="async" onerror="this.src='../missingCloud.png'" loading="lazy" />
 # </div>
 # genSegmentImg
+
+
+def genPlayButton(startTime, stopTime, fileStem, classTooltipPosition):
+  dictTemplate = dict(fileStem=fileStem, classTooltipPosition=classTooltipPosition, startTime=startTime, stopTime=stopTime)
+  template = string.Template(('''
+      <i class="fa-regular fa-circle-play tooltip" onclick="play('${fileStem}.mp3');">
+        <span class="tooltiptext ${classTooltipPosition}">
+          <div>${startTime} - ${stopTime}<br>${fileStem}</div>
+        </span>
+      </i>
+'''))
+  return template.substitute(dictTemplate)
+
+# genPlayButton
+
+
+def genTextButton(fileStem):
+  dictTemplate = dict(fileStem=fileStem)
+  template = string.Template(('''
+      <a href="${fileStem}.text">
+        <i class="fa-regular fa-file-lines tooltip" ></i>
+      </a>
+'''))
+  return template.substitute(dictTemplate)
+
+# genTextButton
 
 
 def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
@@ -1466,7 +1606,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
         # title should be renamed "segment", really.
         title = jsonSchedule[startTime][Day]
         classChunkExist = ''
-        play = ''
+        plays = ''
         texts = ''
         segmentImg = ''
         classTooltipPosition = 'tooltipBottomLeft'
@@ -1541,10 +1681,10 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
             for row in listChunks:
               # This is by segment (title), not byChunk: we therefore list all chunks for that segment.
               # Also, no \n between them or it will translate into a white space
-              play += '<i class="fa-regular fa-circle-play tooltip" onclick="play(\'%s.mp3\');"><span class="tooltiptext %s"><div>%s - %s<br>%s</div></span></i>' %(row[2], classTooltipPosition, row[0], row[1], row[2])
-              texts += '<a href="%s"><i class="fa-regular fa-file-lines tooltip" ></i></a>' %(row[2] + ".text")
+              plays += genPlayButton(row[0], row[1], row[2], classTooltipPosition)
+              texts += genTextButton(row[2])
 
-          rowspanDict[startTime][Day] = genHtmlChunk(rowspan[Day], classChunkExist, title, play, texts, segmentImg)
+          rowspanDict[startTime][Day] = genHtmlChunk(rowspan[Day], classChunkExist, title, plays, texts, segmentImg)
 
           # if we are not processing the last time key of the day:
           if getNextKey(reversedTimeList, key):
@@ -1581,10 +1721,10 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
               # Also, no \n between them or it will translate into a white space
               if startTime[:2] == row[0][:2]:
                 classChunkExist = 'class="chunkExist"'
-                play += '<i class="fa-regular fa-circle-play tooltip" onclick="play(\'%s.mp3\');"><span class="tooltiptext %s"><div>%s - %s<br>%s</div></span></i>' %(row[2], classTooltipPosition, row[0], row[1], row[2])
-                texts += '<a href="%s"><i class="fa-regular fa-file-lines tooltip" ></i></a>' %(row[2] + ".text")
+                plays += genPlayButton(row[0], row[1], row[2], classTooltipPosition)
+                texts += genTextButton(row[2])
           # rowspanDict[startTime][Day] = '<td rowspan="%s" %s><div>%s<span>%s</span><span>%s</span></div></td>\n' %(rowspan[Day], classChunkExist, title, play, texts)
-          rowspanDict[startTime][Day] = genHtmlChunk(rowspan[Day], classChunkExist, title, play, texts)
+          rowspanDict[startTime][Day] = genHtmlChunk(rowspan[Day], classChunkExist, title, plays, texts)
           info("%s =1 %s %s - %s" %(startTime, rowspan[Day], title, None), 4, progress)
       
         progress.advance(task)
@@ -1605,7 +1745,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   # https://github.com/openplayerjs/openplayerjs/blob/master/docs/
   # for simplicity of switching tracks when you click play buttons, 
   # track is pre-added so we can find it with a simple document.querySelector("track").track
-  html += '''\n
+  html += '''
 <div class="audio">
   <audio id="player" class="op-player__media">
     <track kind="subtitles" srclang="en" label="English" />
@@ -1715,7 +1855,10 @@ def usage(RC=99):
   usage += ("    --misInformation\n                   PICture: generate misInformation graph or heatmap for all 4 factors:\n                   explanatory/retractors/sourcing/uncertainty")+os.linesep
   usage += ("      --graph *bar | pie | line\n                   What graph you want. Ignored with --noMerge: heat map will be generated instead.")+os.linesep
   usage += ("    --wordCloud\n                   PICture: generate word cloud from gettext output. Will not output any text.")+os.linesep
-  usage += ("      --stopLevel  0 1 2 3 *4\n                   add various levels of stopwords")+os.linesep
+  usage += ("      --noPngquant\n                   Disable pngquant compression")+os.linesep
+  usage += ("      --useJpeg\n                   Produces jpeg instead of png")+os.linesep
+  usage += ("      --jpegQuality <*50>\n                   0-100 jpeg quality")+os.linesep
+  usage += ("      --stopLevel  0 1 2 3 *4\n                   Add various levels of stopwords")+os.linesep
   usage += ("        --listLevel <0[,1 ..]> to just show the words in that level(s).")+os.linesep+os.linesep
   for key, item in wordCloudDict.items():
     if item["input"]: usage += ("      --%s *%s %s" %(key, item["value"], item["usage"]))+os.linesep
@@ -1740,7 +1883,7 @@ argumentList = sys.argv[1:]
 # define short Options
 options = "hviq:g:d:t:f:m:p"
 # define Long options
-long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "keepStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation", "output=", "graph=", "html=", "byChunk", "printOut", "listLevel=", "silent", "dryRun", "autoGenerate", "rebuildThumbnails="]
+long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "keepStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation", "output=", "graph=", "html=", "byChunk", "printOut", "listLevel=", "silent", "dryRun", "autoGenerate", "rebuildThumbnails=", "noPngquant", "useJpeg", "jpegQuality="]
 wordCloudDictToParams = [(lambda x: '--' + x)(x) for x in wordCloudDict.keys()]
 wordCloudDictToOptions = [(lambda x: x + '=')(x) for x in wordCloudDict.keys()]
 long_options += wordCloudDictToOptions
@@ -1838,6 +1981,9 @@ try:
     elif currentArgument in ("--html"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       weekNumber = int(currentValue)
+    elif currentArgument in ("--jpegQuality"):
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
+      jpegQuality = int(currentValue)
     elif currentArgument in ("--byChunk"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       byChunk = True
@@ -1865,6 +2011,13 @@ try:
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       wordCloud = True
       misInformation = False
+    elif currentArgument in ("--noPngquant"):
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, False), 2)
+      usePngquant = False
+    elif currentArgument in ("--useJpeg"):
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
+      useJpeg = True
+      usePngquant = False
     elif currentArgument in ("--misInformation"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       wordCloud = False
@@ -1947,11 +2100,14 @@ else:
 
 #################################### import of new chunks of broadcast
 if importChunks:
+  if (not inputTextFile and not inputFolder):
+    error("--import requires --text <file.text> or --folder <folder>", 10)
+
   # first we build inputFiles
   if inputTextFile:
-    inputFiles += loadInputFile(inputTextFile)
+    inputFiles += readInputFile(inputTextFile)
   if inputFolder:
-    inputFiles += loadInputFolder(inputFolder)
+    inputFiles += readInputFolder(inputFolder)
   
   # second we load the db with inputFiles
   if len(inputFiles):
@@ -1999,14 +2155,16 @@ if gettext:
   # gettext = "week=43+title=Classic Jazz with Chazz Rayburn+Day=Mon"
   # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
   gettextDict = buildGetTextDict(gettext)
-  title = "KJZZ" + gettext.replace("+", " ")
+  wordCloudTitle = "KJZZ " + gettext.replace("+", " ")
   records = getText(gettextDict)
   
   if records:
 
     ################## wordCloud
-    # first we check if a wordCloud is requested:
-    if wordCloud: genWordCloudDicts = genWordClouds(records, title, mergeRecords, showPicture, wordCloudDict, outputFolder, dryRun)
+    # first we check if week number was passed in the gettext to infer outputFolder
+    if "week" in gettextDict: outputFolder = os.path.join(outputFolder, str(gettextDict['week']))
+    # then we check if a wordCloud is requested:
+    if wordCloud: genWordCloudDicts = genWordClouds(records, wordCloudTitle, mergeRecords, showPicture, wordCloudDict, outputFolder, dryRun)
 
     ################## misInformation
     # then we check if a misInformation misInformation is requested:
@@ -2075,7 +2233,10 @@ print (text.lower().count("change"))
 words = text.lower().partition("global warming")
 
 
-# https://stackoverflow.com/questions/31897436/efficient-way-to-get-words-before-and-after-substring-in-text-python/31932413#31932413
+# TODO: https://stackoverflow.com/questions/31897436/efficient-way-to-get-words-before-and-after-substring-in-text-python/31932413#31932413
+# my question: https://stackoverflow.com/questions/31897436/efficient-way-to-get-words-before-and-after-substring-in-text-python/31932413?noredirect=1#comment136272843_31932413
+# answer: @scavenger: What do you mean by "multi-word search" ? Note that the pattern uses the VERBOSE flag, so, If you want to figure several words separated by blank characters, you have to escape them several\ words\ separated\ by\ spaces or to put the searched expression between \Q and \E to quote them for the pattern, like that: \Qseveral words separated by spaces\E, otherwise spaces are ignored. – 
+
 # word = 'global warming'
 word = 'warming'
 n = 4

@@ -71,12 +71,26 @@ tbody, tfoot {
 .chunkExist {
   background-color: azure;
   color: #434343;
+  /* display: flex; */
 }
 img.chunkExist {
   width: 100%;
   max-width: 15vw; /* width divided by 8 */
   cursor: pointer;
 }
+
+/* attempt to get those icons without space; the actual solution is still to just suppress spaces and CR between the <i> */
+/* https://stackoverflow.com/questions/5078239/how-to-remove-the-space-between-inline-inline-block-elements */
+.block {
+  /* white-space-collapse: collapse; */ /* not implemented yet */
+  display: block;
+  /* text-align: center; */
+}
+.block > i, .block > a {
+  /* this will collapse spaces, but what happens on different viewports and smaller screensizes? */
+  margin-right: -3px;
+}
+
 
 /* Navigation */
 a.prevWeek, a.nextWeek {
@@ -107,7 +121,7 @@ a.nextWeek {
 }
 
 /* Tooltip text */
-.tooltip .tooltiptext {
+.tooltiptext {
   font-family: sans-serif;
   visibility: hidden;
   /* width: 420px; */
@@ -135,7 +149,7 @@ a.nextWeek {
 }
 
 /* top arrow for bottom left */
-.tooltip .tooltiptext::after {
+.tooltiptext::after {
   content: " ";
   position: absolute;
   bottom: 100%;
@@ -144,10 +158,10 @@ a.nextWeek {
   border-style: solid;
   border-color: transparent transparent black transparent;
 }
-.tooltip .tooltipBottomLeft::after {
+.tooltipBottomLeft::after {
   left: 97%;
 }
-.tooltip .tooltipBottomRight::after {
+.tooltipBottomRight::after {
   left: 2%;
 }
 
