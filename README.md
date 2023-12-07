@@ -32,6 +32,9 @@ The Windows part could run on Linux as well, whisper also can use CPU (slower), 
 
 ![week46 example](assets/week46%20example.png)
 
+These schedules are hosted temporaruily here: https://www.it-cooking.com/kjzz/48/index.html
+
+
 # Under the hood
 
 ## Linux part: kjzz.sh
@@ -73,7 +76,8 @@ The structure is pretty simple, and simply lists by hour then by Day, the title 
   ...
 ```
 
-The schedule does not look like it's going to change until next year. No handling of various schedules yet.
+The schedule does not look like it's going to change until next year. 
+No handling of multi-schedules or other radio broadcasts yet.
 
 
 ## Windows part 1: BiasBuster-whisper.cmd
@@ -130,11 +134,14 @@ This Python script does the following:
   - [ ] see roadmap ...
 
 
-### Usage
+# KJZZ-db.py Usage
+
+KJZZ-db.py needs at least `--import / --query / --gettext / --listLevel`.
 `python KJZZ-db.py --help`
 
 ```
 usage: python KJZZ-db.py --help
+Required at least: --import / --query / --gettext / --listLevel
 
   --import < --text "KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text" | --folder inputFolder >
     -m, --model *small medium large...
@@ -150,6 +157,8 @@ usage: python KJZZ-db.py --help
                    Will (re)generate PICtures thumbnails only for that week.
     --dryRun
                    Will not generate PICtures, will not import chunks.
+    --force
+                   Will regenerate existing PICtures.
 
   --db *kjzz.db    Path to the local SQlite db.
   -q, --query < title | first | last | last10 | byDay | byTitle | chunkLast10 >
@@ -181,8 +190,8 @@ usage: python KJZZ-db.py --help
     --misInformation
                    PICture: generate misInformation graph or heatmap for all 4 factors:
                    explanatory/retractors/sourcing/uncertainty
-      --graph *bar | pie | line
-                   What graph you want. Ignored with --noMerge: heat map will be generated instead.
+      --graphs *bar,*pie,line
+                   What graph(s) you want. Ignored with --noMerge: a heatMap will be generated instead.
     --wordCloud
                    PICture: generate word cloud from gettext output. Will not output any text.
       --noPngquant
@@ -191,7 +200,7 @@ usage: python KJZZ-db.py --help
                    Produces jpeg instead of png
       --jpegQuality <*50>
                    0-100 jpeg quality
-      --stopLevel  0 1 2 3 *4
+      --stopLevel  0 1 2 *3
                    add various levels of stopwords
         --listLevel <0[,1 ..]> to just show the words in that level(s).
 
@@ -245,6 +254,9 @@ usage: python KJZZ-db.py --help
                    Not verbose.
 ```
 
+## Import new data
+`-i, --import` *--text file | --folder folder*
+
 ### File naming convention
 
 #### For KJZZ
@@ -257,14 +269,6 @@ KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text
 ```
 
 _Day_ is redundant since we have the date, but makes the chunk name and database, convenient to interact with.
-
-
-# KJZZ-db.py Usage
-
-KJZZ-db.py needs at least `--import | --query | --gettext`.
-
-## Import new data
-`-i, --import` *--text file | --folder folder*
 
 ### Import text files in the Database
 `python KJZZ-db.py --import --folder kjzz\\42`
@@ -357,6 +361,36 @@ You can also combine the keys with *+*, examples:
 - ALL programs for a specific week: `--gettext week=42`
 - Specific date and time (30mn chunk): `--gettext datetime="2023-10-08 HH:MM"`
 
+--stopLevel 3 is used by default; Look in the script what words the various levels contain, or type this to find out:
+`python KJZZ-db.py --listLevel 0,1`
+
+```
+0: basic stopWords
+  {'being', "i'm", "hadn't", "he'd", 'you', 'yours', "mustn't", 'about', "he'll", 'how', "what's", 'ours', 'my', 'what',
+  'through', 'nor', "can't", 'cannot', 'have', 'other', 'over', 'otherwise', 'below', 'this', "let's", 'i', 'both',
+  "where's", "it's", "i'd", 'we', 'against', 'where', 'to', 'for', 'itself', "shan't", 'can', 'does', 'just', 'out',
+  "aren't", 'in', 'no', 'r', 'above', "they're", 'get', "she'll", 'shall', 'on', 'like', 'after', "shouldn't", 'having',
+  'since', "we'd", "hasn't", 'because', 'been', 'ourselves', 'hers', 'until', "he's", 'should', "there's", "haven't",
+  "we'll", 'all', 'an', 'however', 'again', "why's", 'a', 'once', 'than', "she'd", "we've", "couldn't", 'as', 'with',
+  'myself', 'was', 'further', "isn't", 'the', 'and', 'your', 'why', 'his', 'so', 'only', 'him', 'between', 'by', 'few',
+  'theirs', 'ought', 'most', 'they', 'under', 'which', 'its', 'of', 'some', 'whom', 'themselves', 'but', 'ever', 'down',
+  'hence', 'own', "who's", 'am', 'off', 'who', 'such', 'same', 'doing', "won't", 'while', 'any', "here's", 'therefore',
+  'could', 'k', 'had', 'when', 'yourself', 'be', "we're", 'herself', "they've", 'each', 'here', 'she', 'more', "i'll",
+  "wasn't", "you'd", 'very', 'their', 'or', 'up', 'http', 'at', "i've", "weren't", 'yourselves', 'if', 'too', 'not',
+  'himself', 'are', "didn't", 'did', 'do', 'from', "when's", "how's", 'during', 'then', "she's", 'them', 'has', 'it',
+  "that's", "doesn't", 'those', 'me', 'her', 'into', "they'll", 'he', 'our', 'there', 'www', 'before', 'would', "they'd",
+  "you'll", 'also', 'that', 'were', 'is', "wouldn't", 'com', 'these', 'else', "you're", "you've", "don't"}
+1: more stopWords related to broadcasting speech
+  {'mean', 'new', 'kind', 'case', 'called', 'report', 'things', 'need', 'morning', 'become', 'live', 'even', 'okay',
+  'many', 'point', 'trying', 'lot', 'come', 'came', 'really', 'week', 'going', 'always', 'got', 'think', 're', 'good',
+  'day', 'almost', 'first', 'two', 'comes', 'part', 'went', 'still', 'little', 'today', 'well', 'actually', 'take',
+  'years', 'another', 'right', 'next', 'look', 'one', 'see', 'will', 'thing', 'know', 'back', 'said', 'says', 'last',
+  'yeah', 'made', 'say', 'never', 'number', 'coming', 'want', 'something', 'show', 'talk', 'way', 'much', 'sort',
+  'edition', 'time', 'year', 'around', 'now', 'let', 'work', 'hour', 'people'}
+2: specific stopWords for KJZZ station
+{'month', 'donation', 'thank', 'gift', 'NPR', 'org', 'you', 'help', 'please', 'doubled', 'news', 'KJZZ',
+'sustaining', 'member', 'make', 'contribution', 'call', 'give', 'BBC', 'support', 'drive'}
+```
 
 ### Get the text for a particular chunk
 `python KJZZ-db.py --gettext chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -p`
@@ -367,10 +401,10 @@ You can also combine the keys with *+*, examples:
 
 
 ### Generate a word Cloud for a program, on a specific week and Day
-`python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud`--stopLevel 4 --show --max_words=1000
+`python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud`--show --max_words=1000
 
 Same but If you know the actual date:
-`python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud`--stopLevel 4 --show --max_words=1000
+`python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud`--show --max_words=1000
 
 
 ### Generate a word Cloud for a particular chunk of program
@@ -412,12 +446,12 @@ wordCloud generated: Notice how it makes no sense as onlt the stop words are hig
 
 
 ### Generate a cloud a an episode of "Freakonomics" on week 42
-`python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt`
+`python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --show --max_words=1000 --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt`
 
 ![KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto](assets/KJZZ%20week=42%20title=Freakonomics%20words=8523%20maxw=1000%20minf=4%20maxf=400%20scale=1%20relscale=auto.png)
 
 ### Generate a cloud a an episode of "Freakonomics" on week 42 with smaller max font size
-`python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt`
+`python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --show --max_words=1000 --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt`
 
 Notice how more smaller words are stacked and make the cloud illegigle:
 
@@ -447,7 +481,7 @@ Simply add --noMerge: --graph will be ignored when treating multiple chunks, and
 
 The loop below will generate png files for each program of each day of week 42, manually:
 
-`for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt --output kjzz)`
+`for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt --output kjzz)`
 
 Notice how the order of --gettext parameters influence the file names: 
 this is useful when you want your files sorted a certain way. 
@@ -461,7 +495,7 @@ Now, there is a much easier way to generate all those wordCloud pictures.
 
 Automatically: this command will generate week's 42 schedule html page, linking available wordCloud pictures:
 
-`python KJZZ-db.py --html 42 --autoGenerate --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt`
+`python KJZZ-db.py --html 42 --autoGenerate --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt`
 ![week41 example](assets/week41%20example.png)
 
 
@@ -469,7 +503,7 @@ Manually: the loop below will generate only the wordCloud files:
 
 ```
 REM (re)generate all thumbnails for week 42 manually:
-for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt --output kjzz)
+for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt --output kjzz)
 ```
 Notice how the order of --gettext parameters influence the file names: 
 this is useful when you want your files sorted a certain way. 
@@ -479,38 +513,101 @@ If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
 
 
 
+# Requirements
+
+## Linux
+
+- none
+
+## Windows
+
+- Python 3.x:
+  - getopt, sys, os, re, regex, io, glob, time, datetime, pathlib, json, urllib, random, sqlite3, collections
+- Python 3.x modules:
+  - rich
+  - pandas
+  - numpy
+  - matplotlib
+  - seaborn
+  - wordcloud
+  - pngquant
+- Windows software:
+  - busybox.exe
+  - whisper-faster from https://github.com/Purfview/whisper-standalone-win
+
+
+# Acknowledgements
+- busybox:        https://busybox.net/
+- rich print:     https://github.com/Textualize/rich
+- pngquant:       https://github.com/kornelski/pngquant
+- wordCloud:      https://github.com/amueller/word_cloud
+- gender bias:    https://github.com/auroracramer/language-model-bias
+- misInformation: https://github.com/PDXBek/Misinformation
+  - heatMap.explanatory.csv
+  - heatMap.retractors.csv
+  - heatMap.sourcing.csv
+  - heatMap.uncertainty.csv
+- IA transcribe:  https://github.com/Purfview/whisper-standalone-win
+- stopWords lists: 
+  - ranks.nl compilation:     https://www.ranks.nl/stopwords
+    - stopWords.ranks.nl.txt
+  - Thesaurus and adjectives: https://github.com/taikuukaits/SimpleWordlists/tree/master
+    - stopWords.Wordlist-Adjectives-All.txt
+- mp3 player:     OpenPlayer.js https://github.com/openplayerjs/openplayerjs/
+
+
+# Support
+
+👍🏻 If you're using this project & happy with it or you appreciate what I do and wish to support my work, you can consider by
+
+⭐️ Starring & Sharing the project is also appreciated. Thanks! ❤️
+[![GitHub Repo stars](https://img.shields.io/badge/share%20on-reddit-red?logo=reddit)](https://reddit.com/submit?url=https://github.com/audioscavenger/BiasBuster&title=Discover%20the%20bias%20and%20the%20agenda%20of%20KJZZ%20radio%20broadcasts)
+[![GitHub Repo stars](https://img.shields.io/badge/share%20on-hacker%20news-orange?logo=ycombinator)](https://news.ycombinator.com/submitlink?u=https://github.com/audioscavenger/BiasBuster)
+[![GitHub Repo stars](https://img.shields.io/badge/share%20on-twitter-03A9F4?logo=twitter)](https://twitter.com/share?url=https://github.com/audioscavenger/BiasBuster&text=Discover%20the%20bias%20and%20the%20agenda%20of%20KJZZ%20radio%20broadcasts)
+[![GitHub Repo stars](https://img.shields.io/badge/share%20on-facebook-1976D2?logo=facebook)](https://www.facebook.com/sharer/sharer.php?u=https://github.com/audioscavenger/BiasBuster)
+[![GitHub Repo stars](https://img.shields.io/badge/share%20on-linkedin-3949AB?logo=linkedin)](https://www.linkedin.com/shareArticle?url=https://github.com/audioscavenger/BiasBuster&title=Discover%20the%20bias%20and%20the%20agenda%20of%20KJZZ%20radio%20broadcasts)
+
+# Contribution
+
+I will be open to any contribution. If you have any idea, please let me know. 
+I am by no means an expert in English language or statistics. Any idea to help reveal the agenda of the programmings are welcome.
+
+# License
+
+This project is under [GPL-2.0](https://github.com/audioscavenger/BiasBuster/blob/master/LICENSE) License.
+
 # Roadmap
 Scope creep ahead...
 
-- [ ] 0.9.?   TODO should the case matter for title?
-- [ ] 0.9.?   TODO include some of the most offensive Hexspeak from https://en.wikipedia.org/wiki/Hexspeak to trigger fools
-- [ ] 0.9.?   TODO separate KJZZ into its own table to add other broadcasters
-- [ ] 0.9.?   TODO automate mp3 downloads from cloud + process + uploads from/to cloud server
-- [ ] 0.9.?   TODO adding bias_score.py from https://github.com/auroracramer/language-model-bias
 - [ ] 0.9.10  WIP
   - [ ] db
-    - [x] PRAGMA temp_store = 2 | MEMORY
-    - [x] created indexes and tested them: they work
-    - [ ] store statistics but what statistics?
+    - [x] switch db to PRAGMA temp_store = 2 (MEMORY)
+    - [x] created indexes and tested them: they work and somewhat speed up cursors
+    - [x] store misInfo statistics as text
     - [ ] add statistics table or more columns for each chunk?
     - [ ] how to store statistics for segments rather then chunks?
   - [ ] ui
+    - [x] enable closed-captions by default: asked on stackoverflow and found a workaround
     - [ ] start to think about how to access the misInformation heatmaps
-    - [ ] also compute a wordCloud per chunk and show it in the tooltip?
     - [ ] make text icons also a modal
+    - [ ] integrate text analysis with keyword search in a modal
     - [ ] fix table header that's transparent when scrolling down
     - [ ] build an actual front page with Bootstrap or smth
-    - [ ] enable closed-captions by default: nothing works, asked on stackoverflow
     - [ ] add a modal for statistical analysis of a program
-    - [ ] add social media share buttons for that modal
-    - [ ] highlight the top 10 BS of the week or smth
-    - [ ] integrate front page with cgi or smth so we can ajax-build missing pictures or smth
-    - [ ] integrate front page with cgi so we can tap in the database with SQLite worker
-    - [ ] integrate text analysis with keyword search
+    - [ ] front page: add social media share buttons for that modal
+    - [ ] front page: highlight the top 10 BS of the week or smth
+    - [ ] integrate front page with cgi or smth so we can ajax-build missing pictures or smth and spare dev of a dynamic page
+    - [ ] integrate front page with cgi so we can tap in the database with SQLite worker and spare dev of a dynamic page
+    - [ ] also compute a wordCloud per chunk and show it in the tooltip?
     - [ ] keep player playing while navigating like plex => iframe
-    - [ ] player handles playlist
+    - [ ] player handles playlist?
     - [ ] segments have only 1 play button that loads a playlist? how about the texts?
   - [ ] python
+    - [x] cleaned up many functions and info levels
+    - [x] simplified info messages
+    - [x] created saveImage and saveThumbnail
+    - [x] refactored stopLevel and dictStopWords
+    - [x] move all stopLevels off Python into text files under data\
     - [ ] change gettext time= to start=|stop= instead, so we can generate same segments as by week+title+Day
     - [x] add --useJpeg and --jpegQuality but it's actually worse
     - [x] enable string.Template instead of those %s everywhere
@@ -519,23 +616,28 @@ Scope creep ahead...
     - [ ] rename title to segment or show? they seem to call their programmings "shows"
     - [ ] color segments by bias/misInformation/etc
     - [ ] color wordClouds by bias/misInformation/etc
-    - [ ] add --saveProfile --listProfiles
-    - [ ] add --listProfiles
-    - [ ] add saveProfile() function
-    - [ ] add loadProfile() function
+    - [ ] add --saveProfile --listProfiles --listProfiles
+    - [ ] add saveProfile() loadProfile() functions
     - [ ] extract presenters' names
+    - [ ] should the case matter for title?
+    - [ ] add bias_score.py from https://github.com/auroracramer/language-model-bias
   - [ ] misc
-    - [ ] integrate (re)generate html(s)
-    - [ ] integrate (re)generate picture(s)
+    - [x] move all stopWords and stuff under data\
+    - [ ] integrate AI summarization with **h2ogpt** or **text-generation-webui**, and Summarization model such as *impira_layoutlm-document-qa*
+    - [ ] use AI to detect and build ads stopWords
     - [ ] integrate (re)generate misInformation heatMap(s)
     - [ ] integrate (re)generate biase(s)
     - [ ] automate transcription and server updates
     - [ ] auto-import mp3 to process via ssl batch putty or plink or smth
     - [ ] auto-upload processed text back to server via ssl batch putty or plink or smth
+    - [ ] include some of the most offensive Hexspeak from https://en.wikipedia.org/wiki/Hexspeak to trigger fools
+    - [ ] separate KJZZ into its own table to add other broadcasters
+    - [ ] automate mp3 downloads from cloud + process + uploads from/to cloud server
+  - [ ] future
+    - [ ] dynamic page in PHP or nodeJS/typeScript
 - [x] 0.9.9   release better_ui
   - [x] ui
     - [x] add link to switch between byChunk and not
-    - [x] generate both byChunk and bySegment schedules html files
     - [x] click to open image
     - [x] classes to highlight available segments
     - [x] integrate listen to available recordings
@@ -553,6 +655,7 @@ Scope creep ahead...
     - [x] close image modal onclick anywhere outside image
     - [x] cleanup genHtml() code by exporting stuff in sub functions
   - [x] python
+    - [x] (re)generate both byChunk and bySegment schedules html files
     - [x] bugfix in genHtml where same program image was generated multiple times (1 per startTime withing the segment)
     - [x] add --rebuildThumbnails to (re)generate only thumbnails by week
 - [x] 0.9.8   release html_builder
@@ -590,67 +693,4 @@ Scope creep ahead...
 - [x] 0.9.2   updated stopwords to level 5 + you can add many files with --inputStopWordsFiles
 - [x] 0.9.1   added wordCloud from https://github.com/amueller/word_cloud/blob/main/examples/simple.py
 - [x] 0.9.0   automated mp3 process with whisper-faster from https://github.com/Purfview/whisper-standalone-win
-
-## Requirements
-
-### Linux
-
-- none
-
-### Windows
-
-- Python 3.x:
-  - getopt, sys, os, re, regex, io, glob, time, datetime, pathlib, json, urllib, random, sqlite3, collections
-- Python 3.x modules:
-  - rich
-  - pandas
-  - numpy
-  - matplotlib
-  - seaborn
-  - wordcloud
-  - pngquant
-- Windows software:
-  - busybox.exe
-  - whisper-faster from https://github.com/Purfview/whisper-standalone-win
-
-
-## Acknowledgements
-- busybox:        https://busybox.net/
-- rich print:     https://github.com/Textualize/rich
-- pngquant:       https://github.com/kornelski/pngquant
-- wordCloud:      https://github.com/amueller/word_cloud
-- gender bias:    https://github.com/auroracramer/language-model-bias
-- misInformation: https://github.com/PDXBek/Misinformation
-  - heatMap.explanatory.csv
-  - heatMap.retractors.csv
-  - heatMap.sourcing.csv
-  - heatMap.uncertainty.csv
-- IA transcribe:  https://github.com/Purfview/whisper-standalone-win
-- stopWords lists: 
-  - ranks.nl compilation:     https://www.ranks.nl/stopwords
-    - stopWords.ranks.nl.txt
-  - Thesaurus and adjectives: https://github.com/taikuukaits/SimpleWordlists/tree/master
-    - stopWords.Wordlist-Adjectives-All.txt
-- mp3 player:     OpenPlayer.js https://github.com/openplayerjs/openplayerjs/
-
-
-## Support
-
-👍🏻 If you're using this project & happy with it or you appreciate what I do and wish to support my work, you can consider by
-
-⭐️ Starring & Sharing the project is also appreciated. Thanks! ❤️
-[![GitHub Repo stars](https://img.shields.io/badge/share%20on-reddit-red?logo=reddit)](https://reddit.com/submit?url=https://github.com/audioscavenger/BiasBuster&title=Discover%20the%20bias%20and%20the%20agenda%20of%20KJZZ%20radio%20broadcasts)
-[![GitHub Repo stars](https://img.shields.io/badge/share%20on-hacker%20news-orange?logo=ycombinator)](https://news.ycombinator.com/submitlink?u=https://github.com/audioscavenger/BiasBuster)
-[![GitHub Repo stars](https://img.shields.io/badge/share%20on-twitter-03A9F4?logo=twitter)](https://twitter.com/share?url=https://github.com/audioscavenger/BiasBuster&text=Discover%20the%20bias%20and%20the%20agenda%20of%20KJZZ%20radio%20broadcasts)
-[![GitHub Repo stars](https://img.shields.io/badge/share%20on-facebook-1976D2?logo=facebook)](https://www.facebook.com/sharer/sharer.php?u=https://github.com/audioscavenger/BiasBuster)
-[![GitHub Repo stars](https://img.shields.io/badge/share%20on-linkedin-3949AB?logo=linkedin)](https://www.linkedin.com/shareArticle?url=https://github.com/audioscavenger/BiasBuster&title=Discover%20the%20bias%20and%20the%20agenda%20of%20KJZZ%20radio%20broadcasts)
-
-## Contribution
-
-I will be open to any contribution. If you have any idea, please let me know. 
-I am by no means an expert in English language or statistics. Any idea to help reveal the agenda of the programmings are welcome.
-
-## License
-
-This project is under [GPL-2.0](https://github.com/audioscavenger/BiasBuster/blob/master/LICENSE) License.
 

@@ -32,22 +32,22 @@
 # python KJZZ-db.py -g title="Marketplace" -v --wordCloud
 # python KJZZ-db.py -g title="Morning Edition" -v --wordCloud
 # python KJZZ-db.py -g title="The Show" -v --wordCloud
-# python KJZZ-db.py -g week=42+Day=Mon+title="The Show" -v --wordCloud --stopLevel 2
+# python KJZZ-db.py -g week=42+Day=Mon+title="The Show" -v --wordCloud --stopLevel 3
 # python KJZZ-db.py -g week=42+Day=Mon+title="All Things Considered" --wordCloud --stopLevel 3 --show
 # python KJZZ-db.py -g week=42 --wordCloud --stopLevel 3 --show --max_words=10000
-# python KJZZ-db.py -g week=43 --wordCloud --stopLevel 4 --show --max_words=10000
-# python KJZZ-db.py -g week=44 --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
-# python KJZZ-db.py -g week=43+title="TED Radio Hour" --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+# python KJZZ-db.py -g week=43 --wordCloud --stopLevel 3 --show --max_words=10000
+# python KJZZ-db.py -g week=44 --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
+# python KJZZ-db.py -g week=43+title="TED Radio Hour" --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
 #   example: week=42+title="Freakonomics"+Day=Sun is about men/women
-# python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
-# for /l %a in (40,1,45) DO python KJZZ-db.py -g week=%a+title="TED Radio Hour" --wordCloud --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
-# python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+# python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
+# for /l %a in (40,1,45) DO python KJZZ-db.py -g week=%a+title="TED Radio Hour" --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
+# python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
 # python KJZZ-db.py --html 42 --byChunk
 # python KJZZ-db.py --rebuildThumbnails 41
-# for /l %a in (40,1,47) DO python KJZZ-db.py --html %a --autoGenerate --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+# for /l %a in (40,1,47) DO python KJZZ-db.py --html %a --autoGenerate --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
 
 
 # TODO: enable closed-captions by default: nothing works, asked on stackoverflow
@@ -55,13 +55,13 @@
 # my question: https://stackoverflow.com/questions/77581173/how-to-enable-closed-captions-by-default-with-openplayerjs-video-js
 
 # TODO: improve file read fd with list = set(map(str.strip, open(os.path.join(inputFolder, fileName)).readlines()))
-# TODO: somehow find way to always include --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+# TODO: somehow find way to always include --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
 # TODO: add --force to regenerate existing pictures
 # TODO: handle same program at differnt time of the day such as Sat: BBC World Service morning and evening - currently we can only generate one same wordCloud for both
 # TODO: heatMap: do we keep stopWords or not, brfore the counting occurs?
 # TODO: https://github.com/auroracramer/language-model-bias
 # TODO: export all configuration into external json files or yaml
-# TODO: explore stopWords from https://github.com/taikuukaits/SimpleWordlists/tree/master
+# TODO: explore stopWords from https://github.com/taikuukaits/SimpleWordlists/
 # TODO: analyse gender bias
 # TODO: analyse language bias
 # egrep -i "trans[gsv]|\bgay\b|\blesb|\bbisex|\btransg|\bqueer|gender|LGBT" *text
@@ -70,7 +70,7 @@
 
 
 
-import getopt, sys, os, re, regex, io, inspect, string
+import getopt, sys, os, re, regex, io, inspect, string, copy
 import glob, time, datetime, json, urllib, random, sqlite3
 from dateutil import parser
 from pathlib import Path
@@ -78,8 +78,8 @@ from collections import Counter
 
 # 3rd party modules:
 # https://github.com/Textualize/rich
-from   rich import print
-from   rich.progress import track, Progress
+from rich import print
+from rich.progress import track, Progress
 
 # we do not preload this bunch unless we need them:
 # -------------------------------------------------
@@ -139,7 +139,9 @@ removeStopwords = True
 showPicture = False
 inputStopWords = []
 outputFolder = Path("./kjzz")
-graph = "bar"
+dataFolder = Path("./data")
+thesaurusFolder = Path("./data/SimpleWordlists")
+graphs = []   # bar pie line
 weekNumber = 0
 jsonScheduleFile = os.path.realpath("kjzz/KJZZ-schedule.json")
 byChunk = False
@@ -155,6 +157,7 @@ rebuildThumbnail = False
 usePngquant = True
 useJpeg = False
 jpegQuality = 50
+force = False
 
 # busybox sed -E "s/^.{,3}$//g" stopWords.ranks.nl.txt | busybox sort | busybox uniq >stopWords.ranks.nl.txt 
 # wordcloud internal STOPWORDS: https://github.com/amueller/word_cloud/blob/main/wordcloud/stopwords
@@ -163,17 +166,8 @@ jpegQuality = 50
 # https://github.com/taikuukaits/SimpleWordlists/blob/master/Wordlist-Adjectives-All.txt
 # wget https://raw.githubusercontent.com/taikuukaits/SimpleWordlists/master/Wordlist-Adjectives-All.txt -OstopWords.Wordlist-Adjectives-All.txt
 
-stopwordsDict = {
-  0: ["what", "who", "is", "as", "at", "he", "the", "an", "to", "in", "for", "of", "or", "by", "with", "on", "this", "that", "be", "and", "it", "its", "no", "yes"],
-  1: ["NPR", "KJZZ", "org", "BBC", "gift", "make", "support", "sustaining", "member", "doubled", "thank", "you", "call", "news", "month", "help", "give", "donation", "contribution", "please", "drive"],
-  2: ["let", "say", "says", "said", "new", "one", "re", "not", "but", "are", "from", "become", "still", "way", "went"],
-  3: ["now", "know", "will", "going", "well", "yeah", "okay", "really", "actually", "right", "think", "today", "time", "thing", "things", "kind", "lot", "part", "year", "years", "show", "morning", "see", "much", "want", "made", "sort", "come", "came", "comes", "day", "need", "got"],
-  4: ["even", "never", "always", "next", "case", "another", "coming", "number", "many", "two", "something", "look", "talk", "little", "first", "last", "people", "good", "mean", "back", "around", "almost", "called", "trying", "point", "week", "take", "work", "hour", "live", "edition", "report"],
-  5: ["Israel", "Israeli", "Gaza", "Hamas", "Phoenix"],
-}
-
-stopLevel = 4
-# after merging 1+2 to what WordCloud has in its own set, we get this:
+stopLevel = 3
+# after merging 0+1 we get this:
 # stopwordsDict = {
 # 0: ['up', 'ever', 'yourself', 'therefore', 'cannot', 'could', 'new', "they've", 'theirs', "who's", 'u', 'an', 'am', 'get', 're', 'where', 'herself', 'same', 'was', "you'd", 'www', 'some', 'through', 'each', 'himself', 'once', 'me', 'have', 'our', 'this', 'or', "i'm", 'they', "hasn't", 'which', 'why', 'to', "how's", 'can', 'com', 'we', 'did', 'yours', 'the', "we're", 'more', 'shall', 'about', 'are', 'so', "they're", "he'd", 'otherwise', 'below', 'else', 'further', 'has', 'most', 'ours', 'ourselves', "why's", 'a', 'at', "we'd", 'between', "isn't", 'that', 'one', 'since', "doesn't", 'her', 'into', 'k', "couldn't", 'before', "she'd", "wasn't", 'it', "don't", 'during', 'only', 'hers', "when's", "shouldn't", "she's", 'in', 'my', 'no', 'however', 'r', "they'll", 'above', 'if', 'he', 'of', 'how', 'over', 'say', 'whom', "we've", "here's", 'been', "hadn't", 's', 'be', 'these', 'own', 'both', 'doing', 'itself', 'but', 'against', 'ought', 'http', 'nor', "weren't", "he's", 'does', 'i', 'and', "what's", "wouldn't", 'myself', 'just', 'out', "they'd", 'on', 'than', 'hence', 'themselves', 'then', 'very', "we'll", 'she', "it's", "you'll", 'its', 'is', "let's", 'were', "won't", 'what', 'by', "that's", 'again', 'had', 'too', "mustn't", "i've", "there's", 'as', "she'll", 'few', 'being', 'when', "aren't", 'should', "shan't", 'all', 'under', 'your', 'here', 'down', 'with', 'also', 'after', "you're", 'like', 'you', "where's", 'not', 'any', 'him', 'until', "you've", 'says', "didn't", 'such', "i'd", "i'll", 'them', 'do', 'while', "haven't", 'there', 'their', 'who', 'because', "he'll", "can't", 'from', 'having', 'for', 'off', 'other', 'would', 'those', 'yourselves', 'his'],
 # }
@@ -407,6 +401,7 @@ def db_init(localSqlDb):
         , title     TEXT    NOT NULL
         , text      TEXT
         , model     TEXT
+        , misInfo   TEXT
         );
     CREATE UNIQUE INDEX [IFK_ScheduleStartStop]    ON "schedule" ([start],[stop]);
     CREATE        INDEX [IFK_ScheduleWeekTitleDay] ON "schedule" ([week],[title],[Day]);
@@ -418,8 +413,6 @@ def db_init(localSqlDb):
     if not str(error).find("already exists"):
       info("queryScheduleTable %s: %s" %(localSqlDb, error), 1)
     else:
-      records = cursor(localSqlDb, conn, """SELECT count(start) from schedule""")
-      info("COLUMNS: %s" %(records[0]), 1)
       records = cursor(localSqlDb, conn, """SELECT count(start) from schedule""")
       info("%s chunks found in schedule %s" %(records[0][0], localSqlDb), 1)
   
@@ -453,6 +446,20 @@ def db_init(localSqlDb):
     # progress.console.print(f"Working on job #{inputFile}")
     # time.sleep(0.2)
     # progress.advance(task)
+
+def db_update(table, column, value, textConditions, localSqlDb, conn):
+  if not conn:
+    conn = sqlite3.connect(localSqlDb)
+
+  # if isinstance(value,str):
+  sqlText = """ UPDATE {table} SET {column} = '{value}' where 1=1 and {textConditions}; """
+  sql = string.Template((sqlText)).substitute(dict(table=table, column=column, value=value, textConditions=textConditions))
+  
+  records = cursor(localSqlDb, conn, sql)
+  print(records)
+  
+# db_update
+
 
 def db_load(inputFiles, localSqlDb, conn, model):
   importedFiles = []
@@ -575,19 +582,16 @@ def replaceNum2Days(record):
 def getText(gettextDict, progress=""):
   # gettextDict = {'week': '40', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
   sqlGettext = "SELECT start, text from schedule where 1=1"
-  title = "KJZZ"
   
   # build the actual query
   for key in gettextDict.keys():
     # build the SQL query:
-    sqlGettext += (" and %s = '%s'" % (key, gettextDict[key]))
+    sqlGettext += (" and %s='%s'" % (key, gettextDict[key]))
     
     # reformat start time for the fileName: chunk has been build if the key is "chunk"
     if key == "start":
       gettextDict[key] = parser.parse(gettextDict[key]).strftime("%Y-%m-%d %H:%M")
     
-    # build a title that contains the gettextDict: normally that would be "KJZZ week= title= Day="
-    title += " %s=%s" % (key, gettextDict[key])
   info("sqlGettext: %s" %(sqlGettext), 3, progress)
   
   records = cursor(localSqlDb, conn, sqlGettext)
@@ -600,9 +604,7 @@ def getText(gettextDict, progress=""):
 
 def checkChunk(getTextDict, progress=""):
   # gettextDict = {'week': '40', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
-
   sqlGettext = "SELECT count(*) from schedule where 1=1"
-  title = "KJZZ"
   
   # build the actual query
   for key in gettextDict.keys():
@@ -613,8 +615,6 @@ def checkChunk(getTextDict, progress=""):
     if key == "start":
       gettextDict[key] = parser.parse(gettextDict[key]).strftime("%Y-%m-%d %H:%M")
     
-    # build a title that contains the gettextDict: normally that would be "KJZZ week= title= Day="
-    title += " %s=%s" % (key, gettextDict[key])
   info("sqlGettext: %s" %(sqlGettext), 3, progress)
   
   records = cursor(localSqlDb, conn, sqlGettext)
@@ -711,9 +711,6 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
   from   matplotlib import style
   from   matplotlib.patches import Rectangle
   import seaborn
-  import PIL
-  import pngquant
-  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
   from wordcloud import WordCloud
   # from wordcloud import STOPWORDS
   # print(STOPWORDS)
@@ -750,17 +747,17 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
     wordCloudDict["relative_scaling"]["value"], 
   )
   genWordCloudDict["fileName"] = genWordCloudDict["wordCloudTitle"].replace(": ", "=").replace(":", "")
-  genWordCloudDict["outputFile"] = os.path.join(outputFolder, genWordCloudDict["fileName"] + ".png")
+  genWordCloudDict["outputFileName"] = ""
+  genWordCloudDict["outputFile"] = ""
   if dryRun: return genWordCloudDict
   
   if removeStopwords:
-    from wordcloud import STOPWORDS
-    info("STOPWORDS: %s" %(STOPWORDS), 4, progress)
+    stopwordsDict = loadStopWordsDict()
     
     for i in range(level + 1): genWordCloudDict["stopWords"] += stopwordsDict[i]
     genWordCloudDict["stopWords"] += wordCloudDict["inputStopWords"]["value"]
     # print(len(STOPWORDS))
-    STOPWORDS.update(genWordCloudDict["stopWords"])
+    # STOPWORDS.update(genWordCloudDict["stopWords"]) # STOPWORDS is now listLevel 0 == stopwordsDict[0]
     # print(len(STOPWORDS))
     # print(len(stopWords))
     # print(stopWords)
@@ -769,15 +766,15 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
     genWordCloudDict["cleanWordsList"] = [word for word in re.split("\W+",text) if word.lower() not in genWordCloudDict["stopWords"]]
     info("most 10 common words after: \n%s" % (Counter(genWordCloudDict["cleanWordsList"]).most_common(10)), 2, progress)
     genWordCloudDict["top100tuples"] = Counter(genWordCloudDict["cleanWordsList"]).most_common(100)
-    info("%s words - %s stopWords (%s words removed) == %s total words" %(genWordCloudDict["numWords"], len(STOPWORDS), genWordCloudDict["numWords"] - len(genWordCloudDict["cleanWordsList"]), len(genWordCloudDict["cleanWordsList"])), 2, progress)
-    info("stopWords = %s" %(str(STOPWORDS)), 3, progress)
+    info("%s words - %s stopWords (%s words removed) == %s total words" %(genWordCloudDict["numWords"], len(genWordCloudDict["stopWords"]), genWordCloudDict["numWords"] - len(genWordCloudDict["cleanWordsList"]), len(genWordCloudDict["cleanWordsList"])), 2, progress)
+    info("stopWords = %s" %(str(genWordCloudDict["stopWords"])), 3, progress)
   else:
     info("%s words" %(genWordCloudDict["numWords"]), 1, progress)
   # image 1: Display the generated image:
   # font_path="fonts\\Quicksand-Regular.ttf"
   # class WordCloud: https://github.com/amueller/word_cloud/blob/fa7ac29c6c96c713f51585818e289e8f99c0f211/wordcloud/wordcloud.py#L154C25-L154C25
   wordcloud = WordCloud(
-                        stopwords=STOPWORDS, 
+                        stopwords=genWordCloudDict["stopWords"], 
                         background_color=wordCloudDict["background_color"]["value"], 
                         max_words=wordCloudDict["max_words"]["value"], 
                         width=wordCloudDict["width"]["value"], 
@@ -792,7 +789,7 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
                         collocation_threshold=wordCloudDict["collocation_threshold"]["value"], 
                         ).generate(text)
   # wordcloud.generate_from_frequencies(Counter(genWordCloudDict["cleanWordsList"]))
-                        # stopwords=STOPWORDS, 
+                        # stopwords=genWordCloudDict["stopWords"], 
                         # background_color=wordCloudDict["background_color"]["value"], 
                         # max_words=wordCloudDict["max_words"]["value"], 
                         # width=wordCloudDict["width"]["value"], 
@@ -886,35 +883,10 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
   
   fileName = genWordCloudDict["fileName"]
   # always save BEFORE show
-  if fileName:
-    if not useJpeg:
-      genWordCloudDict["outputFileName"] = fileName  + ".png"
-      genWordCloudDict["outputFile"] = os.path.join(outputFolder, genWordCloudDict["outputFileName"])
-      plt.savefig(outputFile, bbox_inches='tight')
-      if usePngquant: pngquant.quant_image(image=genWordCloudDict["outputFile"])
-    else:
-      genWordCloudDict["outputFileName"] = fileName  + ".jpg"
-      genWordCloudDict["outputFile"] = os.path.join(outputFolder, genWordCloudDict["outputFileName"])
-      plt.savefig(genWordCloudDict["outputFile"], pil_kwargs={
-                              'quality': 50,
-                              'subsampling': 10
-                              })
-    info('image saved: "%s"' %(genWordCloudDict["outputFileName"]), 1, progress)
-    
-    # I would love this to work instead of reloading the file we just produced:
-    # PILoutputFile = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
-    PILoutputFile = PIL.Image.open(genWordCloudDict["outputFile"])
-    PILoutputFile.thumbnail((256, 256), PIL.Image.Resampling.LANCZOS)   # looks okay
-    # PILoutputFile = thumbnail.resize((256,256), PIL.Image.LANCZOS)    # does not look good
-    
-    thumbnail = os.path.join(outputFolder, "thumbnail-" + genWordCloudDict["outputFileName"])
-    if not useJpeg:
-      PILoutputFile.save(thumbnail)
-      if usePngquant: pngquant.quant_image(image=thumbnail)
-    else:
-      PILoutputFile.save(thumbnail , "JPEG", quality=80, optimize=True)
-    # print(PILoutputFile.size)
-    info('thumbnail saved: "%s"' %(thumbnail), 2, progress)
+  if fileName: genWordCloudDict["outputFile"] = saveImage(outputFolder, genWordCloudDict["fileName"], plt, usePngquant, progress)
+  if genWordCloudDict["outputFile"]:
+    genWordCloudDict["outputFileName"] = os.path.basename(genWordCloudDict["outputFile"])
+    genWordCloudDict["outputThumbnailFile"] = saveThumbnail(genWordCloudDict["outputFile"], outputFolder, "thumbnail-" + genWordCloudDict["outputFileName"], usePngquant)
 
   if showPicture: plt.show()
   plt.close()
@@ -922,135 +894,190 @@ def genWordCloud(text, title, removeStopwords=True, level=0, wordCloudDict=wordC
 # genWordCloud
 
 
-def genMisInformation(records, mergeRecords, showPicture, dryRun=False):
+def loadStopWordsDict():
+  from wordcloud import STOPWORDS
+  # https://stackoverflow.com/questions/2831212/python-sets-vs-lists
+  # z=set()
+  # for word in stopwordsDict[4]:
+    # if word not in STOPWORDS: z.add(word)   --> now you have a cleaned set of words not already in STOPWORDS
+  
+  # each stopwords list is actually a set. it's faster to check for word in set then in list, or so they say
+  stopwordsDict = {
+    0: STOPWORDS,
+  }
+  
+  # TODO: what do we do with stopWords.Wordlist-Adjectives-All.txt? it also contains words, not just adjectives
+  stopWordsFileNames = ['dummy', 'stopWords.1.txt', 'stopWords.kjzz.txt', 'stopWords.ranks.nl.uniq.txt']
+  for index, stopWordsFileName in enumerate(stopWordsFileNames):
+    info("index=%s, stopWordsFileName=%s" %(index, stopWordsFileName), 2)
+    stopWordsFile = os.path.join(dataFolder, stopWordsFileName)
+    if os.path.isfile(stopWordsFile):
+      stopwordsDict[index] = set()
+      with open(stopWordsFile, 'r') as fd:
+        for line in fd:
+          word = line.strip()
+          stopwordsDict[index].add(word)
+
+  return stopwordsDict
+# loadStopWordsDict
+
+
+def loadDictHeatMap(withSynonyms=False):
+  synonymsFile = os.path.join(thesaurusFolder, 'Thesaurus-Synonyms-Common.txt')
+  # only the synonyms of sourcing and uncertainty seem to make sense, and look the most closely related
+  heatFactorSynonymsFor = set({"sourcing", "uncertainty"})
+
+  dictHeatMap = { 
+    "explanatory":{"words":set(),"heatCount":0,"heat":0}, 
+    "retractors":{"words":set(),"heatCount":0,"heat":0}, 
+    "sourcing":{"words":set(),"heatCount":0,"heat":0}, 
+    "uncertainty":{"words":set(),"heatCount":0,"heat":0}, 
+  }
+  totalWords = 0
+  
+  # load the sets of heat words
+  for heatFactor in dictHeatMap.keys():
+    heatFactorFile = os.path.join(dataFolder, 'heatMap.'+heatFactor+'.csv')
+    info("%s: open file %s" %( heatFactor, heatFactorFile), 3)
+    with open(heatFactorFile, 'r') as fd:
+      for line in fd:
+        word = line.strip()
+        # print('ddebug ------------------------------------------------------ '+word)
+        if not withSynonyms or heatFactor not in heatFactorSynonymsFor:
+          dictHeatMap[heatFactor]["words"].add(word)
+        else:
+          for synLine in open(synonymsFile).readlines():
+            # match will only match first word == first line found
+            if re.match(re.escape(word+"|"), synLine):
+              # split line found and update the set()
+              synonyms = re.split(r"[|,]",synLine.strip())
+              # print('ddebug',synonyms)
+              dictHeatMap[heatFactor]["words"].update(set().union(synonyms))
+            else:
+              dictHeatMap[heatFactor]["words"].add(word)
+    
+    totalWords += len(dictHeatMap[heatFactor]["words"])
+    info("%s: words = %s" %( heatFactor, len(dictHeatMap[heatFactor]["words"]) ), 3)
+    info("%s: words: %s" %( heatFactor, dictHeatMap[heatFactor]["words"]), 4)
+
+  return dictHeatMap
+# loadDictHeatMap
+
+
+def genMisInformation(records, mergeRecords, graphTitle, graphs, showPicture=False, dryRun=False):
   if len(records) == 0: return []
-  genMisinfoDicts = []
   mergedText = ''
+  dictHeatMap = loadDictHeatMap(True)
   
   if mergeRecords:
     for record in records: mergedText += record[1]
-    genMisinfoDicts += genMisinfoBarGraph(mergedText, title, wordCloudDict, graph, showPicture, dryRun)
+    genMisinfoDicts = genMisinfoBarGraph(mergedText, graphTitle, dictHeatMap, wordCloudDict, graphs, showPicture, dryRun)
+    # print('ddebug',genMisinfoDicts)
+    # {'heatMaps': [ [0.7, 0.4, 0.4, 2.9] ], 'Xlabels': .. }
+    
   else:
     textArray = []
     Ylabels = []
     for record in records:
       textArray.append(record[1])
       Ylabels.append(parser.parse(record[0]).strftime("%H:%M"))
-    genMisinfoDicts += genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict, showPicture, dryRun)
-  
+
+    genMisinfoDicts = genMisinfoHeatMap(textArray, Ylabels, graphTitle, dictHeatMap, wordCloudDict, showPicture, dryRun)
+    # print('ddebug',genMisinfoDicts)
+    # {
+    # 'heatMaps': [
+        # [0.7, 0.4, 0.4, 2.9],
+        # ..
+        # [0.4, 0.4, 0.3, 2.3]
+      # ],
+    # 'Xlabels': ['explanatory', 'retractors', 'sourcing', 'uncertainty'],
+    # 'Ylabels': [
+        # '03:00',
+        # ..
+        # '08:30'
+      # ]
+    # }
+    
+    
+  # genMisinfoDicts = {"heatMaps":heatMaps, "Xlabels":Xlabels, "Ylabels":Ylabels}
   return genMisinfoDicts
 #
 
 
-def genMisinfoBarGraph(text, title, wordCloudDict=wordCloudDict, graph="bar", showPicture=False, dryRun=False):
-  info("%s" %(title), 2)
-  # heatMap = {     "explanatory":{"words":[],"heatCount":0,"heat":0},     "retractors":{"words":[],"heatCount":0,"heat":0},     "sourcing":{"words":[],"heatCount":0,"heat":0},     "uncertainty":{"words":[],"heatCount":0,"heat":0},   }
-  heatMap = { 
-    "explanatory":{"words":[],"heatCount":0,"heat":0}, 
-    "retractors":{"words":[],"heatCount":0,"heat":0}, 
-    "sourcing":{"words":[],"heatCount":0,"heat":0}, 
-    "uncertainty":{"words":[],"heatCount":0,"heat":0}, 
-  }
+def genMisinfoBarGraph(text, graphTitle, dictHeatMap, wordCloudDict=wordCloudDict, graphs=["bar", "pie"], showPicture=False, dryRun=False, progress=""):
+  info("%s" %(graphTitle), 2)
   textWordsLen = len(text.split())
-  
-  # build the lists of heat words
-  for heatFactor in heatMap.keys():
-    with open('heatMap.'+heatFactor+'.csv', 'r') as fd:
-      for line in fd:
-        heatMap[heatFactor]["words"].append(line.strip())
-      info("heatFactor: %s: words = %s" %( heatFactor, len(heatMap[heatFactor]["words"]) ), 1)
+
+  # load the sets of heat words
+  for heatFactor in dictHeatMap.keys():
     
     # count occurences in the text
-    for word in heatMap[heatFactor]["words"]:
+    for word in dictHeatMap[heatFactor]["words"]:
       # print("  "+word)
-      heatMap[heatFactor]["heatCount"] += sum(1 for _ in re.finditer(r'\b%s\b' % re.escape(word), text))
+      dictHeatMap[heatFactor]["heatCount"] += sum(1 for _ in re.finditer(r'\b%s\b' % re.escape(word), text))
       
-    heatMap[heatFactor]["heat"] = ( 100 * heatMap[heatFactor]["heatCount"] / textWordsLen )
-    print("    %s heatCount %s" %( heatFactor, heatMap[heatFactor]["heatCount"] ))
-    print("    %s heat      %s" %( heatFactor, heatMap[heatFactor]["heat"] ))
+    dictHeatMap[heatFactor]["heat"] = ( 100 * dictHeatMap[heatFactor]["heatCount"] / textWordsLen )
+    info("%s heatCount %s" %( heatFactor, dictHeatMap[heatFactor]["heatCount"] ), 2, progress)
+    info("%s heat      %s" %( heatFactor, dictHeatMap[heatFactor]["heat"] ), 2, progress)
     
   
-  X = heatMap.keys()
-  Y = []
-  for dic in heatMap.values():
-    Y.append(dic["heat"])
+  Xlabels = dictHeatMap.keys()
+  Ylabels = []
+  for dictFactor in dictHeatMap.values():
+    Ylabels.append(dictFactor["heat"])
   
-  fileName = graph + " " + title.replace(": ", "=").replace(":", "")
-  if graph == "bar": graph_bar(X, Y, title, fileName)
-  if graph == "pie": graph_pie(X, Y, title, fileName)
-  if graph == "line": graph_line(X, Y, title, fileName)
+  partialFileName = graphTitle.replace(": ", "=").replace(":", "")
+  if "bar"  in graphs: graph_bar(Xlabels, Ylabels, graphTitle,  "bar "+partialFileName)
+  if "pie"  in graphs: graph_pie(Xlabels, Ylabels, graphTitle,  "pie "+partialFileName)
+  if "line" in graphs:                     graph_line(Xlabels, Ylabels, graphTitle, "line "+partialFileName)
 
-  return []
+  return {"heatMaps":[Ylabels], "Xlabels":Xlabels, "Ylabels":Ylabels}
 # genMisinfoBarGraph
 
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
-def genMisinfoHeatMap(textArray, Ylabels, title, wordCloudDict=wordCloudDict, graph="bar", showPicture=False, dryRun=False):
-  import numpy as np
-  import pandas as pd
-  import matplotlib
-  # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
-  if not showPicture: matplotlib.use('Agg')
-  import matplotlib.pyplot as plt
-  import matplotlib.dates as mdates
-  from   matplotlib import style
-  from   matplotlib.patches import Rectangle
-  import seaborn
-  import PIL
-  import pngquant
-  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
+def genMisinfoHeatMap(textArray, Ylabels, graphTitle, dictHeatMapBlank, wordCloudDict=wordCloudDict, showPicture=False, dryRun=False, progress=""):
 
-  info("%s" %(title), 2)
+  info("%s showPicture=%s dryRun=%s" %(graphTitle, showPicture, dryRun), 1, progress)
   heatMaps = []
   i=0
   for text in textArray:
-    heatMap = { 
-      "explanatory":{"words":[],"heatCount":0,"heat":0}, 
-      "retractors":{"words":[],"heatCount":0,"heat":0}, 
-      "sourcing":{"words":[],"heatCount":0,"heat":0}, 
-      "uncertainty":{"words":[],"heatCount":0,"heat":0}, 
-    }
-    Xlabels = list(heatMap.keys())
-
-    print("%s" %( title ))
-    # heatMap = {     "explanatory":{"words":[],"heatCount":0,"heat":0},     "retractors":{"words":[],"heatCount":0,"heat":0},     "sourcing":{"words":[],"heatCount":0,"heat":0},     "uncertainty":{"words":[],"heatCount":0,"heat":0},   }
+    dictHeatMap = copy.deepcopy(dictHeatMapBlank)
+    Xlabels = list(dictHeatMap.keys())
     textWordsLen = len(text.split())
     
     # build the lists of heat words
-    for heatFactor in heatMap.keys():
-      with open('heatMap.'+heatFactor+'.csv', 'r') as fd:
-        for line in fd:
-          heatMap[heatFactor]["words"].append(line.strip())
-        info("heatFactor: %s: words = %s" %( heatFactor, len(heatMap[heatFactor]["words"]) ), 1)
+    for heatFactor in dictHeatMap.keys():
       
       # count occurences in the text
-      for word in heatMap[heatFactor]["words"]:
+      for word in dictHeatMap[heatFactor]["words"]:
         # print("  "+word)
-        heatMap[heatFactor]["heatCount"] += sum(1 for _ in re.finditer(r'\b%s\b' % re.escape(word), text))
+        dictHeatMap[heatFactor]["heatCount"] += sum(1 for _ in re.finditer(r'\b%s\b' % re.escape(word), text))
         
-      heatMap[heatFactor]["heat"] = round( 100 * heatMap[heatFactor]["heatCount"] / textWordsLen , 1 )
-      info("heatFactor: %s heatCount %s" %( heatFactor, heatMap[heatFactor]["heatCount"] ), 1)
-      info("heatFactor: %s heat      %s" %( heatFactor, heatMap[heatFactor]["heat"] ), 1)
+      dictHeatMap[heatFactor]["heat"] = round( 100 * dictHeatMap[heatFactor]["heatCount"] / textWordsLen , 1 )
+      info("%s heatCount %s" %( heatFactor, dictHeatMap[heatFactor]["heatCount"] ), 2, progress)
+      info("%s heat      %s" %( heatFactor, dictHeatMap[heatFactor]["heat"] ), 2, progress)
       
     
     Y = []
-    for dic in heatMap.values():
-      Y.append(dic["heat"])
+    for dictFactor in dictHeatMap.values():
+      Y.append(dictFactor["heat"])
     heatMaps.append(Y)
     
     i += 1
   
-  fileName = "heatMap " + title.replace(": ", "=").replace(":", "")
-  graph_heatMap(heatMaps, Xlabels, Ylabels, title, fileName)
+  fileName = "heatMap " + graphTitle.replace(": ", "=").replace(":", "")
+               # graph_heatMap(arrays,   Xlabels, Ylabels, graphTitle="", fileName="", showPicture=False, progress=""):
+  if not dryRun: graph_heatMap(heatMaps, Xlabels, Ylabels, graphTitle, fileName, showPicture)
   
-  return []
+  return {"heatMaps":heatMaps, "Xlabels":Xlabels, "Ylabels":Ylabels}
 # genMisinfoHeatMap
 
 
 
 def readInputFolder(inputFolder):
   if os.path.isdir(inputFolder):
-    info(("  listing folder %s ...") % (inputFolder), 1)
+    info(("listing folder %s ...") % (inputFolder), 1)
     # inputFiles = sorted([os.fsdecode(file) for file in os.listdir(inputFolder) if os.fsdecode(file).endswith(".text")])
     # inputFiles = sorted([os.path.join(inputFolder, file) for file in os.listdir(inputFolder) if os.fsdecode(file).endswith(".text")] , key=os.path.getctime)
     inputFiles = [str(child.resolve()) for child in Path.iterdir(Path(inputFolder)) if os.fsdecode(child).endswith(".text")]
@@ -1081,7 +1108,7 @@ def readInputFile(inputTextFile):
 
 
 
-def graph_line(X, Y, title="", fileName=""):
+def graph_line(X, Y, title="", fileName="", progress=""):
   import numpy as np
   import pandas as pd
   import matplotlib
@@ -1092,9 +1119,6 @@ def graph_line(X, Y, title="", fileName=""):
   from   matplotlib import style
   from   matplotlib.patches import Rectangle
   import seaborn
-  import PIL
-  import pngquant
-  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
   # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.plot_date.html
   plt.plot_date(X,Y,linestyle='solid')
@@ -1103,18 +1127,16 @@ def graph_line(X, Y, title="", fileName=""):
   plt.xlabel('date')
 
   # always save BEFORE show
-  if fileName:
-    plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
-    if usePngquant: pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
-    info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, usePngquant, progress)
 
   if showPicture: plt.show()
   plt.close()
+  return outputFile
 # graph_line
 
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph bar --show
-def graph_bar(X, Y, title="", fileName=""):
+def graph_bar(X, Y, title="", fileName="", progress=""):
   import numpy as np
   import pandas as pd
   import matplotlib
@@ -1125,9 +1147,6 @@ def graph_bar(X, Y, title="", fileName=""):
   from   matplotlib import style
   from   matplotlib.patches import Rectangle
   import seaborn
-  import PIL
-  import pngquant
-  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
   # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.bar.html
   plt.bar(X,Y)
@@ -1136,18 +1155,16 @@ def graph_bar(X, Y, title="", fileName=""):
   plt.xlabel('date')
 
   # always save BEFORE show
-  if fileName:
-    plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
-    if usePngquant: pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
-    info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, usePngquant, progress)
 
   if showPicture: plt.show()
   plt.close()
+  return outputFile
 # graph_bar
 
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show
-def graph_pie(X, Y, title="", fileName=""):
+def graph_pie(X, Y, title="", fileName="", progress=""):
   import numpy as np
   import pandas as pd
   import matplotlib
@@ -1158,9 +1175,6 @@ def graph_pie(X, Y, title="", fileName=""):
   from   matplotlib import style
   from   matplotlib.patches import Rectangle
   import seaborn
-  import PIL
-  import pngquant
-  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
   # https://matplotlib.org/stable/gallery/pie_and_polar_charts/pie_features.html#sphx-glr-gallery-pie-and-polar-charts-pie-features-py
   # fig, ax = plt.subplots(figsize=(20, 10))  # 2000 x 1000
@@ -1177,17 +1191,15 @@ def graph_pie(X, Y, title="", fileName=""):
        # )
        
   # always save BEFORE show
-  if fileName:
-    plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
-    if usePngquant: pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
-    info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, usePngquant, progress)
 
   if showPicture: plt.show()
   plt.close()
+  return outputFile
 # graph_pie
 
 
-def graph_heatMapTestHighlight():
+def graph_heatMapTestHighlight(progress=""):
   import numpy as np
   import pandas as pd
   import matplotlib
@@ -1198,9 +1210,6 @@ def graph_heatMapTestHighlight():
   from   matplotlib import style
   from   matplotlib.patches import Rectangle
   import seaborn
-  import PIL
-  import pngquant
-  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
   labels = list('abcdef')
   N = len(labels)
@@ -1216,18 +1225,16 @@ def graph_heatMapTestHighlight():
   ax.tick_params(length=0)
 
   # always save BEFORE show
-  if fileName:
-    plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
-    if usePngquant: pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
-    info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, usePngquant, progress)
 
   if showPicture: plt.show()
   plt.close()
+  return outputFile
 # graph_heatMapTestHighlight
 
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
-def graph_heatMap(arrays, X, Y, title="", fileName=""):
+def graph_heatMap(arrays, Xlabels, Ylabels, graphTitle="", fileName="", showPicture=False, progress=""):
   import numpy as np
   import pandas as pd
   import matplotlib
@@ -1238,19 +1245,16 @@ def graph_heatMap(arrays, X, Y, title="", fileName=""):
   from   matplotlib import style
   from   matplotlib.patches import Rectangle
   import seaborn
-  import PIL
-  import pngquant
-  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 
   # https://matplotlib.org/stable/gallery/images_contours_and_fields/image_annotated_heatmap.html
   # https://seaborn.pydata.org/tutorial/color_palettes.html
   # https://stackoverflow.com/questions/62533046/how-to-add-color-border-or-similar-highlight-to-specifc-element-of-heatmap-in-py
-  info("title    = "+title, 1)
-  info("fileName = "+fileName, 1)
-  # title = "Harvest of local farmers (in tons/year)"
-  # Y = ["cucumber", "tomato", "lettuce", "asparagus",
+  info("title    = "+graphTitle, 2)
+  info("fileName = "+fileName, 2)
+  # graphTitle = "Harvest of local farmers (in tons/year)"
+  # Ylabels = ["cucumber", "tomato", "lettuce", "asparagus",
                 # "potato", "wheat", "barley"]
-  # X = ["Farmer Joe", "Upland Bros.", "Smith Gardening",
+  # Xlabels = ["Farmer Joe", "Upland Bros.", "Smith Gardening",
              # "Agrifun", "Organiculture", "BioGoods Ltd.", "Cornylee Corp."]
   # indices = np.array([[0.8, 2.4, 2.5, 3.9, 0.0, 4.0, 0.0],
                       # [2.4, 0.0, 4.0, 1.0, 2.7, 0.0, 0.0],
@@ -1271,21 +1275,23 @@ def graph_heatMap(arrays, X, Y, title="", fileName=""):
   # cmap='coolwarm'
   # cmap='Spectral'
   # cmap='Spectral'
-  ax = seaborn.heatmap(indices, cmap='YlOrBr', annot=True, linewidths=.5, xticklabels=X, yticklabels=Y)
+  ax = seaborn.heatmap(indices, cmap='YlOrBr', annot=True, linewidths=.5, xticklabels=Xlabels, yticklabels=Ylabels)
 
   # Loop over data dimensions and create text annotations at each top-left corner
-  # for x in range(len(Y)):
-    # for y in range(len(X)):
+  # for x in range(len(Ylabels)):
+    # for y in range(len(Xlabels)):
       # text = ax.text(y, x, indices[x, y], ha="center", va="center", color="y")
 
-  Xindex = X.index("sourcing")
+  # get Xindex of sourcing as the start column. we want to highlight 2 columns only.
+  # "sourcing" is the 3rd column
+  Xindex = Xlabels.index("sourcing")
   Xwidth = 2
-  # Yindex = Y.index("04:30")
+  # Yindex = Ylabels.index("04:30")
   Yheight = 1
   # x, y, w, h = Xindex, Yindex, Xwidth, Yheight
   # this is very specific: we KNOW Xindex = 2 is sourcing and Xindex +1 = uncertainty
-  for x in range(Xindex, len(X) - 1):
-    for y in range(len(Y)):
+  for x in range(Xindex, len(Xlabels) - 1):
+    for y in range(len(Ylabels)):
       # we only divide by uncertainty because it's never == 0 while sourcing can be == 0
       sourcing    = indices[y][x]
       uncertainty = indices[y][x+1]
@@ -1310,24 +1316,63 @@ def graph_heatMap(arrays, X, Y, title="", fileName=""):
   # plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
            # rotation_mode="anchor")
   
-  # title and layout must be set AT THE END or they will be cut
-  ax.set_title("misInformation heatMap\n"+title)
+  # graphTitle and layout must be set AT THE END or they will be cut
+  ax.set_title("misInformation heatMap\n"+graphTitle)
   fig.tight_layout()
 
   # always save BEFORE show
-  if fileName:
-    plt.savefig(os.path.join(outputFolder, fileName  + ".png"), bbox_inches='tight')
-    if usePngquant: pngquant.quant_image(image=os.path.join(outputFolder, fileName  + ".png"))
-    info("png saved: "+os.path.join(outputFolder, fileName  + ".png"), 2)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, usePngquant, progress)
 
   if showPicture: plt.show()
   plt.close()
-
+  return outputFile
 # graph_heatMap
 
 
-# graph_heatMapTestHighlight()
-# exit()
+def saveImage(outputFolder, fileName, plt, usePngquant=usePngquant, progress=""):
+  if useJpeg:
+    outputFileName = fileName + ".jpg"
+    outputFile = os.path.join(outputFolder, outputFileName)
+    plt.savefig(outputFile, pil_kwargs={
+                            'quality': jpegQuality,
+                            'subsampling': 10
+                            })
+  else:
+    outputFileName = fileName + ".png"
+    outputFile = os.path.join(outputFolder, outputFileName)
+    plt.savefig(outputFile, bbox_inches='tight')
+    if usePngquant:
+      import pngquant
+      pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
+      pngquant.quant_image(image=outputFile)
+  info('image saved: "%s" [%.0fk]' %(outputFile, os.path.getsize(outputFile)/1024), 1, progress)
+  return outputFile
+# saveImage
+
+
+def saveThumbnail(inputFile, outputFolder, thumbnailFileName, usePngquant=usePngquant, progress=""):
+  import PIL
+
+  # I would love this to work instead of reloading the file we just produced:
+  # PILoutputFile = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+  PILoutputFile = PIL.Image.open(inputFile)
+  PILoutputFile.thumbnail((256, 256), PIL.Image.Resampling.LANCZOS)   # looks okay
+  # PILoutputFile = thumbnail.resize((256,256), PIL.Image.LANCZOS)    # does not look good
+  
+  thumbnailFile = os.path.join(outputFolder, thumbnailFileName)
+  if useJpeg:
+    PILoutputFile.save(thumbnailFile , "JPEG", quality=jpegQuality, optimize=True)
+  else:
+    PILoutputFile.save(thumbnailFile)
+    if usePngquant:
+      import pngquant
+      # for clean, electronically generated graphs, pngquant will always give better results than jpeg 50%
+      pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
+      pngquant.quant_image(image=thumbnailFile)
+
+  info('thumbnail saved: "%s" [%.0fk]' %(thumbnailFile, os.path.getsize(thumbnailFile)/1024), 2, progress)
+  return thumbnailFile
+#
 
 
 
@@ -1343,7 +1388,6 @@ def graph_heatMap(arrays, X, Y, title="", fileName=""):
         # 'Sun': 'BBC World Service'
     # },
     # '01:00': {
-
 def getNextKey(timeList, key):
   if key+1 < len(timeList):
     # print("len=%s timelist[%s] = %s" %(len(timeList), key, timeList[key]))
@@ -1360,10 +1404,6 @@ def getPrevKey(timeList, key):
 
 
 def rebuildThumbnails(inputFolder, outputFolder, dryRun=False, progress=""):
-  import PIL
-  import pngquant
-  pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
-  
   pngPath = '%s/KJZZ*.png' %(inputFolder)
   pngList = glob.glob(pngPath, recursive=False)
   # print(pngList)
@@ -1371,14 +1411,7 @@ def rebuildThumbnails(inputFolder, outputFolder, dryRun=False, progress=""):
   with Progress() as progress:
     task = progress.add_task("Thumbnail gen ...", total=len(pngList))
     for png in pngList:
-      thumbnail = PIL.Image.open(png)
-      thumbnail.thumbnail((256, 256), PIL.Image.Resampling.LANCZOS)
-      outputFile = os.path.join(outputFolder, "thumbnail-" + os.path.basename(png))
-      if not dryRun:
-        thumbnail.save(outputFile)
-        if usePngquant: pngquant.quant_image(image=outputFile)
-      
-      info("thumbnail saved: %s" %(outputFile), 2, progress)
+      outputThumbnailFile = saveThumbnail(png, outputFolder, "thumbnail-" + os.path.basename(png), usePngquant)
       progress.advance(task)
   
 # rebuildThumbnails
@@ -1637,7 +1670,8 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
             thatWordCloudPngList = glob.glob(thisPngPath, recursive=False)
 
           # now we are certain that we need to generate the wordCloud
-          if len(thatWordCloudPngList) == 0:
+          # Note: there is a bug when using force: since we process by timeList, we may regenerate same segments multiple times
+          if len(thatWordCloudPngList) == 0 or force:
             # setup an empty src for an img is indeed an error we will get the missingCloud.png for:
             thatWordCloudPngList = []
             
@@ -1654,7 +1688,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
                 # we should only have 1 item since we mergeRecords
                 if len(genWordCloudDicts) > 0:
                   classChunkExist = 'class="chunkExist"'
-                  thatWordCloudPngList = [os.path.basename(genWordCloudDicts[0]["fileName"])]
+                  thatWordCloudPngList = [os.path.basename(genWordCloudDicts[0]["outputFileName"])]
               # else:
                 # # we do not have any record in the db, no use to show a missing image
                 # thatWordCloudPngList = [voidPic]
@@ -1810,33 +1844,42 @@ def warning(message, RC=0, progress=""):
 
 def info(message, verbosity=0, progress=""):
   stack = ''
-  for i in reversed(range(1, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
+  infoPattern = "info   : %s[white]%s%s[/]"
+  if verbosity >1:
+    for i in reversed(range(1, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
+    infoPattern = f"info   : %-30s[white]%s%s[/]"
+    
   # if verbose >= verbosity: print ("info   : %-30s[white]%s%s[/]" %(stack, " ", message), file=sys.stderr)
   if verbose >= verbosity:
     if progress:
-      progress.console.print(f"info   : %-30s[white]%s%s[/]" %(stack, " ", message))
+      progress.console.print(infoPattern %(stack, " ", message))
     else:
-      print ("info   : %-30s[white]%s%s[/]" %(stack, " ", message), file=sys.stderr)
+      print (infoPattern %(stack, " ", message), file=sys.stderr)
 #
 
 
 def usage(RC=99):
   usage  = (("usage: python %s --help") % (sys.argv[0]))+os.linesep
+  usage += ("Required at least: --import / --query / --gettext / --listLevel")+os.linesep
   usage += ("")+os.linesep
   usage += ("  --import < --text \"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text\" | --folder inputFolder >")+os.linesep
   usage += ("    -m, --model *%s medium large...\n                   Model that you used with whisper, to transcribe the text to import." %(model))+os.linesep
-  usage += ("    -p, --pretty\n                   Convert \\n to carriage returns and does json2text.\n                   Ignored when outputing pictures.")+os.linesep
-  usage += ("    --output *%s\n                   Folder where to output pictures.." %(outputFolder))+os.linesep
-  usage += ("    --show\n                   Opens the picture upon generation.")+os.linesep
-  usage += ("    --rebuildThumbnails <week>\n                   Will (re)generate PICtures thumbnails only for that week.")+os.linesep
+  usage += ("    -p, --pretty\n                   Convert \\n to carriage returns and convert json ouyput to text.\n                   Ignored when outputing pictures.")+os.linesep
+  usage += ("    --output *%s\\\n                   Folder where to output PICtures.\n                   Will be %s\\week\\ when gettext has week=n" %(outputFolder, outputFolder))+os.linesep
+  usage += ("    --show\n                   Opens the PICtures upon generation.")+os.linesep
+  usage += ("    --rebuildThumbnails <week>\n                   Will (re)generate only PICtures thumbnails for that week, if main PICtures exist.")+os.linesep
+  usage += ("    --noPngquant\n                   Disable pngquant compression")+os.linesep
+  usage += ("    --useJpeg\n                   Produces jpeg PICtures instead of png.")+os.linesep
+  usage += ("    --jpegQuality <*50>\n                   0-100 jpeg quality for PICtures.")+os.linesep
   usage += ("    --dryRun\n                   Will not generate PICtures, will not import chunks.")+os.linesep
+  usage += ("    --force\n                   Will regenerate existing PICtures.")+os.linesep
   usage += ("")+os.linesep
   usage += ("  --db *%s    Path to the local SQlite db." %(localSqlDb))+os.linesep
   usage += ("  -q, --query < title | first | last | last10 | byDay | byTitle | chunkLast10 >\n                   Quick and dirty way to see what's in the db.")+os.linesep
   usage += ("")+os.linesep
   usage += ("  --html [--byChunk --printOut --autoGenerate] <week>\n                   PICture: generate week number's schedule as an html table.")+os.linesep
   usage += ("                   Outputs html file: %s/week00[-byChunk].html" %(outputFolder))+os.linesep
-  usage += ("                   --byChunk  Outputs schedule by 30mn chucks, no rowspan, no picture.")+os.linesep
+  usage += ("                   --byChunk  Outputs schedule by 30mn chucks, no rowspan, no PICtures.")+os.linesep
   usage += ("                   --printOut Will output html on the prompt.")+os.linesep
   usage += ("                   --autoGenerate Will loop generate all wordCloud PICtures to show in html for that week.")+os.linesep
   usage += ("")+os.linesep
@@ -1853,13 +1896,10 @@ def usage(RC=99):
   usage += ("   *--printOut\n                   Will output selected text on the prompt (default if no other option passed).")+os.linesep
   usage += ("    --noMerge\n                   Do not merge 30mn chunks of the same title within the same timeframe.")+os.linesep
   usage += ("    --misInformation\n                   PICture: generate misInformation graph or heatmap for all 4 factors:\n                   explanatory/retractors/sourcing/uncertainty")+os.linesep
-  usage += ("      --graph *bar | pie | line\n                   What graph you want. Ignored with --noMerge: heat map will be generated instead.")+os.linesep
+  usage += ("      --graphs *bar,*pie,line \n                   What graph(s) you want. Ignored with --noMerge: a heatMap will be generated instead.")+os.linesep
   usage += ("    --wordCloud\n                   PICture: generate word cloud from gettext output. Will not output any text.")+os.linesep
-  usage += ("      --noPngquant\n                   Disable pngquant compression")+os.linesep
-  usage += ("      --useJpeg\n                   Produces jpeg instead of png")+os.linesep
-  usage += ("      --jpegQuality <*50>\n                   0-100 jpeg quality")+os.linesep
-  usage += ("      --stopLevel  0 1 2 3 *4\n                   Add various levels of stopwords")+os.linesep
-  usage += ("        --listLevel <0[,1 ..]> to just show the words in that level(s).")+os.linesep+os.linesep
+  usage += ("      --stopLevel  0 1 2 *3\n                   Add various levels of stopwords")+os.linesep
+  usage += ("        --listLevel <0[,1,..]> to just show the stopWords in that level(s).")+os.linesep+os.linesep
   for key, item in wordCloudDict.items():
     if item["input"]: usage += ("      --%s *%s %s" %(key, item["value"], item["usage"]))+os.linesep
   usage += ("")+os.linesep
@@ -1883,7 +1923,7 @@ argumentList = sys.argv[1:]
 # define short Options
 options = "hviq:g:d:t:f:m:p"
 # define Long options
-long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "keepStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation", "output=", "graph=", "html=", "byChunk", "printOut", "listLevel=", "silent", "dryRun", "autoGenerate", "rebuildThumbnails=", "noPngquant", "useJpeg", "jpegQuality="]
+long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "keepStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation", "output=", "graphs=", "html=", "byChunk", "printOut", "listLevel=", "silent", "dryRun", "autoGenerate", "rebuildThumbnails=", "noPngquant", "useJpeg", "jpegQuality=", "force"]
 wordCloudDictToParams = [(lambda x: '--' + x)(x) for x in wordCloudDict.keys()]
 wordCloudDictToOptions = [(lambda x: x + '=')(x) for x in wordCloudDict.keys()]
 long_options += wordCloudDictToOptions
@@ -1957,6 +1997,9 @@ try:
     elif currentArgument in ("--show"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       showPicture = True
+    elif currentArgument in ("--force"):
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
+      force = True
     elif currentArgument in ("--stopLevel"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       stopLevel = int(currentValue)
@@ -1975,9 +2018,9 @@ try:
     elif currentArgument in ("-m", "--model"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       model = currentValue
-    elif currentArgument in ("--graph"):
+    elif currentArgument in ("--graphs"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
-      if currentValue in ["bar", "pie"]: graph = currentValue
+      graphs = currentValue.split(',')
     elif currentArgument in ("--html"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       weekNumber = int(currentValue)
@@ -2050,6 +2093,7 @@ if (not importChunks and not sqlQuery and not gettext and not weekNumber and not
 
 #################################### help functions
 if listLevel:
+  stopwordsDict = loadStopWordsDict()
   if pretty:
     for level in listLevel: print(('%s') %(" ".join(stopwordsDict[int(level)])))
   else:
@@ -2156,22 +2200,43 @@ if gettext:
   # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
   gettextDict = buildGetTextDict(gettext)
   wordCloudTitle = "KJZZ " + gettext.replace("+", " ")
-  records = getText(gettextDict)
   
-  if records:
+  records = getText(gettextDict)
+  # records = [(start, text), ..]
+  
+  if len(records) > 0:
 
     ################## wordCloud
     # first we check if week number was passed in the gettext to infer outputFolder
     if "week" in gettextDict: outputFolder = os.path.join(outputFolder, str(gettextDict['week']))
     # then we check if a wordCloud is requested:
-    if wordCloud: genWordCloudDicts = genWordClouds(records, wordCloudTitle, mergeRecords, showPicture, wordCloudDict, outputFolder, dryRun)
+    if wordCloud:
+      genWordCloudDicts = genWordClouds(records, wordCloudTitle, mergeRecords, showPicture, wordCloudDict, outputFolder, dryRun)
 
     ################## misInformation
     # then we check if a misInformation misInformation is requested:
-    elif misInformation: genMisinfoDicts = genMisInformation(records, mergeRecords, showPicture, dryRun)
+    elif misInformation:
+      genMisinfoDicts = genMisInformation(records, mergeRecords, wordCloudTitle, graphs, showPicture, dryRun)
+
+      # now for not mergeRecords, we save those 4 values as text, for each chunk:
+      # print('ddebug',genMisinfoDicts)
+      # {'heatMaps': [ [0.7, 0.4, 0.4, 2.9], .. ], 'Xlabels': .. }
+      if not mergeRecords:
+        for index, misInfo in enumerate(genMisinfoDicts["heatMaps"]):
+        print('ddebug', ",".join(misInfo))
+        # start times are unique, why do we bother with other conditions?
+                   # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
+        # for key in gettextDict: textConditions += "and %s='%s'" %(key, )+ gettextDict[key]
+                                                          # textConditions = "and week='..' and title='..' and Day='..'"
+
+        # start times are unique and it's the first column in records
+        textConditions = "and start='%s'" %(records[index][0])
+        db_update('schedule', 'misInfo', ",".join(misInfo), textConditions, localSqlDb, conn)
+                                                          # textConditions = "and start='YYYY-MM-DD HH:MM'"
   
     # Finally, we just output gettext: printOut is purely optional since it's the last option
-    else: printOutGetText(records, mergeRecords, pretty, dryRun)
+    else:
+      printOutGetText(records, mergeRecords, pretty, dryRun)
     
   # exit(0)
 #

@@ -33,6 +33,7 @@ gitsync*
 !stopWords.ranks.nl.txt
 !stopWords.Wordlist-Adjectives-All.txt
 
+!data/*
 !assets/*
 assets/*.vsdx
 !fonts/*

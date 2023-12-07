@@ -64,25 +64,26 @@ IF "%~1"=="" (
   echo   python KJZZ-db.py --gettext title="Marketplace" -v --wordCloud
   echo   python KJZZ-db.py --gettext title="Morning Edition" -v --wordCloud
   echo   python KJZZ-db.py --gettext title="The Show" -v --wordCloud
-  echo   python KJZZ-db.py --gettext week=42+Day=Mon+title="The Show" -v --wordCloud --stopLevel 2
+  echo   python KJZZ-db.py --gettext week=42+Day=Mon+title="The Show" -v --wordCloud --stopLevel 3
   echo   python KJZZ-db.py --gettext week=42+Day=Mon+title="All Things Considered" --wordCloud --stopLevel 3 --show
   echo   python KJZZ-db.py --gettext week=42 --wordCloud --stopLevel 3 --show --max_words=10000
-  echo   python KJZZ-db.py --gettext week=44 --wordCloud --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles  stopWords.Wordlist-Adjectives-All.txt
-  echo   python KJZZ-db.py --gettext week=43+title="TED Radio Hour" --wordCloud --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles  stopWords.Wordlist-Adjectives-All.txt
-  echo   python KJZZ-db.py --gettext week=42+title="Freakonomics" --misInformation --stopLevel 5 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+  echo   python KJZZ-db.py --gettext week=44 --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
+  echo   python KJZZ-db.py --gettext week=43+title="TED Radio Hour" --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
+  echo   python KJZZ-db.py --gettext week=42+title="Freakonomics" --misInformation --show
   echo   python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show
-  echo   python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
+  echo   python KJZZ-db.py --gettext week=46+title="Morning Edition"+Day=Mon --misInformation --show
+  echo   python KJZZ-db.py --gettext week=48+title="The Pulse" --wordCloud
   echo   python KJZZ-db.py --html 42 --byChunk
   echo   python KJZZ-db.py --rebuildThumbnails 41
   REM    for /l %a in (42,1,48) DO @python KJZZ-db.py --rebuildThumbnails %a
-  echo   python KJZZ-db.py --gettext week=43+title="TED Radio Hour"+Day=Sun --wordCloud  --useJpeg --jpegQuality 50 --stopLevel 4 --show --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles  stopWords.Wordlist-Adjectives-All.txt
+  echo   python KJZZ-db.py --gettext week=43+title="TED Radio Hour"+Day=Sun --wordCloud  --useJpeg --jpegQuality 50 --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
 
   REM (re)generate all thumbnails for week 42 manually:
-  REM for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO @python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --stopLevel 4 --max_words=1000 --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt --output kjzz)
+  REM for /f "tokens=*" %t in ('python KJZZ-db.py -q title -p') DO (for %d in (Mon Tue Wed Thu Fri Sat Sun) DO @python KJZZ-db.py -g week=42+title=%t+Day=%d --wordCloud --stopLevel 3 --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt --output kjzz)
   REM (re)generate all thumbnails for week 42 automatically along with an html page:
-  echo python KJZZ-db.py --html 42 --autoGenerate --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+  echo python KJZZ-db.py --html 42 --autoGenerate --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
   REM (re)generate all wordClouds and html for some weeks:
-  REM for /l %a in (40,1,48) DO @python KJZZ-db.py --html %a --autoGenerate --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+  REM for /l %a in (40,1,48) DO @python KJZZ-db.py --html %a --autoGenerate --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
   
   cmd /k
   exit
@@ -116,7 +117,7 @@ if /I NOT "%html%"=="y" (
   set /P    import=import texts?       [%import%] 
 )
 if /I "%import%"=="y" set importTexts=--import --folder "%~1"
-if /I "%html%"=="y"   set htmlGen=--html %~n1 --autoGenerate --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+if /I "%html%"=="y"   set htmlGen=--html %~n1 --autoGenerate --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
 
 IF EXIST "%~1\*" (
   REM :: first, address reprocess by deleting processed files, in case the batch was interrupted for instance
@@ -186,7 +187,7 @@ if /I NOT "%import%"=="y" (
   echo:
   echo IMPORT DISABLED!
   echo to import:                 python KJZZ-db.py --import --folder "%~1"
-  echo to import + generate html: python KJZZ-db.py --import --folder "%~1" --html %~n1 --autoGenerate --inputStopWordsFiles stopWords.ranks.nl.txt --inputStopWordsFiles stopWords.Wordlist-Adjectives-All.txt
+  echo to import + generate html: python KJZZ-db.py --import --folder "%~1" --html %~n1 --autoGenerate --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
   goto :end
 )
 
