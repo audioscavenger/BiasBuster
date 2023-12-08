@@ -579,7 +579,7 @@ This project is under [GPL-2.0](https://github.com/audioscavenger/BiasBuster/blo
 # Roadmap
 Scope creep ahead...
 
-- [ ] 0.9.10  WIP
+- [ ] WIP 0.9.10 data_folder
   - [ ] db
     - [x] switch db to PRAGMA temp_store = 2 (MEMORY)
     - [x] created indexes and tested them: they work and somewhat speed up cursors

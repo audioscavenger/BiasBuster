@@ -158,6 +158,9 @@ usePngquant = True
 useJpeg = False
 jpegQuality = 50
 force = False
+# when uncertainty/sourcing >= BSoMeterTrigger then highlight it
+BSoMeterTrigger = 0.9
+defaultGraphs = ["bar", "pie"]
 
 # busybox sed -E "s/^.{,3}$//g" stopWords.ranks.nl.txt | busybox sort | busybox uniq >stopWords.ranks.nl.txt 
 # wordcloud internal STOPWORDS: https://github.com/amueller/word_cloud/blob/main/wordcloud/stopwords
@@ -447,16 +450,18 @@ def db_init(localSqlDb):
     # time.sleep(0.2)
     # progress.advance(task)
 
-def db_update(table, column, value, textConditions, localSqlDb, conn):
+def db_update(table, column, value, textConditions, localSqlDb, conn, progress=""):
+  # db_update('schedule', 'misInfo', str(misInfo), textConditions, localSqlDb, conn)
   if not conn:
     conn = sqlite3.connect(localSqlDb)
 
   # if isinstance(value,str):
-  sqlText = """ UPDATE {table} SET {column} = '{value}' where 1=1 and {textConditions}; """
+  sqlText = """ UPDATE ${table} SET ${column}='${value}' where 1=1 ${textConditions}; """
   sql = string.Template((sqlText)).substitute(dict(table=table, column=column, value=value, textConditions=textConditions))
+  info(sql, 3, progress)
   
+  # records is always [] for an update
   records = cursor(localSqlDb, conn, sql)
-  print(records)
   
 # db_update
 
@@ -1004,9 +1009,10 @@ def genMisInformation(records, mergeRecords, graphTitle, graphs, showPicture=Fal
 #
 
 
-def genMisinfoBarGraph(text, graphTitle, dictHeatMap, wordCloudDict=wordCloudDict, graphs=["bar", "pie"], showPicture=False, dryRun=False, progress=""):
+def genMisinfoBarGraph(text, graphTitle, dictHeatMap, wordCloudDict=wordCloudDict, graphs=defaultGraphs, showPicture=False, dryRun=False, progress=""):
   info("%s" %(graphTitle), 2)
   textWordsLen = len(text.split())
+  if len(graphs) == 0: graphs=defaultGraphs
 
   # load the sets of heat words
   for heatFactor in dictHeatMap.keys():
@@ -1040,32 +1046,33 @@ def genMisinfoHeatMap(textArray, Ylabels, graphTitle, dictHeatMapBlank, wordClou
 
   info("%s showPicture=%s dryRun=%s" %(graphTitle, showPicture, dryRun), 1, progress)
   heatMaps = []
-  i=0
-  for text in textArray:
-    dictHeatMap = copy.deepcopy(dictHeatMapBlank)
-    Xlabels = list(dictHeatMap.keys())
-    textWordsLen = len(text.split())
-    
-    # build the lists of heat words
-    for heatFactor in dictHeatMap.keys():
+
+  with Progress() as progress:
+    task = progress.add_task("BSoMetter running ...", total=len(textArray))
+    for text in textArray:
+      dictHeatMap = copy.deepcopy(dictHeatMapBlank)
+      Xlabels = list(dictHeatMap.keys())
+      textWordsLen = len(text.split())
       
-      # count occurences in the text
-      for word in dictHeatMap[heatFactor]["words"]:
-        # print("  "+word)
-        dictHeatMap[heatFactor]["heatCount"] += sum(1 for _ in re.finditer(r'\b%s\b' % re.escape(word), text))
+      # build the lists of heat words
+      for heatFactor in dictHeatMap.keys():
         
-      dictHeatMap[heatFactor]["heat"] = round( 100 * dictHeatMap[heatFactor]["heatCount"] / textWordsLen , 1 )
-      info("%s heatCount %s" %( heatFactor, dictHeatMap[heatFactor]["heatCount"] ), 2, progress)
-      info("%s heat      %s" %( heatFactor, dictHeatMap[heatFactor]["heat"] ), 2, progress)
+        # count occurences in the text
+        for word in dictHeatMap[heatFactor]["words"]:
+          # print("  "+word)
+          dictHeatMap[heatFactor]["heatCount"] += sum(1 for _ in re.finditer(r'\b%s\b' % re.escape(word), text))
+          
+        dictHeatMap[heatFactor]["heat"] = round( 100 * dictHeatMap[heatFactor]["heatCount"] / textWordsLen , 1 )
+        info("%s heatCount %s" %( heatFactor, dictHeatMap[heatFactor]["heatCount"] ), 2, progress)
+        info("%s heat      %s" %( heatFactor, dictHeatMap[heatFactor]["heat"] ), 2, progress)
+        
       
-    
-    Y = []
-    for dictFactor in dictHeatMap.values():
-      Y.append(dictFactor["heat"])
-    heatMaps.append(Y)
-    
-    i += 1
-  
+      Y = []
+      for dictFactor in dictHeatMap.values():
+        Y.append(dictFactor["heat"])
+      heatMaps.append(Y)
+      progress.advance(task)
+      
   fileName = "heatMap " + graphTitle.replace(": ", "=").replace(":", "")
                # graph_heatMap(arrays,   Xlabels, Ylabels, graphTitle="", fileName="", showPicture=False, progress=""):
   if not dryRun: graph_heatMap(heatMaps, Xlabels, Ylabels, graphTitle, fileName, showPicture)
@@ -1297,7 +1304,7 @@ def graph_heatMap(arrays, Xlabels, Ylabels, graphTitle="", fileName="", showPict
       uncertainty = indices[y][x+1]
       
       # we want RED   when sourcing is low and uncertainty is high       : missing sources and complete BS
-      if (uncertainty - sourcing)/uncertainty >= 0.9:
+      if (uncertainty - sourcing)/uncertainty >= BSoMeterTrigger:
         ax.add_patch(Rectangle((x, y), Xwidth, Yheight, fill=False, edgecolor='crimson', lw=4, clip_on=False))
 
       # we want RED   when sourcing is low and uncertainty is low        : missing sources
@@ -2223,16 +2230,17 @@ if gettext:
       # {'heatMaps': [ [0.7, 0.4, 0.4, 2.9], .. ], 'Xlabels': .. }
       if not mergeRecords:
         for index, misInfo in enumerate(genMisinfoDicts["heatMaps"]):
-        print('ddebug', ",".join(misInfo))
-        # start times are unique, why do we bother with other conditions?
-                   # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
-        # for key in gettextDict: textConditions += "and %s='%s'" %(key, )+ gettextDict[key]
-                                                          # textConditions = "and week='..' and title='..' and Day='..'"
+          # print('ddebug', ",".join(map(str, misInfo)))
+          # start times are unique, why do we bother with other conditions?
+                     # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
+          # for key in gettextDict: textConditions += "and %s='%s'" %(key, )+ gettextDict[key]
+                                                            # textConditions = "and week='..' and title='..' and Day='..'"
 
-        # start times are unique and it's the first column in records
-        textConditions = "and start='%s'" %(records[index][0])
-        db_update('schedule', 'misInfo', ",".join(misInfo), textConditions, localSqlDb, conn)
-                                                          # textConditions = "and start='YYYY-MM-DD HH:MM'"
+          # start times are unique and it's the first column in records
+          textConditions = "and start='%s'" %(records[index][0])
+          # to reload misInfo as an object, simply do json.loads(misInfoText)
+          db_update('schedule', 'misInfo', str(misInfo), textConditions, localSqlDb, conn)
+                                                            # textConditions = "and start='YYYY-MM-DD HH:MM'"
   
     # Finally, we just output gettext: printOut is purely optional since it's the last option
     else:

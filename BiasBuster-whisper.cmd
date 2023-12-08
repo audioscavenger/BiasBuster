@@ -70,7 +70,7 @@ IF "%~1"=="" (
   echo   python KJZZ-db.py --gettext week=44 --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
   echo   python KJZZ-db.py --gettext week=43+title="TED Radio Hour" --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
   echo   python KJZZ-db.py --gettext week=42+title="Freakonomics" --misInformation --show
-  echo   python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show
+  echo   python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graphs pie,bar --show
   echo   python KJZZ-db.py --gettext week=46+title="Morning Edition"+Day=Mon --misInformation --show
   echo   python KJZZ-db.py --gettext week=48+title="The Pulse" --wordCloud
   echo   python KJZZ-db.py --html 42 --byChunk
