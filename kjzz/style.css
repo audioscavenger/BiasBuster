@@ -110,6 +110,25 @@ a.nextWeek {
   right: 0;
 }
 
+/********************* special *********************/
+.roundRed {
+  background: radial-gradient(orange 65%, transparent 65%);
+}
+.roundCrimson {
+  background: radial-gradient(red 65%, transparent 65%);
+}
+.BSoMeter {
+  font-style: italic;
+  list-style-type: none;
+}
+.BSoMeterTrigger {
+  color: orange;
+}
+.alignLeft {
+  text-align: left;
+}
+
+
 /********************* Tooltip *********************/
 /* https://www.w3schools.com/css/css_tooltip.asp ***/
 /* Tooltip container */

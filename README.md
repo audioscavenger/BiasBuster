@@ -156,7 +156,9 @@ Required at least: --import / --query / --gettext / --listLevel
     --rebuildThumbnails <week>
                    Will (re)generate PICtures thumbnails only for that week.
     --dryRun
-                   Will not generate PICtures, will not import chunks.
+                   Will not generate PICtures, will not import or update the database.
+    --noPics
+                   Will not generate PICtures.
     --force
                    Will regenerate existing PICtures.
 
@@ -464,18 +466,19 @@ No stopWords: adjectives are now prominents and the cloud has no meaning anymore
 `python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --stopLevel 0 --show --max_words=1000`
 ![KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=400 scale=1 relscale=auto noStopWords](assets/KJZZ%20week=42%20title=Freakonomics%20words=8523%20maxw=1000%20minf=4%20maxf=400%20scale=1%20relscale=auto%20noStopWords.png)
 
-### Generate a PIE about how uncertain information is in a program
+### Generate PIE+BAR graphs about how uncertain information is in a program
 
-`python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show`
-![pie KJZZ week=42 title=Morning Edition Day=Mon](assets/pie%20KJZZ%20week=42%20title=Morning%20Edition%20Day=Mon.png)
+`python KJZZ-db.py --gettext week=46+title="Morning Edition"+Day=Tue --misInformation --graphs bar,pie --show`
+![misInformation bar KJZZ week=46 title=Morning Edition Day=Tue](assets/bar%20KJZZ%20week=46%20title=Morning%20Edition%20Day=Tue.png)
+![misInformation pie KJZZ week=46 title=Morning Edition Day=Tue](assets/pie%20KJZZ%20week=46%20title=Morning%20Edition%20Day=Tue.png)
 
 
 ### Generate a heat map about how uncertain information is in multiple chunks of a program
 
 Simply add --noMerge: --graph will be ignored when treating multiple chunks, and output a heat map instead.
 
-`python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge --show`
-![heatMap KJZZ week=42 title=Morning Edition Day=Mon](assets/heatMap%20KJZZ%20week=42%20title=Morning%20Edition%20Day=Mon.png)
+`python KJZZ-db.py --gettext week=46+title="Morning Edition"+Day=Tue --misInformation --noMerge --show`
+![misInformation heatMap KJZZ week=46 title=Morning Edition Day=Tue](assets/heatMap%20KJZZ%20week=46%20title=Morning%20Edition%20Day=Tue.png)
 
 ### Batch to generate JUST wordCloud pictures for a week
 
@@ -603,6 +606,9 @@ Scope creep ahead...
     - [ ] player handles playlist?
     - [ ] segments have only 1 play button that loads a playlist? how about the texts?
   - [ ] python
+    - [ ] should genMisinfoBarGraph and genMisinfoHeatMap always overwrite existing png?
+    - [ ] added --noPics
+    - [x] load and save misInfo so we can avoid heavy processing for genMisinfoBarGraph and genMisinfoHeatMap
     - [x] cleaned up many functions and info levels
     - [x] simplified info messages
     - [x] created saveImage and saveThumbnail
@@ -622,6 +628,7 @@ Scope creep ahead...
     - [ ] should the case matter for title?
     - [ ] add bias_score.py from https://github.com/auroracramer/language-model-bias
   - [ ] misc
+    - [ ] loadDictHeatMap with synonyms each time is too slow, find way to same the results
     - [x] move all stopWords and stuff under data\
     - [ ] integrate AI summarization with **h2ogpt** or **text-generation-webui**, and Summarization model such as *impira_layoutlm-document-qa*
     - [ ] use AI to detect and build ads stopWords
