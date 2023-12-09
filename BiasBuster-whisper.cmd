@@ -85,6 +85,10 @@ IF "%~1"=="" (
   REM (re)generate all wordClouds and html for some weeks:
   REM for /l %a in (40,1,48) DO @python KJZZ-db.py --html %a --autoGenerate --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
   
+  REM REimport + REgenerate all misInfo values + regenerate html:
+  echo for /l %a in (40,1,48) DO @python KJZZ-db.py --import --folder kjzz\%a --force --gettext week=%a --misInformation --noMerge --noPics
+  echo for /l %a in (40,1,48) DO @python KJZZ-db.py --html %a
+  
   cmd /k
   exit
 )

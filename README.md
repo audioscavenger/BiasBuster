@@ -582,15 +582,11 @@ This project is under [GPL-2.0](https://github.com/audioscavenger/BiasBuster/blo
 # Roadmap
 Scope creep ahead...
 
-- [ ] WIP 0.9.10 data_folder
+- [ ] WIP 0.9.11
   - [ ] db
-    - [x] switch db to PRAGMA temp_store = 2 (MEMORY)
-    - [x] created indexes and tested them: they work and somewhat speed up cursors
-    - [x] store misInfo statistics as text
     - [ ] add statistics table or more columns for each chunk?
     - [ ] how to store statistics for segments rather then chunks?
   - [ ] ui
-    - [x] enable closed-captions by default: asked on stackoverflow and found a workaround
     - [ ] start to think about how to access the misInformation heatmaps
     - [ ] make text icons also a modal
     - [ ] integrate text analysis with keyword search in a modal
@@ -606,19 +602,7 @@ Scope creep ahead...
     - [ ] player handles playlist?
     - [ ] segments have only 1 play button that loads a playlist? how about the texts?
   - [ ] python
-    - [ ] should genMisinfoBarGraph and genMisinfoHeatMap always overwrite existing png?
-    - [ ] added --noPics
-    - [x] load and save misInfo so we can avoid heavy processing for genMisinfoBarGraph and genMisinfoHeatMap
-    - [x] cleaned up many functions and info levels
-    - [x] simplified info messages
-    - [x] created saveImage and saveThumbnail
-    - [x] refactored stopLevel and dictStopWords
-    - [x] move all stopLevels off Python into text files under data\
     - [ ] change gettext time= to start=|stop= instead, so we can generate same segments as by week+title+Day
-    - [x] add --useJpeg and --jpegQuality but it's actually worse
-    - [x] enable string.Template instead of those %s everywhere
-    - [x] tried to improve import speed with BEGIN+COMMIT but error: You can only execute one statement at a time.
-    - [x] added jpeg output but for same size, quality is attrocious
     - [ ] rename title to segment or show? they seem to call their programmings "shows"
     - [ ] color segments by bias/misInformation/etc
     - [ ] color wordClouds by bias/misInformation/etc
@@ -628,8 +612,6 @@ Scope creep ahead...
     - [ ] should the case matter for title?
     - [ ] add bias_score.py from https://github.com/auroracramer/language-model-bias
   - [ ] misc
-    - [ ] loadDictHeatMap with synonyms each time is too slow, find way to same the results
-    - [x] move all stopWords and stuff under data\
     - [ ] integrate AI summarization with **h2ogpt** or **text-generation-webui**, and Summarization model such as *impira_layoutlm-document-qa*
     - [ ] use AI to detect and build ads stopWords
     - [ ] integrate (re)generate misInformation heatMap(s)
@@ -642,6 +624,33 @@ Scope creep ahead...
     - [ ] automate mp3 downloads from cloud + process + uploads from/to cloud server
   - [ ] future
     - [ ] dynamic page in PHP or nodeJS/typeScript
+- [x] release 0.9.10 data_folder
+  - [x] db
+    - [x] switch db to PRAGMA temp_store = 2 (MEMORY)
+    - [x] created indexes and tested them: they work and somewhat speed up cursors
+    - [x] store misInfo statistics as text
+  - [x] ui
+    - [x] enable closed-captions by default: asked on stackoverflow and found a workaround
+  - [x] python
+    - [x] refactor Chunk() to separate sentences properly
+    - [x] should genMisinfoBarGraph and genMisinfoHeatMap always overwrite existing png? NO: now using --force
+    - [x] loadDictHeatMap with synonyms each time is too slow, rewrite function
+    - [x] added --noPics
+    - [x] load and save misInfo so we can avoid heavy processing for genMisinfoBarGraph and genMisinfoHeatMap
+    - [x] cleaned up many functions and info levels
+    - [x] simplified info messages
+    - [x] created saveImage and saveThumbnail
+    - [x] refactored stopLevel and dictStopWords
+    - [x] move all stopLevels off Python into text files under data\
+    - [x] add --useJpeg and --jpegQuality but it's actually worse
+    - [x] enable string.Template instead of those %s everywhere
+    - [x] tried to improve import speed with BEGIN+COMMIT but error: You can only execute one statement at a time.
+    - [x] added jpeg output but for same size, quality is attrocious
+    - [x] (re)generate both byChunk and bySegment schedules html files
+    - [x] bugfix in genHtml where same program image was generated multiple times (1 per startTime withing the segment)
+    - [x] add --rebuildThumbnails to (re)generate only thumbnails by week
+  - [x] misc
+    - [x] move all stopWords and stuff under data\
 - [x] 0.9.9   release better_ui
   - [x] ui
     - [x] add link to switch between byChunk and not
@@ -661,10 +670,6 @@ Scope creep ahead...
     - [x] display image in modal + zoom and drag
     - [x] close image modal onclick anywhere outside image
     - [x] cleanup genHtml() code by exporting stuff in sub functions
-  - [x] python
-    - [x] (re)generate both byChunk and bySegment schedules html files
-    - [x] bugfix in genHtml where same program image was generated multiple times (1 per startTime withing the segment)
-    - [x] add --rebuildThumbnails to (re)generate only thumbnails by week
 - [x] 0.9.8   release html_builder
   - [x] stopped uploading the db after week 46: `git update-index --assume-unchanged kjzz.db`
   - [x] fixed error Tcl_AsyncDelete: async handler deleted by the wrong thread

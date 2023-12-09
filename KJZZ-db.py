@@ -115,6 +115,7 @@ from rich.progress import track, Progress
 # exit()
 
 verbose = 1
+progress = ""
 
 importChunks = False
 inputFolder = None
@@ -160,8 +161,10 @@ jpegQuality = 50
 force = False
 # when uncertainty/sourcing >= BSoMeterTrigger then highlight it
 BSoMeterTrigger = 0.9
-BSoMeterTrigger2 = 0.93
+BSoMeterLevel2 = 0.93
 defaultGraphs = ["bar", "pie"]
+withSynonyms = True
+minChunkSize = 20000
 
 dictHeatMapBlank = { 
   "explanatory":{"words":set(),"heatCount":0,"heat":None}, 
@@ -344,7 +347,7 @@ sqlCountsByWord = """ SELECT title, Day, count(start)
 
 
 class Chunk:
-  def __init__(self, inputFile, model=model):
+  def __init__(self, inputFile, model=model, loadText=True, progress=""):
     self.inputFile = Path(inputFile)
     self.model = model
     self.dirname = os.path.dirname(self.inputFile)
@@ -353,7 +356,7 @@ class Chunk:
     self.ext = Path(self.basename).suffix
     self.split = re.split(r"[_-]", self.stem) # ['KJZZ', '2023', '10', '09', 'Mon', '1330', '1400', 'BBC Newshour']
     if len(self.split) != 8:
-      raise ValueError("    Chunk: invalid name: %s" % (self.inputFile))
+      raise ValueError("Chunk: invalid name: %s" % (self.inputFile))
     self.week = datetime.date(int(self.split[1]),int(self.split[2]),int(self.split[3])).isocalendar().week
     self.YYYYMMDD = '-'.join([self.split[1],self.split[2],self.split[3]])
     self.Day = self.split[4]
@@ -363,11 +366,21 @@ class Chunk:
     self.stopTime = ':'.join([self.split[6][:2],self.split[6][2:]]) + ":00.000"
     self.stop = ' '.join([self.YYYYMMDD, self.stopTime])
     self.title = self.split[-1]
-    # with open(self.inputFile, 'r') as pointer:
+    
+    # generally for 30mn chunks, text files are 25k on average
     if os.path.isfile(self.inputFile):
-      with io.open(self.inputFile, mode="r", encoding="utf-8") as pointer:
-        self.text = pointer.read()
-        # print(text)
+      self.size = os.path.getsize(self.inputFile)
+      if self.size < minChunkSize:
+        warning("%s [%.1fk] small size is sus" %(self.inputFile, self.size/1024), 0, progress)
+      if loadText:
+        # with open(self.inputFile, 'r') as pointer:
+        with io.open(self.inputFile, mode="r", encoding="utf-8") as pointer:
+          # separate sentences properly:
+          text = pointer.read().replace('\n',' ')
+          self.text = text.replace('. ','.\n')
+          # ddebug(self.text)
+    else:
+      raise ValueError("Chunk: file not found: %s" % (self.inputFile))
 #
 
 
@@ -489,53 +502,67 @@ def db_load(inputFiles, localSqlDb, conn, model, commit, progress=""):
     task = progress.add_task("Loading inputFiles...", total=len(inputFiles))
     # KJZZ_2023-10-08_Sun_2300-2330_BBC World Service.text
     for inputFile in inputFiles:
-      info("Reading Chunk %s ..." % (inputFile), 3, progress)
+      info('Chunk init:     "%s"' % (inputFile), 3, progress)
       try:
-        chunk = Chunk(inputFile, model)
-        info("Chunk read %s" % (chunk.basename), 3, progress)
+        # first we do not read the file:
+        chunk = Chunk(inputFile, model, False, progress)
         # time.sleep(0.2)
       except Exception as error:
-        error("Chunk load error for %s: %s" % (inputFile, error), 11)
+        error('Chunk error:    "%s": %s' % (chunk.basename, error), 11)
       
       # check if exist in db:
       sqlCheck = """ SELECT * from schedule where start = ?; """
-      records = cursor(localSqlDb, conn, sqlCheck, (chunk.start,))
+      records = cursor(localSqlDb, conn, sqlCheck, (chunk.start,), progress)
       # exit()
-      if len(records) == 0:
-        # load in db:
-        # tentative to use BEGIN+COMMIT to speed up loading at the expense of memory
-        # sqlLoad += """ INSERT INTO schedule(start, stop , week, Day, title, text, model) VALUES(%s,%s,%s,%s,%s,%s,%s); """ %((chunk.start, chunk.stop , chunk.week, chunk.Day, chunk.title, chunk.text, chunk.model))
-        sqlLoad = """ INSERT INTO schedule(start, stop , week, Day, title, text, model) VALUES(?,?,?,?,?,?,?); """
-        records = cursor(localSqlDb, conn, sqlLoad, (chunk.start, chunk.stop , chunk.week, chunk.Day, chunk.title, chunk.text, chunk.model))
+      if len(records) == 0 or force:
+        # recreate chunk and actually read the file:
+        try:
+          chunk = Chunk(inputFile, model, True, progress)
+          info('Chunk read:     "%s" [%.1fk]' % (chunk.basename, chunk.size/1024), 3, progress)
+          # time.sleep(0.2)
+        except Exception as error:
+          error('Chunk error:    "%s": %s' % (chunk.basename, error), 11)
+        
+        # load Chunk in db:
+        if len(records) == 0:
+          sqlLoad = """ INSERT INTO schedule(start, stop , week, Day, title, text, model) VALUES(?,?,?,?,?,?,?); """
+          records = cursor(localSqlDb, conn, sqlLoad, (chunk.start, chunk.stop , chunk.week, chunk.Day, chunk.title, chunk.text, chunk.model), progress)
+        else:
+          # you can only use ? in this case: VALUES(?,?,?,?,?,?,?) - not in a WHERE clause or anything else
+          sqlUpdate = """ UPDATE schedule set (text, model) = (?,?) WHERE start = '%s'; """ %(chunk.start)
+          records = cursor(localSqlDb, conn, sqlUpdate, (chunk.text, chunk.model), progress)
+        
         importedFiles += [inputFile]
-        info("Chunk imported: %s" % (chunk.basename), 1, progress)
+        info('Chunk imported: "%s" [%.1fk]' % (chunk.basename, chunk.size/1024), 2, progress)
       else:
-        info("[bright_black]Chunk already exist: %s[/]" % (chunk.basename), 2, progress)
+        info('Chunk exist:    "%s"' % (chunk.basename), 2, progress)
       progress.advance(task)
   
   # BEGIN+COMMIT cannot work like this unfortunately: You can only execute one statement at a time.
-  # records = cursor(localSqlDb, conn, sqlLoad)
+  # records = cursor(localSqlDb, conn, sqlLoad, None, progress)
   
   if commit and not dryRun: conn.commit()
   info("Done loading %s/%s files" %(len(importedFiles), len(inputFiles)), 1, progress)
 #
 
 
-def cursor(localSqlDb, conn, sql, data=None):
+def cursor(localSqlDb, conn, sql, data=None, progress=""):
   if not conn:
     conn = sqlite3.connect(localSqlDb)
   cur = conn.cursor()
   records = []
   try:
-    if data:
-      info("cur.execute(%s) ... %s ..." %(sql, data[0]), 3)
+    if data is not None:
+      info("cur.execute(%s) ... %s ..." %(sql, data[0]), 4, progress)
+      # ddebug(sql, data)
       cur.execute(sql, data)
     else:
-      info("cur.execute(%s) ..." %(sql), 3)
+      info("cur.execute(%s) ..." %(sql), 4, progress)
       cur.execute(sql)
     records = cur.fetchall()
-    info("%s records" %(len(records)), 3)
+    info("%s records" %(len(records)), 4, progress)
   except Exception as error:
+    error("cur.execute(%s) ..." %(sql))
     error("%s" %(error))
   return records
 #
@@ -941,35 +968,55 @@ def loadStopWordsDict():
 # loadStopWordsDict
 
 
-def loadDictHeatMap(dictHeatMap, withSynonyms=False):
+def loadDictHeatMap(dictHeatMap, withSynonyms=withSynonyms):
   synonymsFile = os.path.join(thesaurusFolder, 'Thesaurus-Synonyms-Common.txt')
   # only the synonyms of sourcing and uncertainty seem to make sense, and look the most closely related
   heatFactorSynonymsFor = set({"sourcing", "uncertainty"})
-
-  totalWords = 0
   
   # load the sets of heat words
   for heatFactor in dictHeatMap.keys():
     heatFactorFile = os.path.join(dataFolder, 'heatMap.'+heatFactor+'.csv')
-    info("%s: open file %s" %( heatFactor, heatFactorFile), 3)
-    with open(heatFactorFile, 'r') as fd:
-      for line in fd:
-        word = line.strip()
-        # ddebug(' ------------------------------------------------------ '+word)
-        if not withSynonyms or heatFactor not in heatFactorSynonymsFor:
-          dictHeatMap[heatFactor]["words"].add(word)
-        else:
-          for synLine in open(synonymsFile).readlines():
-            # match will only match first word == first line found
-            if re.match(re.escape(word+"|"), synLine):
-              # split line found and update the set()
-              synonyms = re.split(r"[|,]",synLine.strip())
-              # ddebug(synonyms)
-              dictHeatMap[heatFactor]["words"].update(set().union(synonyms))
-            else:
-              dictHeatMap[heatFactor]["words"].add(word)
+    heatFactorWSynonymsFile = os.path.join(dataFolder, 'heatMap.'+heatFactor+'+synonyms.csv')
+    synonymsList = set()
     
-    totalWords += len(dictHeatMap[heatFactor]["words"])
+    # synonyms wanted and available:
+    if heatFactor in heatFactorSynonymsFor and withSynonyms:
+      if not force and os.path.isfile(heatFactorWSynonymsFile) and os.path.getsize(heatFactorWSynonymsFile) > os.path.getsize(heatFactorFile):
+        info("%s: open file %s" %( heatFactor, heatFactorWSynonymsFile), 3)
+        with open(heatFactorWSynonymsFile, 'r') as fd:
+          # BUGFIX: split() also splits compound words like "according to" so we resort to .strip().split('\n')
+          dictHeatMap[heatFactor]["words"].update(fd.read().strip().split('\n'))
+      else:
+        # load the whole synonyms file only once
+        if not synonymsList:
+          info("%s: open file %s" %( heatFactor, synonymsFile), 3)
+          with open(synonymsFile, 'r') as fd: synonymsList.update(fd.read().strip().split('\n'))
+        info("%s: open file %s" %( heatFactor, heatFactorFile), 3)
+        with open(heatFactorFile, 'r') as fd: words = fd.read().strip().split('\n')
+
+        for word in words:
+          dictHeatMap[heatFactor]["words"].add(word)
+          for synonym in synonymsList:
+            # match will only match first word == first line found
+            if re.match(re.escape(word+"|"), synonym):
+              # split line found and update the set()
+              synonyms = re.split(r"[|,]", synonym.strip())
+              info("%s: synonyms of %s = %s" %( heatFactor, word, synonyms), 3)
+              dictHeatMap[heatFactor]["words"].update(synonyms)
+              break
+          
+        # and finally we save it to not redo it again:
+        if not dryRun:
+          info("%s: save file %s" %( heatFactor, heatFactorWSynonymsFile), 3)
+          with open(heatFactorWSynonymsFile, 'w') as fd:
+            fd.write('\n'.join(dictHeatMap[heatFactor]["words"]))
+    
+    # no synonyms wanted or unavailable:
+    else:
+      info("%s: open file %s" %( heatFactor, heatFactorFile), 3)
+      with open(heatFactorFile, 'r') as fd: words = fd.read().strip().split('\n')
+      dictHeatMap[heatFactor]["words"].update(words)
+
     info("%s: words = %s" %( heatFactor, len(dictHeatMap[heatFactor]["words"]) ), 3)
     info("%s: words: %s" %( heatFactor, dictHeatMap[heatFactor]["words"]), 4)
 
@@ -983,24 +1030,35 @@ def genMisInformation(records, mergeRecords, graphTitle, graphs, showPicture=Fal
   # records = [(start, text, misInfo), ..]
   if len(records) == 0: return []
   mergedText = ''
-  dictHeatMap = loadDictHeatMap(dictHeatMapBlank, True) 
+  dictHeatMap = loadDictHeatMap(dictHeatMapBlank, withSynonyms)
               # dictHeatMapBlank = { 
                 # "explanatory":{"words":set(),"heatCount":0,"heat":0.0}, 
                 # ..
   
   if mergeRecords:
     for record in records:
-      mergedText += record[1]
+      start = record[0]
+      text = record[1]
+      misInfoText = record[2]
+      mergedText += text
       
       # shortcut: pre-load retrieved misInfo values into "heat" when they exist. 
       # dictHeatMapBlank.keys() are assumed to be in same order as the misInfo list items
       # BUG: We also assume all chunks of a processed segment have been processed and no item in misInfo is=None
-      if record[2] is not None and not force:
-        for index, key in enumerate(dictHeatMap.keys()):
-          dictHeatMap[key]["heat"] = json.loads(record[2])[index]
+      if misInfoText is not None and not force:
+        for index, heatFactor in enumerate(dictHeatMap.keys()):
+          if dictHeatMap[heatFactor]["heat"] is None:
+            dictHeatMap[heatFactor]["heat"]  = json.loads(misInfoText)[index]
+          else:
+            dictHeatMap[heatFactor]["heat"] += json.loads(misInfoText)[index]
+    
+    # and finally, we average this heat. 
+    # TODO: Maybe modal is more useful, we don't know yet
+    for heatFactor in enumerate(dictHeatMap.keys()):
+      dictHeatMap[heatFactor]["heat"] = dictHeatMap[heatFactor]["heat"] / len(records)
       
     genMisinfoDicts = genMisinfoBarGraph(mergedText, graphTitle, dictHeatMap, wordCloudDict, graphs, showPicture, dryRun)
-    # ddebug(genMisinfoDicts)
+    info(genMisinfoDicts, 4, progress)
     # {'heatMaps': [ [0.7, 0.4, 0.4, 2.9] ], 'Xlabels': .. }
     
   else:
@@ -1008,21 +1066,25 @@ def genMisInformation(records, mergeRecords, graphTitle, graphs, showPicture=Fal
     Ylabels = []
     dictHeatMaps = []
     for record in records:
-      Ylabels.append(parser.parse(record[0]).strftime("%H:%M"))
-      textArray.append(record[1])
+      start = record[0]
+      text = record[1]
+      misInfoText = record[2]
+      Ylabels.append(parser.parse(start).strftime("%H:%M"))
+      textArray.append(text)
 
-      # shortcut: pre-load retrieved misInfo values into "heat" when they exist. 
+      # shortcut: pre-load retrieved misInfoText values into "heat" when they exist. 
       # dictHeatMapBlank.keys() are assumed to be in same order as the misInfo list items
       # BUG: We also assume all chunks of a processed segment have been processed and no item in misInfo is=None
-      if record[2] is not None and not force:
-        for index, key in enumerate(dictHeatMap.keys()):
-          dictHeatMap[key]["heat"] = json.loads(record[2])[index]
+      if misInfoText is not None and not force:
+        for index, heatFactor in enumerate(dictHeatMap.keys()):
+          dictHeatMap[heatFactor]["heat"] = json.loads(misInfoText)[index]
           
       # we need a deepcopy of dictHeatMap or they will all be pointing to the same one
       dictHeatMaps.append(copy.deepcopy(dictHeatMap))
 
     
     genMisinfoDicts = genMisinfoHeatMap(textArray, Ylabels, graphTitle, dictHeatMaps, wordCloudDict, showPicture, dryRun)
+    info(genMisinfoDicts, 4, progress)
     # ddebug(genMisinfoDicts)
     # {
     # 'heatMaps': [
@@ -1087,7 +1149,11 @@ def genMisinfoHeatMap(textArray, Ylabels, graphTitle, dictHeatMaps, wordCloudDic
   with Progress() as progress:
     task = progress.add_task("BSoMeter running ...", total=len(textArray))
     for index, text in enumerate(textArray):
-      textWordsLen = len(text.split())
+      textWordsLen = len(text.strip().split())
+      if len(text) < minChunkSize:
+        warning("%s[%s]: chunkSize %s < %s minChunkSize at %s:" %(graphTitle, index, len(text), minChunkSize, Ylabels[index]), 0, progress)
+        if verbose > 2: warning(dictHeatMaps[index], 0, progress)
+        if verbose > 3: warning(textArray[index], 0, progress)
       
       # build the lists of heat words
       for heatFactor in Xlabels:
@@ -1098,13 +1164,20 @@ def genMisinfoHeatMap(textArray, Ylabels, graphTitle, dictHeatMaps, wordCloudDic
             dictHeatMaps[index][heatFactor]["heatCount"] += sum(1 for _ in re.finditer(r'\b%s\b' % re.escape(word), text))
             
           dictHeatMaps[index][heatFactor]["heat"] = round( 100 * dictHeatMaps[index][heatFactor]["heatCount"] / textWordsLen , 1 )
-          info("%s heatCount %s" %( heatFactor, dictHeatMaps[index][heatFactor]["heatCount"] ), 2, progress)
-          info("%s heat      %s" %( heatFactor, dictHeatMaps[index][heatFactor]["heat"] ), 2, progress)
+          info("%s[%s]: %s heatCount %s" %( graphTitle, index, heatFactor, dictHeatMaps[index][heatFactor]["heatCount"] ), 2, progress)
+          info("%s[%s]: %s heat      %s" %( graphTitle, index, heatFactor, dictHeatMaps[index][heatFactor]["heat"] ), 2, progress)
         
       
       Y = []
+      Ytotal = 0.0
       for dictFactor in dictHeatMaps[index].values():
         Y.append(dictFactor["heat"])
+        Ytotal += dictFactor["heat"]
+      if Ytotal == 0.0:
+        warning("%s[%s]: heatFactors are null at %s" %(graphTitle, index, Ylabels[index]), 0, progress)
+        if verbose > 2: warning(dictHeatMaps[index], 0, progress)
+        if verbose > 3: warning(textArray[index], 0, progress)
+        
       heatMaps.append(Y)
       progress.advance(task)
       
@@ -1138,11 +1211,11 @@ def readInputFolder(inputFolder):
 
 def readInputFile(inputTextFile):
   if os.path.isfile(inputTextFile):
-    if (os.path.getsize(inputFile) > 0):
+    if (os.path.getsize(inputTextFile) > 0):
       info("inputTextFile %s passed" % (inputTextFile), 1)
       return [inputTextFile]
     else:
-      info("%s is empty" % (inputFile), 1)
+      info("%s is empty" % (inputTextFile), 1)
   else:
     error("%s not found" % (inputTextFile))
   #
@@ -1342,7 +1415,7 @@ def graph_heatMap(arrays, Xlabels, Ylabels, graphTitle="", fileName="", showPict
       BSoMeter = round((uncertainty - sourcing) / uncertainty, 2)
       if BSoMeter >= BSoMeterTrigger:
         edgecolor = 'orange'
-        if BSoMeter >= BSoMeterTrigger2: edgecolor = 'crimson'
+        if BSoMeter >  BSoMeterLevel2: edgecolor = 'crimson'
         ax.add_patch(Rectangle((x, y), Xwidth, Yheight, fill=False, edgecolor=edgecolor, lw=4, clip_on=False))
 
       # we want RED   when sourcing is low and uncertainty is low        : missing sources
@@ -1599,18 +1672,21 @@ def genPlayButton(startTime, stopTime, fileStem, misInfoText, misInfoLabels, cla
   BSoMeterTriggerClass = ''
   if misInfoText:
     misInfo = json.loads(misInfoText)
+    info(misInfoText, 3, progress)
     misInfoHtmlTemplate = '<ul class="alignLeft">'
     for index, label in enumerate(misInfoLabels):
       misInfoHtmlTemplate += '<li>%s: %s</li>' %(label, misInfo[index])
       
-    BSoMeter = round((misInfo[3] - misInfo[2]) / misInfo[3], 2)
+    BSoMeter = 0.0
+    if misInfo[3] > 0.0:
+      BSoMeter = round((misInfo[3] - misInfo[2]) / misInfo[3], 2)
     misInfoHtmlTemplate += '<li class="BSoMeter ${BSoMeterTriggerClass}">%s: %s</li>' %('BSoMeter', BSoMeter)
     misInfoHtmlTemplate += '</ul>'
     if BSoMeter >= BSoMeterTrigger:
       info("%s BSoMeter: %s >= %s" %(fileStem, BSoMeter, BSoMeterTrigger), 3, progress)
       BSoMeterTriggerClass = 'BSoMeterTrigger'
-      if BSoMeter >= BSoMeterTrigger:    colorClass = 'roundRed'
-      if BSoMeter >= BSoMeterTrigger2:   colorClass = 'roundCrimson'
+      colorClass = 'roundRed'
+      if BSoMeter >  BSoMeterLevel2: colorClass = 'roundCrimson'
   
   misInfoHtml = string.Template(misInfoHtmlTemplate).substitute(dict(BSoMeterTriggerClass=BSoMeterTriggerClass))
   
@@ -1908,15 +1984,24 @@ def buildGetTextDict(gettext, gettextDict=gettextDict):
 
 def error(message, RC=1, progress=""):
   stack = ''
+  errorPattern = "error  : %-30s[red]%s%s [/]"
   for i in reversed(range(1, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
-  print    ("error  : %-30s[red]%s%s [/]" %(stack, " ", message), file=sys.stderr)
+  if progress:
+    progress.console.print(errorPattern %(stack, " ", message))
+  else:
+    print (errorPattern %(stack, " ", message), file=sys.stderr)
   if RC: exit(RC)
 #
 
 def warning(message, RC=0, progress=""):
   stack = ''
+  warningPattern = "warning: %-30s[yellow]%s%s [/]"
   for i in reversed(range(1, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
-  print ("warning: %-30s[yellow]%s%s [/]" %(stack, " ", message), file=sys.stderr)
+  if progress:
+    progress.console.print(warningPattern %(stack, " ", message))
+  else:
+    print (warningPattern %(stack, " ", message), file=sys.stderr)
+  if RC: exit(RC)
 #
 
 def info(message, verbosity=0, progress=""):
@@ -2245,7 +2330,7 @@ if importChunks:
     
     # finally we will also print a summary:
     info("python KJZZ-db.py -q title", 2)
-    if verbose >1: sqlQuery = sqlCountsByTitle
+    if verbose >2: sqlQuery = sqlCountsByTitle
   else:
     error('No files found to import', 7)
 # importChunks
