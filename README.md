@@ -1,4 +1,4 @@
-# BiasBuster - WIP 0.9.10
+# BiasBuster - WIP 0.9.11
 
 A set of tools which ultimate goal is to analyze biases in English. 
 Currently only handles KJZZ's radio broadcast. 
@@ -20,7 +20,7 @@ and a Python script to output visual statistics and html schedules to present al
 
 The transcription is done on GPU and produces text files and captions in various formats.
 They are then crunched by a python script that fills a database, and outputs html files and word clouds, etc.
-PNG files are compressed by pngquant to saqve space.
+PNG files are compressed by pngquant to save space.
 
 This project comes in 2 parts: 
 - A bash script that runs every 30mn to download mp3 chunks of, well, 30mn each
@@ -32,7 +32,7 @@ The Windows part could run on Linux as well, whisper also can use CPU (slower), 
 
 ![week46 example](assets/week46%20example.png)
 
-These schedules are hosted temporaruily here: https://www.it-cooking.com/kjzz/48/index.html
+These schedules are hosted temporarily here: https://www.it-cooking.com/kjzz/48/index.html
 
 
 # Under the hood
@@ -276,7 +276,7 @@ _Day_ is redundant since we have the date, but makes the chunk name and database
 `python KJZZ-db.py --import --folder kjzz\\42`
 
 Will import every text file in the folder "kjzz\42" (week 42).
---import will always avoid chunks already present in the database.
+--import will always avoid chunks already present in the database unless you add --force.
 
 ```
   db_init: 314 chunks found in kjzz.db
@@ -289,8 +289,6 @@ Will import every text file in the folder "kjzz\42" (week 42).
 Loading... ---------------------------------------- 100% 0:00:00
   db_load: done loading 53/146 files
 ```
-If you need a --force option to overwrite existing chunks, please file a PR.
-
 
 ## Query database
 `-q, --query` *title first last last10 byDay byTitle chunkLast10*
@@ -455,7 +453,7 @@ wordCloud generated: Notice how it makes no sense as onlt the stop words are hig
 ### Generate a cloud a an episode of "Freakonomics" on week 42 with smaller max font size
 `python KJZZ-db.py -g week=42+title="Freakonomics" --wordCloud --show --max_words=1000 --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt`
 
-Notice how more smaller words are stacked and make the cloud illegigle:
+Notice how more smaller words are stacked and make the cloud illegible:
 
 ![KJZZ week=42 title=Freakonomics words=8523 maxw=1000 minf=4 maxf=200 scale=1 relscale=auto](assets/KJZZ%20week=42%20title=Freakonomics%20words=8523%20maxw=1000%20minf=4%20maxf=200%20scale=1%20relscale=auto.png)
 
@@ -602,6 +600,9 @@ Scope creep ahead...
     - [ ] player handles playlist?
     - [ ] segments have only 1 play button that loads a playlist? how about the texts?
   - [ ] python
+    - [x] now passing actual start stop times + chunkName in records
+    - [x] created class TimeDict
+    - [x] merged getText() and getChunkNames() into getChunks()
     - [ ] change gettext time= to start=|stop= instead, so we can generate same segments as by week+title+Day
     - [ ] rename title to segment or show? they seem to call their programmings "shows"
     - [ ] color segments by bias/misInformation/etc
@@ -612,6 +613,8 @@ Scope creep ahead...
     - [ ] should the case matter for title?
     - [ ] add bias_score.py from https://github.com/auroracramer/language-model-bias
   - [ ] misc
+    - [ ] BUG: 0 bytes mp3 will crash the batch completely
+    - [ ] BUG: streams sometimes interrupt for reasons. Must find a way to restart the download
     - [ ] integrate AI summarization with **h2ogpt** or **text-generation-webui**, and Summarization model such as *impira_layoutlm-document-qa*
     - [ ] use AI to detect and build ads stopWords
     - [ ] integrate (re)generate misInformation heatMap(s)

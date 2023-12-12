@@ -1,7 +1,7 @@
 # BiasBuster
 # author:  AudioscavengeR
 # license: GPLv2
-# version: 0.9.10 WIP
+# version: 0.9.11 WIP
 
 # BUG: jpeg produced by plt.savefig have a wide border
 
@@ -106,7 +106,7 @@ from rich.progress import track, Progress
 
 # # example of progress bar:
 # with Progress() as progress:
-  # task = progress.add_task("twiddling thumbs...", total=10)
+  # task = progress.add_task("twiddling thumbs", total=10)
   # inputFiles = [1,2,3,4,5,6,7,8,9,0]
   # for inputFile in inputFiles:
     # progress.console.print(f"Working on job #{inputFile}")
@@ -151,6 +151,7 @@ listLevel = []
 silent = False
 autoGenerate = False
 dryRun = False
+noPics = False
 missingPic = "../missingPic.png"
 missingCloud = "../missingCloud.png"
 voidPic = "../1x1.png"
@@ -346,6 +347,20 @@ sqlCountsByWord = """ SELECT title, Day, count(start)
 # https://github.com/amueller/word_cloud/blob/main/examples/simple.py
 
 
+class TimeDict:
+  def __init__(self, dateTime):
+  # dateTime = YYYY-MM-DD HH:MM:SS.SSS
+    self.dateTime = dateTime
+    self.split = re.split(r"[ -]", dateTime) # ['2023', '10', '09', 'HH:MM:SS.SSS']
+    self.week = datetime.date(int(self.split[0]),int(self.split[1]),int(self.split[2])).isocalendar().week
+    self.YYYYMMDD = dateTime[:10]
+    self.Day = datetime.date(int(self.split[0]),int(self.split[1]),int(self.split[2])).strftime('%a')
+    self.time = self.split[3]
+    self.HHMM = self.split[3][:5]
+    
+# class TimeDict
+
+
 class Chunk:
   def __init__(self, inputFile, model=model, loadText=True, progress=""):
     self.inputFile = Path(inputFile)
@@ -361,8 +376,10 @@ class Chunk:
     self.YYYYMMDD = '-'.join([self.split[1],self.split[2],self.split[3]])
     self.Day = self.split[4]
     # we want YYYY-MM-DD HH:MM:SS.SSS
+    self.startHHMM = ':'.join([self.split[5][:2],self.split[5][2:]])
     self.startTime = ':'.join([self.split[5][:2],self.split[5][2:]]) + ":00.000"
     self.start = ' '.join([self.YYYYMMDD, self.startTime])
+    self.stopHHMM = ':'.join([self.split[6][:2],self.split[6][2:]])
     self.stopTime = ':'.join([self.split[6][:2],self.split[6][2:]]) + ":00.000"
     self.stop = ' '.join([self.YYYYMMDD, self.stopTime])
     self.title = self.split[-1]
@@ -381,7 +398,7 @@ class Chunk:
           # ddebug(self.text)
     else:
       raise ValueError("Chunk: file not found: %s" % (self.inputFile))
-#
+# class Chunk
 
 
 # TODO: update table for missing columns when this script is updated
@@ -499,7 +516,7 @@ def db_load(inputFiles, localSqlDb, conn, model, commit, progress=""):
   # sqlLoad = """ BEGIN; """
   
   with Progress() as progress:
-    task = progress.add_task("Loading inputFiles...", total=len(inputFiles))
+    task = progress.add_task("Loading inputFiles", total=len(inputFiles))
     # KJZZ_2023-10-08_Sun_2300-2330_BBC World Service.text
     for inputFile in inputFiles:
       info('Chunk init:     "%s"' % (inputFile), 3, progress)
@@ -621,30 +638,8 @@ def replaceNum2Days(record):
 #
 
 
-def getText(gettextDict, progress=""):
-  # gettextDict = {'week': '40', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
-  sqlGettext = "SELECT start, text, misInfo from schedule where 1=1"
-  
-  # build the actual query
-  for key in gettextDict.keys():
-    # build the SQL query:
-    sqlGettext += (" and %s='%s'" % (key, gettextDict[key]))
-    
-    # reformat start time for the fileName: chunk has been build if the key is "chunk"
-    if key == "start":
-      gettextDict[key] = parser.parse(gettextDict[key]).strftime("%Y-%m-%d %H:%M")
-    
-  info("sqlGettext: %s" %(sqlGettext), 3, progress)
-  
-  records = cursor(localSqlDb, conn, sqlGettext)
-  if len(records) == 0:
-    info("0 records for %s" %(gettextDict), 2, progress)
-  
-  return records
-# gettext
-
-
 def checkChunk(getTextDict, progress=""):
+  # gettextDict = {'start': '%Y-%m-%d %H:%M'}
   # gettextDict = {'week': '40', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
   sqlGettext = "SELECT count(*) from schedule where 1=1"
   
@@ -670,32 +665,42 @@ def checkChunk(getTextDict, progress=""):
 
 # the db has:   start stop week day title text model misInfo
 # and we want:  start stop KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title misInfo
-def getChunkNames(getTextDict, progress=""):
+def getChunks(getTextDict, withText=False, progress=""):
+  # gettextDict = {'start': '%Y-%m-%d %H:%M'}
   # gettextDict = {'week': '40', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
+  
+  selectText = ''
+  if withText: selectText = ', text'
 
+  textConditions = ''
+  for column, value in gettextDict.items():
+    textConditions += " and %s='%s'" %(column, value)
+  
+          # strftime('%%H:%%M',start)
+        # , strftime('%%H:%%M',stop)
+  # let's return actual times instead, it's more useful
   sqlListChunks = """ SELECT 
-          strftime('%%H:%%M',start)
-        , strftime('%%H:%%M',stop)
+          start
+        , stop
         , 'KJZZ_' || strftime('%%Y-%%m-%%d_',start) || Day || strftime('_%%H%%M-',start) || strftime('%%H%%M_',stop) || title
         , misInfo
+        %s
           from schedule 
           where 1=1
-          and week = %s
-          and Day = '%s'
-          and title = '%s'
-          ORDER BY start ASC
-          """ %(gettextDict['week'], gettextDict['Day'], gettextDict['title'])
+          %s
+          ORDER BY start ASC;
+          """ %(selectText, textConditions)
   
-  info("sqlListChunks: %s" %(sqlListChunks), 3, progress)
+  info("sqlListChunks: %s" %(sqlListChunks), 4, progress)
   
   records = cursor(localSqlDb, conn, sqlListChunks)
   if len(records) == 0:
-    info("0 records for %s" %(gettextDict), 4, progress)
+    info("0 records for %s" %(gettextDict), 3, progress)
   
   return records
   # records = [
-    # ('01:00', '01:30', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]'),
-    # ('01:30', '02:00', 'KJZZ_2023-10-14_Sat_0130-0200_BBC World Service', '[0.6, 0.4, 0.5, 2.5]'),
+    # ('2023-10-14 01:00.000', '2023-10-14 01:30.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]'),
+    # ('2023-10-14 01:30.000', '2023-10-14 02:00.000', 'KJZZ_2023-10-14_Sat_0130-0200_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...'),
     # ...
 # gettext
 
@@ -721,7 +726,7 @@ def printOutGetText(records, mergeRecords, pretty, dryRun):
 def genWordClouds(records, wordCloudTitle, mergeRecords, showPicture, wordCloudDict, outputFolder=outputFolder, dryRun=False, progress=""):
   # gettext = "week=43+title=Classic Jazz with Chazz Rayburn+Day=Mon"
   # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
-  # records = [(start, text, misInfo), ..]
+  # records = (('2023-10-14 01:00.000', '2023-10-14 01:30.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...'),..)
   # wordCloudTitle = "KJZZ week=43 title=BBC World Service Day=Sat"
   
   if len(records) == 0: return []
@@ -729,14 +734,14 @@ def genWordClouds(records, wordCloudTitle, mergeRecords, showPicture, wordCloudD
   mergedText = ''
   
   if mergeRecords:
-    for record in records: mergedText += record[1]
+    for record in records: mergedText += record[4]
     genWordCloudDicts.append(genWordCloud(mergedText, wordCloudTitle, removeStopwords, stopLevel, wordCloudDict, showPicture, outputFolder, dryRun, progress))
   else:
     i = 1
     for record in records:
       info("wordCloud: image %s" % (i), 1, progress)
       info("wordCloud: record = \n %s" %(record), 2, progress)
-      genWordCloudDicts += genWordCloud(record[1], wordCloudTitle, removeStopwords, stopLevel, wordCloudDict, showPicture, outputFolder, dryRun, progress)
+      genWordCloudDicts += genWordCloud(record[4], wordCloudTitle, removeStopwords, stopLevel, wordCloudDict, showPicture, outputFolder, dryRun, progress)
     i += 1
 
   return genWordCloudDicts
@@ -762,21 +767,21 @@ def genWordCloud(text, wordCloudTitle, removeStopwords=True, level=0, wordCloudD
   # print(STOPWORDS)
 
   genWordCloudDict = {
-    "text": text, 
-    "wordCloudTitle": wordCloudTitle, 
-    "removeStopwords": removeStopwords, 
-    "level": level, 
-    "wordCloudDict": wordCloudDict, 
-    "stopWords": [], 
-    "wordsList": [], 
-    "numWords": 0, 
-    "wordCloudTitle": "", 
-    "fileName": "", 
-    "outputFile": "", 
     "cleanWordsList": [], 
+    "fileName": "", 
+    "level": level, 
+    "numWords": 0, 
+    "outputFile": "", 
+    "removeStopwords": removeStopwords, 
+    "stopWords": [], 
+    "text": text, 
     "top100tuples": [], 
+    "wordCloudDict": wordCloudDict, 
+    "wordCloudTitle": "", 
+    "wordCloudTitle": wordCloudTitle, 
+    "wordsList": [], 
   }
-  
+
   # https://github.com/amueller/word_cloud/blob/main/examples/simple.py
   # we start by removing words from the wordCloudTitle of the show itself
   # for a typical week schedule, normally wordCloudTitle would be == "KJZZ week= title= Day="
@@ -796,7 +801,7 @@ def genWordCloud(text, wordCloudTitle, removeStopwords=True, level=0, wordCloudD
   genWordCloudDict["outputFileName"] = ""
   genWordCloudDict["outputFile"] = ""
   if dryRun: return genWordCloudDict
-  
+
   if removeStopwords:
     stopwordsDict = loadStopWordsDict()
     
@@ -927,9 +932,8 @@ def genWordCloud(text, wordCloudTitle, removeStopwords=True, level=0, wordCloudD
   # image = wordcloud.to_image()
   # image.show()
   
-  fileName = genWordCloudDict["fileName"]
   # always save BEFORE show
-  if fileName: genWordCloudDict["outputFile"] = saveImage(outputFolder, genWordCloudDict["fileName"], plt, usePngquant, progress)
+  if genWordCloudDict["fileName"]: genWordCloudDict["outputFile"] = saveImage(outputFolder, genWordCloudDict["fileName"], plt, usePngquant, progress)
   if genWordCloudDict["outputFile"]:
     genWordCloudDict["outputFileName"] = os.path.basename(genWordCloudDict["outputFile"])
     genWordCloudDict["outputThumbnailFile"] = saveThumbnail(genWordCloudDict["outputFile"], outputFolder, "thumbnail-" + genWordCloudDict["outputFileName"], usePngquant)
@@ -1027,7 +1031,7 @@ def loadDictHeatMap(dictHeatMap, withSynonyms=withSynonyms):
 def genMisInformation(records, mergeRecords, graphTitle, graphs, showPicture=False, dryRun=False):
   # gettext = "week=43+title=Classic Jazz with Chazz Rayburn+Day=Mon"
   # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
-  # records = [(start, text, misInfo), ..]
+  # records = [('2023-10-14 01:00.000', '2023-10-14 01:30.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...')..]
   if len(records) == 0: return []
   mergedText = ''
   dictHeatMap = loadDictHeatMap(dictHeatMapBlank, withSynonyms)
@@ -1035,11 +1039,14 @@ def genMisInformation(records, mergeRecords, graphTitle, graphs, showPicture=Fal
                 # "explanatory":{"words":set(),"heatCount":0,"heat":0.0}, 
                 # ..
   
+  # useful for whole segments:
   if mergeRecords:
     for record in records:
-      start = record[0]
-      text = record[1]
-      misInfoText = record[2]
+      # startDict   = TimeDict(record[0])
+      # stopDict    = TimeDict(record[1])
+      # chunkName   = record[2]
+      misInfoText = record[3]
+      text        = record[4]
       mergedText += text
       
       # shortcut: pre-load retrieved misInfo values into "heat" when they exist. 
@@ -1061,16 +1068,18 @@ def genMisInformation(records, mergeRecords, graphTitle, graphs, showPicture=Fal
     info(genMisinfoDicts, 4, progress)
     # {'heatMaps': [ [0.7, 0.4, 0.4, 2.9] ], 'Xlabels': .. }
     
+  # useful for chunks or db_update:
   else:
-    textArray = []
-    Ylabels = []
+    # let's pass the records directly, this way genMisinfoHeatMap has an opportunity to get chunk names as well
+    # textArray = []
+    # Ylabels = []
     dictHeatMaps = []
     for record in records:
-      start = record[0]
-      text = record[1]
-      misInfoText = record[2]
-      Ylabels.append(parser.parse(start).strftime("%H:%M"))
-      textArray.append(text)
+      # startDict   = TimeDict(record[0])
+      # stopDict    = TimeDict(record[1])
+      # chunkName   = record[2]
+      misInfoText = record[3]
+      # text        = record[4]
 
       # shortcut: pre-load retrieved misInfoText values into "heat" when they exist. 
       # dictHeatMapBlank.keys() are assumed to be in same order as the misInfo list items
@@ -1082,8 +1091,8 @@ def genMisInformation(records, mergeRecords, graphTitle, graphs, showPicture=Fal
       # we need a deepcopy of dictHeatMap or they will all be pointing to the same one
       dictHeatMaps.append(copy.deepcopy(dictHeatMap))
 
-    
-    genMisinfoDicts = genMisinfoHeatMap(textArray, Ylabels, graphTitle, dictHeatMaps, wordCloudDict, showPicture, dryRun)
+    # genMisinfoDicts = genMisinfoHeatMap(textArray, Ylabels, graphTitle, dictHeatMaps, wordCloudDict, showPicture, dryRun)
+    genMisinfoDicts = genMisinfoHeatMap(records, graphTitle, dictHeatMaps, wordCloudDict, showPicture, dryRun)
     info(genMisinfoDicts, 4, progress)
     # ddebug(genMisinfoDicts)
     # {
@@ -1108,7 +1117,7 @@ def genMisInformation(records, mergeRecords, graphTitle, graphs, showPicture=Fal
 
 def genMisinfoBarGraph(text, graphTitle, dictHeatMap, wordCloudDict=wordCloudDict, graphs=defaultGraphs, showPicture=False, dryRun=False, progress=""):
   info("%s" %(graphTitle), 2)
-  textWordsLen = len(text.split())
+  textWordsLen = len(text.strip().split())
   if len(graphs) == 0: graphs=defaultGraphs
 
   # load the sets of heat words
@@ -1140,33 +1149,49 @@ def genMisinfoBarGraph(text, graphTitle, dictHeatMap, wordCloudDict=wordCloudDic
 
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
-def genMisinfoHeatMap(textArray, Ylabels, graphTitle, dictHeatMaps, wordCloudDict=wordCloudDict, showPicture=False, dryRun=False, progress=""):
+# def genMisinfoHeatMap(textArray, Ylabels, graphTitle, dictHeatMaps, wordCloudDict=wordCloudDict, showPicture=False, dryRun=False, progress=""):
+def genMisinfoHeatMap(records, graphTitle, dictHeatMaps, wordCloudDict=wordCloudDict, showPicture=False, dryRun=False, progress=""):
+  # records = [('2023-10-14 01:00:00.000', '2023-10-14 01:30:00.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...'),..]
   
   info("%s showPicture=%s dryRun=%s" %(graphTitle, showPicture, dryRun), 1, progress)
   heatMaps = []
-  Xlabels = list(dictHeatMaps[0].keys())  # just grab the lables from the first one
+  Xlabels = list(dictHeatMaps[0].keys())  # just grab the heatFactor labels from the first one
+  Ylabels = []
 
   with Progress() as progress:
-    task = progress.add_task("BSoMeter running ...", total=len(textArray))
-    for index, text in enumerate(textArray):
-      textWordsLen = len(text.strip().split())
-      if len(text) < minChunkSize:
-        warning("%s[%s]: chunkSize %s < %s minChunkSize at %s:" %(graphTitle, index, len(text), minChunkSize, Ylabels[index]), 0, progress)
-        if verbose > 2: warning(dictHeatMaps[index], 0, progress)
-        if verbose > 3: warning(textArray[index], 0, progress)
+    task = progress.add_task("BSoMeter running", total=len(records))
+    for index, record in enumerate(records):
+      startDict   = TimeDict(record[0])
+      # stopDict    = TimeDict(record[1])
+      chunkName   = record[2]
+      misInfoText = record[3]
+      Ylabels.append(startDict.HHMM)
+      text = record[4]
       
-      # build the lists of heat words
-      for heatFactor in Xlabels:
-        if dictHeatMaps[index][heatFactor]["heat"] is None or force:
+      if misInfoText is None or force:
+        textWordsLen = len(text.strip().split())
+        if len(text) < minChunkSize:
+          # warning("%s[%s]: chunkSize %s < %s minChunkSize at %s:" %(graphTitle, index, len(text), minChunkSize, Ylabels[index]), 0, progress)
+          warning('%s[%s] chunkSize %s < %s minChunkSize "%s"' %(graphTitle, index, len(text), minChunkSize, chunkName), 0, progress)
+          if verbose > 2: warning(dictHeatMaps[index], 0, progress)
+          if verbose > 3: warning(text, 0, progress)
+        
+        # build the lists of heat words
+        for heatFactor in Xlabels:
           # count occurences in the text
           for word in dictHeatMaps[index][heatFactor]["words"]:
             # print("  "+word)
             dictHeatMaps[index][heatFactor]["heatCount"] += sum(1 for _ in re.finditer(r'\b%s\b' % re.escape(word), text))
             
           dictHeatMaps[index][heatFactor]["heat"] = round( 100 * dictHeatMaps[index][heatFactor]["heatCount"] / textWordsLen , 1 )
-          info("%s[%s]: %s heatCount %s" %( graphTitle, index, heatFactor, dictHeatMaps[index][heatFactor]["heatCount"] ), 2, progress)
-          info("%s[%s]: %s heat      %s" %( graphTitle, index, heatFactor, dictHeatMaps[index][heatFactor]["heat"] ), 2, progress)
-        
+          info('%s[%s] processd: %11s heatCount %3s "%s"' %( graphTitle, index, heatFactor, dictHeatMaps[index][heatFactor]["heatCount"], chunkName), 3, progress)
+          info('%s[%s] processd: %11s heat      %3s "%s"' %( graphTitle, index, heatFactor, dictHeatMaps[index][heatFactor]["heat"], chunkName), 3, progress)
+      else:
+        misInfo = json.loads(misInfoText)
+        for num, heatFactor in enumerate(Xlabels):
+          dictHeatMaps[index][heatFactor]["heat"] = misInfo[num]
+          info('%s[%s] database: %11s heat      %3s "%s"' %( graphTitle, index, heatFactor, dictHeatMaps[index][heatFactor]["heat"], chunkName), 3, progress)
+          
       
       Y = []
       Ytotal = 0.0
@@ -1174,9 +1199,10 @@ def genMisinfoHeatMap(textArray, Ylabels, graphTitle, dictHeatMaps, wordCloudDic
         Y.append(dictFactor["heat"])
         Ytotal += dictFactor["heat"]
       if Ytotal == 0.0:
-        warning("%s[%s]: heatFactors are null at %s" %(graphTitle, index, Ylabels[index]), 0, progress)
+        # warning("%s[%s]: heatFactors are null at %s" %(graphTitle, index, Ylabels[index]), 0, progress)
+        warning('%s[%s] heatFactors are null for "%s"' %(graphTitle, index, chunkName), 0, progress)
         if verbose > 2: warning(dictHeatMaps[index], 0, progress)
-        if verbose > 3: warning(textArray[index], 0, progress)
+        if verbose > 3: warning(text, 0, progress)
         
       heatMaps.append(Y)
       progress.advance(task)
@@ -1506,17 +1532,17 @@ def saveThumbnail(inputFile, outputFolder, thumbnailFileName, usePngquant=usePng
         # 'Sun': 'BBC World Service'
     # },
     # '01:00': {
-def getNextKey(timeList, key):
-  if key+1 < len(timeList):
-    # print("len=%s timelist[%s] = %s" %(len(timeList), key, timeList[key]))
-    return timeList[key+1]
+def getNextKey(HHMMList, key):
+  if key+1 < len(HHMMList):
+    # print("len=%s HHMMList[%s] = %s" %(len(HHMMList), key, HHMMList[key]))
+    return HHMMList[key+1]
   else:
     return None
 
-def getPrevKey(timeList, key):
+def getPrevKey(HHMMList, key):
   if key > 0:
-    # print("len=%s timelist[%s] = %s" %(len(timeList), key, timeList[key]))
-    return timeList[key-1]
+    # print("len=%s HHMMList[%s] = %s" %(len(HHMMList), key, HHMMList[key]))
+    return HHMMList[key-1]
   else:
     return None
 
@@ -1527,7 +1553,7 @@ def rebuildThumbnails(inputFolder, outputFolder, dryRun=False, progress=""):
   # print(pngList)
 
   with Progress() as progress:
-    task = progress.add_task("Thumbnail gen ...", total=len(pngList))
+    task = progress.add_task("Thumbnail gen", total=len(pngList))
     for png in pngList:
       outputThumbnailFile = saveThumbnail(png, outputFolder, "thumbnail-" + os.path.basename(png), usePngquant)
       progress.advance(task)
@@ -1766,9 +1792,9 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   html += '<tbody>\n'
   
   rowspanDict       = {}
-  timeList          = list(jsonSchedule.keys())
-  reversedTimeList  = list(reversed(timeList))
-  DayList           = list(jsonSchedule[reversedTimeList[0]].keys())
+  HHMMList          = list(jsonSchedule.keys())
+  reversedHHMMList  = list(reversed(HHMMList))
+  DayList           = list(jsonSchedule[reversedHHMMList[0]].keys())
   rowspan           = {}
   if byChunk:
     outputFileName = "index-byChunk.html"
@@ -1779,7 +1805,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   for Day in DayList: rowspan[Day] = 1
   
   with Progress() as progress:
-    task = progress.add_task("Building %s ..." %(outputFileName), total=len(reversedTimeList)*len(DayList))
+    task = progress.add_task("Building %s ..." %(outputFileName), total=len(reversedHHMMList)*len(DayList))
     
     # We reverse because that's the only way to increase the rowspan of the first occurance of the same title.
     # Also we read each startTime and may end up regenerating the same wordClouds, 
@@ -1787,7 +1813,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
     # Maybe we should work with startTime and stopTime instead? but how?
     # Also we still cannot process multiple segments of same title on the same day.
     # Also some segments can start at the last hour of Sat and pursue next day. We cannot treat those cases yet.
-    for key, startTime in enumerate(reversedTimeList):
+    for key, startTime in enumerate(reversedHHMMList):
       rowspanDict[startTime] = {}
       for Day in DayList:
         # title should be renamed "segment", really.
@@ -1804,9 +1830,9 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
         gettext = "week=%s+title=%s+Day=%s" %(weekNumber, title, Day)
         getTextDict = buildGetTextDict(gettext)
 
-        # without +1, jsonSchedule[reversedTimeList[key+1]] will error out with IndexError: list index out of range
+        # without +1, jsonSchedule[reversedHHMMList[key+1]] will error out with IndexError: list index out of range
         # with +1,    we will not process the last startTime == 23:00
-        # solution:   create a dumb function for if key+1 < len(reversedTimeList) == getNextKey
+        # solution:   create a dumb function for if key+1 < len(reversedHHMMList) == getNextKey
         
         # notByChunk:
         if not byChunk:
@@ -1818,20 +1844,21 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
           # 1. Is it in the list we build at the beginning?
           thatWordCloudPngList = list(filter(regexp.match, pngList))
           # 2. Was it generated at some point?
-          #    Remember, we process every startTime in reversedTimeList, so we may have already generated it
+          #    Remember, we process every startTime in reversedHHMMList, so we may have already generated it
           if len(thatWordCloudPngList) == 0:
             thisPngPath = '%s/KJZZ week=%s title=%s Day=%s*.png' %(os.path.join(outputFolder, str(weekNumber)), weekNumber, title, Day)
             thatWordCloudPngList = glob.glob(thisPngPath, recursive=False)
 
           # now we are certain that we need to generate the wordCloud
-          # Note: there is a bug when using force: since we process by timeList, we may regenerate same segments multiple times
+          # Note: there is a bug when using force: since we process by HHMMList, we may regenerate same segments multiple times
           if len(thatWordCloudPngList) == 0 or force:
             # setup an empty src for an img is indeed an error we will get the missingCloud.png for:
             thatWordCloudPngList = []
             
             # we will not bother looking for excluded programs such as Jazz Blues etc:
             if not any(word in title for word in listTitleWords2Exclude):
-              records = getText(getTextDict, progress)
+              records = getChunks(getTextDict, True, progress)
+              # records = [('2023-10-14 01:00:00.000', '2023-10-14 01:30:00.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...'),..]
               # each record is a 30mn chunk of a segment
               if len(records) > 0:
                 wordCloudTitle = "KJZZ " + gettext.replace("+", " ")
@@ -1856,34 +1883,35 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
 
           if len(thatWordCloudPngList) > 0:
             segmentImg = genSegmentImg(thatWordCloudPngList[0], classChunkExist)
-            listChunks = getChunkNames(getTextDict, progress)
+            records = getChunks(getTextDict, False, progress)
             # print(getTextDict)
-            # print(listChunks)
-            # listChunks = [
-              # ('01:00', '01:30', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]'),
-              # ('01:30', '02:00', 'KJZZ_2023-10-14_Sat_0130-0200_BBC World Service', '[0.6, 0.4, 0.5, 2.5]'),
-              # ...
+            # print(records)
+            # records = [('2023-10-14 01:00:00.000', '2023-10-14 01:30:00.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]'),..]
 
             # fontawesome incons: https://fontawesome.com/search?m=free&o=r
-            for row in listChunks:
+            for record in records:
               # This is by segment (title), not byChunk: we therefore list all chunks for that segment.
               # Also, no \n between them or it will translate into a white space
-              plays += genPlayButton(row[0], row[1], row[2], row[3], dictHeatMapBlank.keys(), classTooltipPosition, progress)
-              texts += genTextButton(row[2], progress)
+              startDict   = TimeDict(record[0])
+              stopDict    = TimeDict(record[1])
+              chunkName   = record[2]
+              misInfoText = record[3]
+              plays += genPlayButton(startDict.HHMM, stopDict.HHMM, chunkName, misInfoText, dictHeatMapBlank.keys(), classTooltipPosition, progress)
+              texts += genTextButton(chunkName, progress)
 
           rowspanDict[startTime][Day] = genHtmlChunk(rowspan[Day], classChunkExist, title, plays, texts, segmentImg)
 
           # if we are not processing the last time key of the day:
-          if getNextKey(reversedTimeList, key):
+          if getNextKey(reversedHHMMList, key):
             info(startTime, 4, progress)
-            if title == jsonSchedule[getNextKey(reversedTimeList, key)][Day]:
+            if title == jsonSchedule[getNextKey(reversedHHMMList, key)][Day]:
               # create a missing td for the rowspan to happen:
               rowspanDict[startTime][Day] = ''
               rowspan[Day] += 1
-              info("%s +1 %s %s - %s" %(startTime, rowspan[Day], title, jsonSchedule[getNextKey(reversedTimeList, key)][Day]), 4, progress)
+              info("%s +1 %s %s - %s" %(startTime, rowspan[Day], title, jsonSchedule[getNextKey(reversedHHMMList, key)][Day]), 4, progress)
             else:
               rowspan[Day]  = 1
-              info("%s =1 %s %s - %s" %(startTime, rowspan[Day], title, jsonSchedule[getNextKey(reversedTimeList, key)][Day]), 4, progress)
+              info("%s =1 %s %s - %s" %(startTime, rowspan[Day], title, jsonSchedule[getNextKey(reversedHHMMList, key)][Day]), 4, progress)
           
           # if we are processing the last key == 00:00 since we loop in reverse:
           else:
@@ -1892,10 +1920,10 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
         # byChunk:
         else:
           if not any(word in title for word in listTitleWords2Exclude):
-            listChunks = getChunkNames(getTextDict, progress)
+            listChunks = getChunks(getTextDict, False, progress)
             # listChunks = [
               # ('01:00', '01:30', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]'),
-              # ('01:30', '02:00', 'KJZZ_2023-10-14_Sat_0130-0200_BBC World Service', '[0.6, 0.4, 0.5, 2.5]'),
+              # ('01:30', '02:00', 'KJZZ_2023-10-14_Sat_0130-0200_BBC World Service', None),
               # ...
             
             # if checkChunk(getTextDict, progress):
@@ -1903,7 +1931,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
             # print(listChunks)
             for row in listChunks:
               # Our schedule is by the hour but the db is by chunk of 30mn so we have certainly 2 chunks per hour:
-              # And do not forget we process timeList in reverse!
+              # And do not forget we process HHMMList in reverse!
               # There is a simple trick to simplify our lives: just compare the hour
               # Also, no \n between them or it will translate into a white space
               if startTime[:2] == row[0][:2]:
@@ -1917,7 +1945,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
         progress.advance(task)
   
   info(rowspanDict, 4, progress)
-  for startTime in timeList:
+  for startTime in HHMMList:
     # html += '    <tr><td>00:00</td><td>BBC World Service</td><td>Classic Jazz with Chazz Rayburn</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Bryan Houston</td><td>Classic Jazz with Michele Robins</td><td>Classic Jazz with Michele Robins</td><td>BBC World Service</td></tr>'
     info('    <tr><td>%s</td>'           %(startTime), 4, progress)
     html   += '    <tr><td class="startTime">%s</td>'           %(startTime)
@@ -1969,7 +1997,7 @@ def buildGetTextDict(gettext, gettextDict=gettextDict):
     for condition in conditions:
       key = re.split(r"[=]",condition)[0]
       if key in gettextKeys:
-        gettextDict[key] = re.split(r"[=]",condition)[1]
+        gettextDict[key] = re.split(r"[=]", condition)[1]
       else:
         error("%s is invalid in %s" %(key, condition), 0)
         info("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"", 0)
@@ -2369,10 +2397,11 @@ if gettext:
   ################### Process inputStopWordsFiles if any:
   # gettext = "week=43+title=Classic Jazz with Chazz Rayburn+Day=Mon"
   # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
-  # records = [(start, text, misInfo), ..]
   gettextDict = buildGetTextDict(gettext)
   wordCloudTitle = "KJZZ " + gettext.replace("+", " ")
-  records = getText(gettextDict)
+  
+  records = getChunks(gettextDict, True, progress)
+  # records = (('2023-10-14 01:00.000', '2023-10-14 01:30.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...'),..)
   
   if len(records) > 0:
 
@@ -2384,7 +2413,7 @@ if gettext:
       genWordCloudDicts = genWordClouds(records, wordCloudTitle, mergeRecords, showPicture, wordCloudDict, outputFolder, dryRun)
 
     ################## misInformation
-    # then we check if a misInformation misInformation is requested:
+    # then we check if a misInformation is requested:
     elif misInformation:
       genMisinfoDicts = genMisInformation(records, mergeRecords, wordCloudTitle, graphs, showPicture, dryRun)
 
@@ -2404,17 +2433,19 @@ if gettext:
         # ]
       # }
       
-      # do not re-update the db if the vales were present with getText()
-      if not mergeRecords:
-        if records[0][2] is None or force:
-          for index, misInfo in enumerate(genMisinfoDicts["heatMaps"]):
+      # update db if we have results AND not doing mergeRecords
+      if not mergeRecords and genMisinfoDicts["heatMaps"]:
+        # do not re-update the db if the values were present with getChunks()
+        # records = (('2023-10-14 01:00.000', '2023-10-14 01:30.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...'),..)
+        for index, misInfo in enumerate(genMisinfoDicts["heatMaps"]):
+          if records[index][3] is None or force:
             # ddebug( ",".join(map(str, misInfo)))
             # start times are unique, why do we bother with other conditions?
                        # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
             # for key in gettextDict: textConditions += "and %s='%s'" %(key, )+ gettextDict[key]
                                                               # textConditions = "and week='..' and title='..' and Day='..'"
 
-            # start times are unique and it's the first column in records
+            # start times are unique and it's the first column in records, and len(records) == len(genMisinfoDicts["heatMaps"])
             textConditions = "and start='%s'" %(records[index][0])
             # to reload misInfo as an object, simply do json.loads(misInfoText)
             db_update('schedule', 'misInfo', str(misInfo), textConditions, localSqlDb, conn, False)
