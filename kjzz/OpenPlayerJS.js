@@ -1,5 +1,3 @@
-// console.log('start', history.state);
-
 const player = new OpenPlayerJS('player', {
   controls: {
       alwaysVisible: false,
@@ -50,7 +48,6 @@ const player = new OpenPlayerJS('player', {
 });
 player.init();
 
-
 function stem(file) {
   return file.substr(0, file.lastIndexOf('.'));
 }
@@ -58,13 +55,14 @@ function stem(file) {
 // OpenPlayerJS
 // https://github.com/openplayerjs/openplayerjs/blob/master/docs/
 // https://www.npmjs.com/package/openplayerjs
-function play(sound) {
+function playThis(sound) {
   // console.log('captions',captions);
   let id = document.querySelector('.op-player').id;
-  // console.log('id',id);
+  console.debug('parent id',id);
   let player = OpenPlayerJS.instances[id];
-  // console.log('player',player);
+  console.debug('parent player',player);
   let captions = stem(sound) + '.vtt';
+  console.debug('parent captions',captions);
 
   player.src = { src: sound };
   player.addCaptions({ src: captions, kind: "subtitles", srclang: "en", label: "English" });
@@ -93,3 +91,21 @@ function play(sound) {
 }
 
 // console.log('end', history.state);
+
+
+
+window.addEventListener('message', function(event) {
+  console.debug(event)
+  if(event.origin === window.location.origin)
+  {
+    console.debug('parent: Received',event.data.message);
+    let sound = event.data.message
+    playThis(sound);
+  }
+  else
+  {
+    console.debug('parent: event.origin=',window.location.origin,'but caller origin=',event.origin);
+    console.debug('parent: Origin not allowed!');
+  }
+
+}, false);

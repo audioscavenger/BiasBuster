@@ -580,7 +580,11 @@ This project is under [GPL-2.0](https://github.com/audioscavenger/BiasBuster/blo
 # Roadmap
 Scope creep ahead...
 
-- [ ] WIP 0.9.11
+- [ ] WIP
+  - [ ] ui
+  - [ ] python
+  - [ ] db
+- [ ] WIP 0.9.12
   - [ ] db
     - [ ] add statistics table or more columns for each chunk?
     - [ ] how to store statistics for segments rather then chunks?
@@ -589,23 +593,17 @@ Scope creep ahead...
     - [ ] make text icons also a modal
     - [ ] integrate text analysis with keyword search in a modal
     - [ ] fix table header that's transparent when scrolling down
-    - [ ] build an actual front page with Bootstrap or smth
     - [ ] add a modal for statistical analysis of a program
     - [ ] front page: add social media share buttons for that modal
     - [ ] front page: highlight the top 10 BS of the week or smth
     - [ ] integrate front page with cgi or smth so we can ajax-build missing pictures or smth and spare dev of a dynamic page
     - [ ] integrate front page with cgi so we can tap in the database with SQLite worker and spare dev of a dynamic page
     - [ ] also compute a wordCloud per chunk and show it in the tooltip?
-    - [ ] keep player playing while navigating like plex => iframe
     - [ ] player handles playlist?
     - [ ] segments have only 1 play button that loads a playlist? how about the texts?
   - [ ] python
-    - [x] now passing actual start stop times + chunkName in records
-    - [x] created class TimeDict
-    - [x] merged getText() and getChunkNames() into getChunks()
     - [ ] change gettext time= to start=|stop= instead, so we can generate same segments as by week+title+Day
     - [ ] rename title to segment or show? they seem to call their programmings "shows"
-    - [ ] color segments by bias/misInformation/etc
     - [ ] color wordClouds by bias/misInformation/etc
     - [ ] add --saveProfile --listProfiles --listProfiles
     - [ ] add saveProfile() loadProfile() functions
@@ -627,6 +625,16 @@ Scope creep ahead...
     - [ ] automate mp3 downloads from cloud + process + uploads from/to cloud server
   - [ ] future
     - [ ] dynamic page in PHP or nodeJS/typeScript
+- [x] WIP 0.9.11 iframe
+  - [x] ui
+    - [x] keep player playing while navigating like plex => iframe
+    - [x] proper iframe navigation
+    - [x] build an actual front page with Bootstrap or smth
+  - [x] python
+    - [x] now passing actual start stop times + chunkName in records
+    - [x] created class TimeDict
+    - [x] merged getText() and getChunkNames() into getChunks()
+    - [x] color play buttons by bias/misInformation/etc
 - [x] release 0.9.10 data_folder
   - [x] db
     - [x] switch db to PRAGMA temp_store = 2 (MEMORY)

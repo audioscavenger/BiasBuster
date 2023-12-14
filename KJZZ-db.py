@@ -1,7 +1,7 @@
 # BiasBuster
 # author:  AudioscavengeR
 # license: GPLv2
-# version: 0.9.11 WIP
+# version: 0.9.11 WIP iframe
 
 # BUG: jpeg produced by plt.savefig have a wide border
 
@@ -145,6 +145,8 @@ thesaurusFolder = Path("./data/SimpleWordlists")
 graphs = []   # bar pie line
 weekNumber = 0
 jsonScheduleFile = os.path.realpath("kjzz/KJZZ-schedule.json")
+indexTemplateFile = os.path.realpath("kjzz/index_template.html")
+indexFile = os.path.realpath("kjzz/index.html")
 byChunk = False
 printOut = False
 listLevel = []
@@ -1561,8 +1563,8 @@ def rebuildThumbnails(inputFolder, outputFolder, dryRun=False, progress=""):
 # rebuildThumbnails
 
 
-def genHtmlHead(pageTitle):
-  dictTemplate = dict(pageTitle=pageTitle, rand1=random.randint(0,99))
+def genHtmlHead(pageTitle, title):
+  dictTemplate = dict(pageTitle=pageTitle, title=title, rand=random.randint(0,99))
   template = string.Template(('''
 <!DOCTYPE html>
 <html lang="en">
@@ -1572,18 +1574,41 @@ def genHtmlHead(pageTitle):
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="ie=edge" />
   
-  <title data-l10n-id="${pageTitle}"></title>
+  <title data-l10n-id="${pageTitle}">${title}</title>
 
-  <link rel="stylesheet" href="../fonts/css/fontawesome.min.css">
-  <link rel="stylesheet" href="../fonts/css/regular.min.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/openplayerjs@1.12.1/dist/openplayer.min.css">
-  <link rel="stylesheet" href="../style.css?${rand1}">
+  <link rel="stylesheet" type="text/css" href="../fonts/css/fontawesome.min.css">
+  <link rel="stylesheet" type="text/css" href="../fonts/css/regular.min.css">
+  <link rel="stylesheet" type="text/css" href="../style-child.css?${rand}">
 
 </head>
 '''))
   return template.substitute(dictTemplate)
 
-# genHtmlModal
+# genHtmlHead
+
+
+def genHtmlNavBar(weekNumber, byChunk):
+  addByChunk = '-byChunk'
+  addNotByChunk = '-bySchedule'
+  switchTo = 'byChunk'
+  if byChunk:
+    addByChunk = '-bySchedule'
+    addNotByChunk = '-byChunk'
+    switchTo = 'bySchedule'
+
+  dictTemplate = dict(weekNumber=weekNumber, prevWeekNumber=(weekNumber-1), nextWeekNumber=(weekNumber+1), addNotByChunk=addNotByChunk, addByChunk=addByChunk, switchTo=switchTo)
+  template = string.Template(('''
+<table><thead>
+  <tr class="navbar">
+    <td><span><a class="prevWeek" href="../${prevWeekNumber}/index${addNotByChunk}.html">&larr; week ${prevWeekNumber}</a></span></td>
+    <td colspan="6"><span>KJZZ week ${weekNumber}<a href="index${addByChunk}.html">&nbsp;&nbsp;&nbsp;${switchTo}</a></span></td>
+    <td><span><a class="nextWeek" href="../${nextWeekNumber}/index${addNotByChunk}.html">week ${nextWeekNumber}&rarr;</a></span></td>
+  </tr>
+</thead></table>
+'''))
+  return template.substitute(dictTemplate)
+
+# genHtmlNavBar
 
 
 def genHtmlModal():
@@ -1600,23 +1625,10 @@ def genHtmlModal():
 '''
 # genHtmlModal
 
-def genHtmlThead(weekNumber, byChunk):
-  addByChunk = '-byChunk'
-  addNotByChunk = ''
-  switchTo = 'byChunk'
-  if byChunk:
-    addByChunk = ''
-    addNotByChunk = '-byChunk'
-    switchTo = 'bySchedule'
-
-  dictTemplate = dict(weekNumber=weekNumber, prevWeekNumber=(weekNumber-1), nextWeekNumber=(weekNumber+1), addNotByChunk=addNotByChunk, addByChunk=addByChunk, switchTo=switchTo)
+def genHtmlThead():
+  dictTemplate = dict()
   template = string.Template(('''
 <thead>
-  <tr class="title">
-    <td><span><a class="prevWeek" href="../${prevWeekNumber}/index${addNotByChunk}.html">&larr; week ${prevWeekNumber}</a></span></td>
-    <td colspan="6"><span>KJZZ week ${weekNumber}<a href="index${addByChunk}.html">&nbsp;&nbsp;&nbsp;${switchTo}</a></span></td>
-    <td><span><a class="nextWeek" href="../${nextWeekNumber}/index${addNotByChunk}.html">week ${nextWeekNumber}&rarr;</a></span></td>
-  </tr>
   <tr>
     <th class="startTime">Time</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
   </tr>
@@ -1662,18 +1674,16 @@ def genHtmlChunk(rowspan, classChunkExist, title, plays, texts, segmentImg=""):
 
 
 def genHtmlFooter():
-  dictTemplate = dict(rand1=random.randint(0,99), rand2=random.randint(0,99))
+  dictTemplate = dict(rand=random.randint(0,99))
   template = string.Template(('''
-<script src="https://cdn.jsdelivr.net/npm/openplayerjs@latest/dist/openplayer.min.js"></script>
-<script src="../OpenPlayerJS.js?${rand1}"></script>
-<script src="../ui.js?${rand2}"></script>
+<script type="application/javascript" src="../ui-child.js?${rand}"></script>
 '''))
   return template.substitute(dictTemplate)
 
 # genHtmlFooter
 
 
-def genSegmentImg(imgFileName, classChunkExist):
+def genHtmlSegmentImg(imgFileName, classChunkExist):
   thumbnailFileName = "thumbnail-%s" %(imgFileName)
 
   dictTemplate = dict(imgFileName=imgFileName, thumbnailFileName=thumbnailFileName, classChunkExist=classChunkExist)
@@ -1687,18 +1697,18 @@ def genSegmentImg(imgFileName, classChunkExist):
 # <div onclick="showModal('KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png');">
   # <img src="thumbnail-KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" alt="KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" class="chunkExist" decoding="async" onerror="this.src='../missingCloud.png'" loading="lazy" />
 # </div>
-# genSegmentImg
+# genHtmlSegmentImg
 
 
-def genPlayButton(startTime, stopTime, fileStem, misInfoText, misInfoLabels, classTooltipPosition, progress=""):
+def genHtmlPlayButton(weekNumber, startTime, stopTime, fileStem, misInfoText, misInfoLabels, classTooltipPosition, progress=""):
   # misInfoText = '[0.7, 0.4, 0.4, 2.9]' or None
   colorClass = ''
   BSoMeterTable = ''
   misInfoHtmlTemplate = ''
   BSoMeterTriggerClass = ''
-  if misInfoText:
+  if misInfoText is not None:
+    info("misInfoText: %s" %(misInfoText), 3, progress)
     misInfo = json.loads(misInfoText)
-    info(misInfoText, 3, progress)
     misInfoHtmlTemplate = '<ul class="alignLeft">'
     for index, label in enumerate(misInfoLabels):
       misInfoHtmlTemplate += '<li>%s: %s</li>' %(label, misInfo[index])
@@ -1729,18 +1739,18 @@ def genPlayButton(startTime, stopTime, fileStem, misInfoText, misInfoLabels, cla
   tooltip = tooltipTemplate.substitute(dictTooltipTemplate)
 
 
-  dictTemplate = dict(fileStem=fileStem, colorClass=colorClass, tooltip=tooltip)
+  dictTemplate = dict(weekNumber=weekNumber, fileStem=fileStem, colorClass=colorClass, tooltip=tooltip)
   template = string.Template(('''
-      <i class="fa-regular fa-circle-play tooltip ${colorClass}" onclick="play('${fileStem}.mp3');">
+      <i class="fa-regular fa-circle-play tooltip ${colorClass}" onclick="play('${weekNumber}/${fileStem}.mp3');">
 ${tooltip}
       </i>
 '''))
   return template.substitute(dictTemplate)
 
-# genPlayButton
+# genHtmlPlayButton
 
 
-def genTextButton(fileStem, progress=""):
+def genHtmlTextButton(fileStem, progress=""):
   dictTemplate = dict(fileStem=fileStem)
   template = string.Template(('''
       <a href="${fileStem}.text">
@@ -1749,10 +1759,10 @@ def genTextButton(fileStem, progress=""):
 '''))
   return template.substitute(dictTemplate)
 
-# genTextButton
+# genHtmlTextButton
 
 
-def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
+def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False, progress=""):
   
   # old school:
   # pngList = []
@@ -1769,27 +1779,34 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   # exit()
 
   # load json
-  if os.path.isfile(jsonScheduleFile):
-    with open(jsonScheduleFile, 'r') as fd:
-      jsonSchedule = json.load(fd)
-      
-    # # alternatively, the old way:
-    # f = open(jsonScheduleFile)
-    # jsonSchedule = json.load(f)
-    # f.close()
+  with open(jsonScheduleFile, 'r') as fd: jsonSchedule = json.load(fd)
+  # # alternatively, the old way:
+  # f = open(jsonScheduleFile)
+  # jsonSchedule = json.load(f)
+  # f.close()
+
+  # recreate index.html from template
+  with open(indexTemplateFile, 'r') as fd: indexTemplate = string.Template(fd.read())
+  # with io.open(indexTemplateFile, mode="r", encoding="utf-8") as fd:  indexTemplate = string.Template(fd.read())
+  dictTemplate = dict(weekNumber=weekNumber, prevWeek=(weekNumber-1), nextWeek=(weekNumber+1), titleData="BiasBuster: KJZZ", title="KJZZ week %s" %(weekNumber), rand=random.randint(0,99))
+  with open(indexFile, 'w') as fd:
+    fd.write(indexTemplate.substitute(dictTemplate))
+    info("outputFile: %s" %(indexFile), 1, progress)
+
+
 
   # how do my table compare to https://kjzz.org/kjzz-print-schedule ? let me know in the comments!
-  
-  html  = genHtmlHead("%s week %s" %("KJZZ", weekNumber))
+  # build weekNumber's index:
+  html  = genHtmlHead("BiasBuster: KJZZ week %s" %(weekNumber), "KJZZ week %s" %(weekNumber))
   html += '<body>\n'
   html += genHtmlModal()
   
   # https://github.com/openplayerjs/openplayerjs/blob/master/docs/api.md
   # https://github.com/openplayerjs/openplayerjs/blob/master/docs/usage.md
   
-  html += '<table>\n'
-  html += genHtmlThead(weekNumber, byChunk)
-  html += '<tbody>\n'
+  html += '\n<table class="schedule">'
+  html += genHtmlThead()
+  html += '<tbody>'
   
   rowspanDict       = {}
   HHMMList          = list(jsonSchedule.keys())
@@ -1799,13 +1816,13 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
   if byChunk:
     outputFileName = "index-byChunk.html"
   else:
-    outputFileName = "index.html"
+    outputFileName = "index-bySchedule.html"
 
   info("DayList: %s" %(DayList), 2)
   for Day in DayList: rowspan[Day] = 1
   
   with Progress() as progress:
-    task = progress.add_task("Building %s ..." %(outputFileName), total=len(reversedHHMMList)*len(DayList))
+    task = progress.add_task("Building %s" %(outputFileName), total=len(reversedHHMMList)*len(DayList))
     
     # We reverse because that's the only way to increase the rowspan of the first occurance of the same title.
     # Also we read each startTime and may end up regenerating the same wordClouds, 
@@ -1882,7 +1899,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
             thatWordCloudPngList = [os.path.basename(thatWordCloudPngList[0])]
 
           if len(thatWordCloudPngList) > 0:
-            segmentImg = genSegmentImg(thatWordCloudPngList[0], classChunkExist)
+            segmentImg = genHtmlSegmentImg(thatWordCloudPngList[0], classChunkExist)
             records = getChunks(getTextDict, False, progress)
             # print(getTextDict)
             # print(records)
@@ -1896,8 +1913,8 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
               stopDict    = TimeDict(record[1])
               chunkName   = record[2]
               misInfoText = record[3]
-              plays += genPlayButton(startDict.HHMM, stopDict.HHMM, chunkName, misInfoText, dictHeatMapBlank.keys(), classTooltipPosition, progress)
-              texts += genTextButton(chunkName, progress)
+              plays += genHtmlPlayButton(weekNumber, startDict.HHMM, stopDict.HHMM, chunkName, misInfoText, dictHeatMapBlank.keys(), classTooltipPosition, progress)
+              texts += genHtmlTextButton(chunkName, progress)
 
           rowspanDict[startTime][Day] = genHtmlChunk(rowspan[Day], classChunkExist, title, plays, texts, segmentImg)
 
@@ -1920,7 +1937,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
         # byChunk:
         else:
           if not any(word in title for word in listTitleWords2Exclude):
-            listChunks = getChunks(getTextDict, False, progress)
+            records = getChunks(getTextDict, False, progress)
             # listChunks = [
               # ('01:00', '01:30', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]'),
               # ('01:30', '02:00', 'KJZZ_2023-10-14_Sat_0130-0200_BBC World Service', None),
@@ -1928,16 +1945,20 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False):
             
             # if checkChunk(getTextDict, progress):
             # print(getTextDict)
-            # print(listChunks)
-            for row in listChunks:
+            # print(records)
+            for record in records:
               # Our schedule is by the hour but the db is by chunk of 30mn so we have certainly 2 chunks per hour:
               # And do not forget we process HHMMList in reverse!
               # There is a simple trick to simplify our lives: just compare the hour
               # Also, no \n between them or it will translate into a white space
-              if startTime[:2] == row[0][:2]:
+              startDict   = TimeDict(record[0])
+              stopDict    = TimeDict(record[1])
+              chunkName   = record[2]
+              misInfoText = record[3]
+              if startTime[:2] == startDict.HHMM[:2]:
                 classChunkExist = 'class="chunkExist"'
-                plays += genPlayButton(row[0], row[1], row[2], row[3], dictHeatMapBlank.keys(), classTooltipPosition, progress)
-                texts += genTextButton(row[2], progress)
+                plays += genHtmlPlayButton(weekNumber, startDict.HHMM, stopDict.HHMM, chunkName, misInfoText, dictHeatMapBlank.keys(), classTooltipPosition, progress)
+                texts += genHtmlTextButton(record[2], progress)
           # rowspanDict[startTime][Day] = '<td rowspan="%s" %s><div>%s<span>%s</span><span>%s</span></div></td>\n' %(rowspan[Day], classChunkExist, title, play, texts)
           rowspanDict[startTime][Day] = genHtmlChunk(rowspan[Day], classChunkExist, title, plays, texts)
           info("%s =1 %s %s - %s" %(startTime, rowspan[Day], title, None), 4, progress)

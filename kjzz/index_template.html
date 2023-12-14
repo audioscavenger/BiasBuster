@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+  
+  <title data-l10n-id="${titleData}">${title}</title>
+
+  <!-- must add type= for css and js or you get was blocked due to MIME type ("text/html") mismatch (X-Content-Type-Options: nosniff). -->
+  <link rel="stylesheet" type="text/css" href="fonts/css/fontawesome.min.css">
+  <link rel="stylesheet" type="text/css" href="fonts/css/regular.min.css">
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/openplayerjs@1.12.1/dist/openplayer.min.css">
+  <link rel="stylesheet" type="text/css" href="style.css?${rand}">
+
+</head>
+<body>
+
+<!-- find icons by drawing them: http://shapecatcher.com/ -->
+<!-- https://symbl.cc/en/collections/arrow-symbols/ -->
+<div class="container">
+
+  <div class="navbar">
+    <a class="prevWeek" href="${prevWeek}/index-bySchedule.html"><span>◀ week ${prevWeek}</span></a>
+    <a class="center" href="${weekNumber}/index-byChunk.html"><span>
+      <span>KJZZ week ${weekNumber}</span>
+      <span>🔁 byChunk</span>
+    </span></a>
+    <a class="nextWeek" href="${nextWeek}/index-bySchedule.html"><span>week ${nextWeek} ▶</span></a>
+  </div>
+
+  <!-- this iframe creates this warning: -->
+  <!-- Content-Security-Policy: Ignoring ‘x-frame-options’ because of ‘frame-ancestors’ directive. -->
+  <!-- Solution: https://stackoverflow.com/questions/30731290/how-to-set-x-frame-options-allow-from-in-nginx-correctly -->
+  <!-- add_header X-Frame-Options "ALLOW-FROM domain.com"; -->
+  <!-- add_header Content-Security-Policy "frame-ancestors domain.com"; -->
+  <iframe id="iframe" name="iframe" src="${weekNumber}/index-bySchedule.html" title="index-bySchedule" loading="lazy"></iframe>
+
+  <div class="audio">
+    <audio id="player" class="op-player__media">
+      <track kind="subtitles" srclang="en" label="English" />
+    </audio>
+  </div>
+
+</div>
+
+<script type="application/javascript" src="https://cdn.jsdelivr.net/npm/openplayerjs@latest/dist/openplayer.min.js"></script>
+<script type="application/javascript" src="OpenPlayerJS.js?${rand}"></script>
+<script type="application/javascript" src="ui.js?${rand}"></script>
+</body>
+</html>
