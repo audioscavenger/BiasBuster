@@ -14,6 +14,9 @@
   <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/openplayerjs@1.12.1/dist/openplayer.min.css">
   <link rel="stylesheet" type="text/css" href="style.css?${rand}">
 
+  <!-- TODO: see if preload helps -->
+  <!-- <link rel="preload" href="49/index-byChunk.html" as="document"> -->
+
 </head>
 <body>
 
@@ -21,21 +24,30 @@
 <!-- https://symbl.cc/en/collections/arrow-symbols/ -->
 <div class="container">
 
-  <div class="navbar">
-    <a class="prevWeek" href="${prevWeek}/index-bySchedule.html"><span>◀ week ${prevWeek}</span></a>
-    <a class="center" href="${weekNumber}/index-byChunk.html"><span>
+  <div class="navBar">
+    <a class="prevWeek" data-week="${prevWeek}" data-action="prevWeek" href="${prevWeek}/index-bySegment.html" target="iframe" onclick="updateNavBar(this);"><span>◀ week ${prevWeek}</span></a>
+    <span class="center">
       <span>KJZZ week ${weekNumber}</span>
-      <span>🔁 byChunk</span>
-    </span></a>
-    <a class="nextWeek" href="${nextWeek}/index-bySchedule.html"><span>week ${nextWeek} ▶</span></a>
+      <a id="swapSchedule" data-week="${weekNumber}" data-action="bySegment" href="${weekNumber}/index-byChunk.html" target="iframe" onclick="updateNavBar(this);" ><span>byChunk</span></a>
+    </span>
+    <a class="nextWeek" data-week="${nextWeek}" data-action="nextWeek" href="${nextWeek}/index-bySegment.html" target="iframe" onclick="updateNavBar(this);"><span>week ${nextWeek} ▶</span></a>
   </div>
+
+  <template id="navBar">
+    <a class="prevWeek" data-week="{{prevWeek}}" data-action="prevWeek" href="{{prevWeek}}/index-{{bySegment}}.html" target="iframe" onclick="updateNavBar(this);"><span>◀ week {{prevWeek}}</span></a>
+    <span class="center">
+      <span>KJZZ week {{weekNumber}}</span>
+      <a id="swapSchedule" data-week="{{weekNumber}}" data-action="{{flip}}" href="{{weekNumber}}/index-{{byChunk}}.html" target="iframe" onclick="updateNavBar(this);"><span>{{byChunk}}</span></a>
+    </span>
+    <a class="nextWeek" data-week="{{nextWeek}}" data-action="nextWeek" href="{{nextWeek}}/index-{{bySegment}}.html" target="iframe" onclick="updateNavBar(this);"><span>week {{nextWeek}} ▶</span></a>
+  </template>
 
   <!-- this iframe creates this warning: -->
   <!-- Content-Security-Policy: Ignoring ‘x-frame-options’ because of ‘frame-ancestors’ directive. -->
   <!-- Solution: https://stackoverflow.com/questions/30731290/how-to-set-x-frame-options-allow-from-in-nginx-correctly -->
   <!-- add_header X-Frame-Options "ALLOW-FROM domain.com"; -->
   <!-- add_header Content-Security-Policy "frame-ancestors domain.com"; -->
-  <iframe id="iframe" name="iframe" src="${weekNumber}/index-bySchedule.html" title="index-bySchedule" loading="lazy"></iframe>
+  <iframe id="iframe" name="iframe" src="${weekNumber}/index-bySegment.html" title="KJZZ week ${weekNumber}" loading="lazy" onclick="swapWordRecurse(this.parentNode.parentNode, 'byChunk', 'bySegment');"></iframe>
 
   <div class="audio">
     <audio id="player" class="op-player__media">

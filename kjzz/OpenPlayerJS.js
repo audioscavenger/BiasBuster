@@ -95,17 +95,17 @@ function playThis(sound) {
 
 
 window.addEventListener('message', function(event) {
-  console.debug(event)
+  // console.debug(event)
   if(event.origin === window.location.origin)
   {
-    console.debug('parent: Received',event.data.message);
+    // console.debug('parent: Received',event.data.message);
     let sound = event.data.message
     playThis(sound);
   }
   else
   {
-    console.debug('parent: event.origin=',window.location.origin,'but caller origin=',event.origin);
-    console.debug('parent: Origin not allowed!');
+    // console.debug('parent: event.origin=',window.location.origin,'but caller origin=',event.origin);
+    console.log('parent: Origin not allowed!');
   }
 
 }, false);

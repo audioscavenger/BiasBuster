@@ -1,4 +1,4 @@
-# BiasBuster - WIP 0.9.11
+# BiasBuster - release 0.9.11 iframe
 
 A set of tools which ultimate goal is to analyze biases in English. 
 Currently only handles KJZZ's radio broadcast. 
@@ -625,12 +625,15 @@ Scope creep ahead...
     - [ ] automate mp3 downloads from cloud + process + uploads from/to cloud server
   - [ ] future
     - [ ] dynamic page in PHP or nodeJS/typeScript
-- [x] WIP 0.9.11 iframe
+- [x] release 0.9.11 iframe
   - [x] ui
-    - [x] keep player playing while navigating like plex => iframe
+    - [x] disabled link checker as this is not production ready
+    - [x] navBar swap with inline template tag, updateNavBar() and interpolate()
+    - [x] keep player playing while navigating like plex => iframe like Plex
     - [x] proper iframe navigation
-    - [x] build an actual front page with Bootstrap or smth
+    - [x] frontpage added: index_template.html
   - [x] python
+    - [x] utf-8 encoding everywhere
     - [x] now passing actual start stop times + chunkName in records
     - [x] created class TimeDict
     - [x] merged getText() and getChunkNames() into getChunks()

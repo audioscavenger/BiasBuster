@@ -66,8 +66,8 @@ th.startTime, td.startTime {
 }
 img.chunkExist {
   width: 100%;
-  max-width: 15vw; /* width divided by 8 */
-  min-height: 80px;
+  min-width: 12vw; /* width divided by 8 */
+  /* min-height: 80px; */
   cursor: pointer;
 }
 /**************** schedule *************************/

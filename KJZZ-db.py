@@ -1,7 +1,7 @@
 # BiasBuster
 # author:  AudioscavengeR
 # license: GPLv2
-# version: 0.9.11 WIP iframe
+# version: 0.9.11 release iframe
 
 # BUG: jpeg produced by plt.savefig have a wide border
 
@@ -392,8 +392,8 @@ class Chunk:
       if self.size < minChunkSize:
         warning("%s [%.1fk] small size is sus" %(self.inputFile, self.size/1024), 0, progress)
       if loadText:
-        # with open(self.inputFile, 'r') as pointer:
-        with io.open(self.inputFile, mode="r", encoding="utf-8") as pointer:
+        with open(self.inputFile, 'r', encoding="utf-8") as pointer:
+        # with io.open(self.inputFile, mode="r", encoding="utf-8") as pointer:
           # separate sentences properly:
           text = pointer.read().replace('\n',' ')
           self.text = text.replace('. ','.\n')
@@ -965,7 +965,7 @@ def loadStopWordsDict():
     stopWordsFile = os.path.join(dataFolder, stopWordsFileName)
     if os.path.isfile(stopWordsFile):
       stopwordsDict[index] = set()
-      with open(stopWordsFile, 'r') as fd:
+      with open(stopWordsFile, 'r', encoding="utf-8") as fd:
         for line in fd:
           word = line.strip()
           stopwordsDict[index].add(word)
@@ -989,16 +989,16 @@ def loadDictHeatMap(dictHeatMap, withSynonyms=withSynonyms):
     if heatFactor in heatFactorSynonymsFor and withSynonyms:
       if not force and os.path.isfile(heatFactorWSynonymsFile) and os.path.getsize(heatFactorWSynonymsFile) > os.path.getsize(heatFactorFile):
         info("%s: open file %s" %( heatFactor, heatFactorWSynonymsFile), 3)
-        with open(heatFactorWSynonymsFile, 'r') as fd:
+        with open(heatFactorWSynonymsFile, 'r', encoding="utf-8") as fd:
           # BUGFIX: split() also splits compound words like "according to" so we resort to .strip().split('\n')
           dictHeatMap[heatFactor]["words"].update(fd.read().strip().split('\n'))
       else:
         # load the whole synonyms file only once
         if not synonymsList:
           info("%s: open file %s" %( heatFactor, synonymsFile), 3)
-          with open(synonymsFile, 'r') as fd: synonymsList.update(fd.read().strip().split('\n'))
+          with open(synonymsFile, 'r', encoding="utf-8") as fd: synonymsList.update(fd.read().strip().split('\n'))
         info("%s: open file %s" %( heatFactor, heatFactorFile), 3)
-        with open(heatFactorFile, 'r') as fd: words = fd.read().strip().split('\n')
+        with open(heatFactorFile, 'r', encoding="utf-8") as fd: words = fd.read().strip().split('\n')
 
         for word in words:
           dictHeatMap[heatFactor]["words"].add(word)
@@ -1014,13 +1014,13 @@ def loadDictHeatMap(dictHeatMap, withSynonyms=withSynonyms):
         # and finally we save it to not redo it again:
         if not dryRun:
           info("%s: save file %s" %( heatFactor, heatFactorWSynonymsFile), 3)
-          with open(heatFactorWSynonymsFile, 'w') as fd:
+          with open(heatFactorWSynonymsFile, 'w', encoding="utf-8") as fd:
             fd.write('\n'.join(dictHeatMap[heatFactor]["words"]))
     
     # no synonyms wanted or unavailable:
     else:
       info("%s: open file %s" %( heatFactor, heatFactorFile), 3)
-      with open(heatFactorFile, 'r') as fd: words = fd.read().strip().split('\n')
+      with open(heatFactorFile, 'r', encoding="utf-8") as fd: words = fd.read().strip().split('\n')
       dictHeatMap[heatFactor]["words"].update(words)
 
     info("%s: words = %s" %( heatFactor, len(dictHeatMap[heatFactor]["words"]) ), 3)
@@ -1589,12 +1589,12 @@ def genHtmlHead(pageTitle, title):
 
 def genHtmlNavBar(weekNumber, byChunk):
   addByChunk = '-byChunk'
-  addNotByChunk = '-bySchedule'
+  addNotByChunk = '-bySegment'
   switchTo = 'byChunk'
   if byChunk:
-    addByChunk = '-bySchedule'
+    addByChunk = '-bySegment'
     addNotByChunk = '-byChunk'
-    switchTo = 'bySchedule'
+    switchTo = 'bySegment'
 
   dictTemplate = dict(weekNumber=weekNumber, prevWeekNumber=(weekNumber-1), nextWeekNumber=(weekNumber+1), addNotByChunk=addNotByChunk, addByChunk=addByChunk, switchTo=switchTo)
   template = string.Template(('''
@@ -1686,10 +1686,11 @@ def genHtmlFooter():
 def genHtmlSegmentImg(imgFileName, classChunkExist):
   thumbnailFileName = "thumbnail-%s" %(imgFileName)
 
+  # removed onerror, too slow: onerror="this.src='../missingCloud.png';" 
   dictTemplate = dict(imgFileName=imgFileName, thumbnailFileName=thumbnailFileName, classChunkExist=classChunkExist)
   template = string.Template(('''
     <div onclick="showModal('${imgFileName}');">
-      <img width="256" src="${thumbnailFileName}" alt="${imgFileName}" ${classChunkExist} decoding="async" onerror="this.src='../missingCloud.png';" loading="lazy" />
+      <img width="256" src="${thumbnailFileName}" alt="${imgFileName}" ${classChunkExist} decoding="async" loading="lazy" />
     </div>
 '''))
   return template.substitute(dictTemplate)
@@ -1779,17 +1780,17 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False, progress=
   # exit()
 
   # load json
-  with open(jsonScheduleFile, 'r') as fd: jsonSchedule = json.load(fd)
+  with open(jsonScheduleFile, 'r', encoding="utf-8") as fd: jsonSchedule = json.load(fd)
   # # alternatively, the old way:
   # f = open(jsonScheduleFile)
   # jsonSchedule = json.load(f)
   # f.close()
 
   # recreate index.html from template
-  with open(indexTemplateFile, 'r') as fd: indexTemplate = string.Template(fd.read())
+  with open(indexTemplateFile, 'r', encoding="utf-8") as fd: indexTemplate = string.Template(fd.read())
   # with io.open(indexTemplateFile, mode="r", encoding="utf-8") as fd:  indexTemplate = string.Template(fd.read())
   dictTemplate = dict(weekNumber=weekNumber, prevWeek=(weekNumber-1), nextWeek=(weekNumber+1), titleData="BiasBuster: KJZZ", title="KJZZ week %s" %(weekNumber), rand=random.randint(0,99))
-  with open(indexFile, 'w') as fd:
+  with open(indexFile, 'w', encoding="utf-8") as fd:
     fd.write(indexTemplate.substitute(dictTemplate))
     info("outputFile: %s" %(indexFile), 1, progress)
 
@@ -1816,7 +1817,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False, progress=
   if byChunk:
     outputFileName = "index-byChunk.html"
   else:
-    outputFileName = "index-bySchedule.html"
+    outputFileName = "index-bySegment.html"
 
   info("DayList: %s" %(DayList), 2)
   for Day in DayList: rowspan[Day] = 1
@@ -1995,7 +1996,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False, progress=
   html += '</html>'
   
   outputFile = os.path.join(outputFolder, str(weekNumber), outputFileName)
-  with open(outputFile, 'w') as fd:
+  with open(outputFile, 'w', encoding="utf-8") as fd:
     fd.write(html)
     info("outputFile: %s" %(outputFile), 1, progress)
 
@@ -2329,7 +2330,7 @@ if rebuildThumbnail:
 def importInputStopWords(wordCloudDict):
   if wordCloudDict["inputStopWordsFiles"]["value"]:
     for inputStopWordsFile in wordCloudDict["inputStopWordsFiles"]["value"]:
-      with open(inputStopWordsFile, 'r') as fd:
+      with open(inputStopWordsFile, 'r', encoding="utf-8") as fd:
         for line in fd:
           wordCloudDict["inputStopWords"]["value"].append(line.strip())
       info("%s stopWords imported from '%s'" %(len(wordCloudDict["inputStopWords"]["value"]), inputStopWordsFile), 2)
