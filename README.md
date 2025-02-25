@@ -32,7 +32,7 @@ The Windows part could run on Linux as well, whisper also can use CPU (slower), 
 
 ![week46 example](assets/week46%20example.png)
 
-These schedules are hosted temporarily here: https://www.it-cooking.com/kjzz/48/index.html
+These schedules are hosted temporarily here: https://www.derewonko.com/kjzz/48/index.html
 
 
 # Under the hood
