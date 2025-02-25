@@ -1,7 +1,11 @@
+# TODO: now we have yearly schedules... handle that but how?
+# TODO: /kjzz is actually needed, or use ../../ for assets...
+# TODO: handle years navigation in index, we can keep iframes relative
+
 # BiasBuster
 # author:  AudioscavengeR
 # license: GPLv2
-# version: 0.9.11 release iframe
+# version: 0.9.12 release iframe
 
 # BUG: jpeg produced by plt.savefig have a wide border
 
@@ -49,6 +53,12 @@
 # python KJZZ-db.py --rebuildThumbnails 41
 # for /l %a in (40,1,47) DO python KJZZ-db.py --html %a --autoGenerate --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
 
+
+# TODO: now we have yearly schedules... handle that but how?
+# TODO: now we have yearly schedules... handle that but how?
+# TODO: now we have yearly schedules... handle that but how?
+# TODO: now we have yearly schedules... handle that but how?
+# TODO: now we have yearly schedules... handle that but how?
 
 # TODO: enable closed-captions by default: nothing works, asked on stackoverflow
 # similar question: https://stackoverflow.com/questions/17247931/video-js-how-do-i-make-subtitle-visible-by-default
@@ -144,8 +154,13 @@ dataFolder = Path("./data")
 thesaurusFolder = Path("./data/SimpleWordlists")
 graphs = []   # bar pie line
 weekNumber = 0
-jsonScheduleFile = os.path.realpath("kjzz/KJZZ-schedule.json")
-indexTemplateFile = os.path.realpath("kjzz/index_template.html")
+# TODO: now we have yearly schedules... handle that but how?
+# TODO: now we have yearly schedules... handle that but how?
+# TODO: now we have yearly schedules... handle that but how?
+# TODO: now we have yearly schedules... handle that but how?
+# TODO: now we have yearly schedules... handle that but how?
+jsonScheduleFile = os.path.realpath("kjzz/2023/KJZZ-schedule.json")
+indexTemplateFile = os.path.realpath("kjzz/2023/index_template.html")
 indexFile = os.path.realpath("kjzz/index.html")
 byChunk = False
 printOut = False
@@ -154,9 +169,9 @@ silent = False
 autoGenerate = False
 dryRun = False
 noPics = False
-missingPic = "../missingPic.png"
-missingCloud = "../missingCloud.png"
-voidPic = "../1x1.png"
+missingPic = "../../lib/assets/missingPic.png"
+missingCloud = "../../lib/assets/missingCloud.png"
+voidPic = "../../lib/assets/1x1.png"
 rebuildThumbnail = False
 usePngquant = True
 useJpeg = False
@@ -1566,7 +1581,7 @@ def rebuildThumbnails(inputFolder, outputFolder, dryRun=False, progress=""):
 def genHtmlHead(pageTitle, title):
   dictTemplate = dict(pageTitle=pageTitle, title=title, rand=random.randint(0,99))
   template = string.Template(('''
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -1576,9 +1591,9 @@ def genHtmlHead(pageTitle, title):
   
   <title data-l10n-id="${pageTitle}">${title}</title>
 
-  <link rel="stylesheet" type="text/css" href="../fonts/css/fontawesome.min.css">
-  <link rel="stylesheet" type="text/css" href="../fonts/css/regular.min.css">
-  <link rel="stylesheet" type="text/css" href="../style-child.css?${rand}">
+  <link rel="stylesheet" type="text/css" href="../../lib/assets/fonts/css/fontawesome.min.css">
+  <link rel="stylesheet" type="text/css" href="../../lib/assets/fonts/css/regular.min.css">
+  <link rel="stylesheet" type="text/css" href="../../lib/css/style-child.css?${rand}">
 
 </head>
 '''))
@@ -1666,7 +1681,7 @@ def genHtmlChunk(rowspan, classChunkExist, title, plays, texts, segmentImg=""):
     # </span>
   # </div>
   # <div onclick="showModal('KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png');">
-    # <img src="thumbnail-KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" alt="KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" class="chunkExist" decoding="async" onerror="this.src='../missingCloud.png'" loading="lazy" />
+    # <img src="thumbnail-KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" alt="KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" class="chunkExist" decoding="async" onerror="this.src='../../lib/assets/missingCloud.png'" loading="lazy" />
   # </div>
 # </td>
 
@@ -1676,7 +1691,7 @@ def genHtmlChunk(rowspan, classChunkExist, title, plays, texts, segmentImg=""):
 def genHtmlFooter():
   dictTemplate = dict(rand=random.randint(0,99))
   template = string.Template(('''
-<script type="application/javascript" src="../ui-child.js?${rand}"></script>
+<script defer type="application/javascript" src="../../lib/js/ui-child.js?${rand}"></script>
 '''))
   return template.substitute(dictTemplate)
 
@@ -1686,7 +1701,7 @@ def genHtmlFooter():
 def genHtmlSegmentImg(imgFileName, classChunkExist):
   thumbnailFileName = "thumbnail-%s" %(imgFileName)
 
-  # removed onerror, too slow: onerror="this.src='../missingCloud.png';" 
+  # removed onerror, too slow: onerror="this.src='../../lib/assets/missingCloud.png';" 
   dictTemplate = dict(imgFileName=imgFileName, thumbnailFileName=thumbnailFileName, classChunkExist=classChunkExist)
   template = string.Template(('''
     <div onclick="showModal('${imgFileName}');">
@@ -1696,7 +1711,7 @@ def genHtmlSegmentImg(imgFileName, classChunkExist):
   return template.substitute(dictTemplate)
 
 # <div onclick="showModal('KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png');">
-  # <img src="thumbnail-KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" alt="KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" class="chunkExist" decoding="async" onerror="this.src='../missingCloud.png'" loading="lazy" />
+  # <img src="thumbnail-KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" alt="KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" class="chunkExist" decoding="async" onerror="this.src='../../lib/assets/missingCloud.png'" loading="lazy" />
 # </div>
 # genHtmlSegmentImg
 

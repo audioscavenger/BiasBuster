@@ -112,6 +112,8 @@ if /I "%html%"=="y" set misInfo=y
 
 REM :: folder was passed
 IF EXIST "%~1\*.mp3" (
+  echo mkdir "%~1\done"
+  mkdir "%~1\done"
   REM :: first, address reprocess by deleting processed files, in case the batch was interrupted for instance
   IF /I "%reprocess%"=="n" (
     for %%a in ("%~1\*.mp3") DO (
@@ -119,12 +121,13 @@ IF EXIST "%~1\*.mp3" (
         IF /I "%deleteMp3%"=="y" (
           echo deleting "%%~a" 1>&2
           del /f /q "%%~a"
-        ) ELSE (
-          echo ERROR: conflict: you don't want to reprocess %%a but also don't want to delete processed files.
-          echo make up your mind.
-          echo:
-          pause
-          exit /b 1
+        REM ) ELSE (
+          REM move processed files so we don't reprocess them
+          REM echo ERROR: conflict: you don't want to reprocess %%a but also don't want to delete processed files.
+          REM echo make up your mind.
+          REM echo:
+          REM pause
+          REM exit /b 1
         )
       )
     )
@@ -146,11 +149,14 @@ IF EXIST "%~1\*.mp3" (
     whisper-faster "%~1" --batch_recursive --language=en --model=%model% --output_format=all --device=cuda --output_dir="%~1"
   )
 
-  IF /I "%deleteMp3%"=="y" (
-    for %%a in ("%~1\*.mp3") DO (
-      IF EXIST "%%~dpna.text" (
+  for %%a in ("%~1\*.mp3") DO (
+    IF EXIST "%%~dpna.text" (
+      IF /I "%deleteMp3%"=="y" (
         echo deleting "%%~a" 1>&2
         del /f /q "%%~a"
+      ) ELSE (
+        echo move /y "%%~a" "%%~dpa\done\%%~nxa" 1>&2
+        move /y "%%~a" "%%~dpa\done\%%~nxa" 1>&2
       )
     )
   )
@@ -162,7 +168,7 @@ REM :: list of files.text was passed
     IF /I "%%~xa"==".mp3" (
       IF DEFINED busybox (
         echo busybox time whisper-faster %%a --language en --model %model% --output_format all --device cuda --output_dir %%~sdpa | busybox tee -a %LOG%
-        busybox time whisper-faster %%a --language en --model %model% --output_format all --device cuda --output_dir %%~sdpa 2>"%%~a.%model%.log" && IF /I "%deleteMp3%"=="y" del /q "%%~a"
+        busybox time whisper-faster %%a - -language en --model %model% --output_format all --device cuda --output_dir %%~sdpa 2>"%%~a.%model%.log" && IF /I "%deleteMp3%"=="y" del /q "%%~a"
       ) ELSE (
         echo whisper-faster %%a --language en --model %model% --output_format all --device cuda --output_dir %%~sdpa >>%LOG%
         echo whisper-faster %%a --language en --model %model% --output_format all --device cuda --output_dir %%~sdpa
@@ -212,7 +218,7 @@ IF NOT "%~1"=="" (
 
 :end
 timeout /t 10
-REM pause
+pause
 exit
 
 

@@ -1,4 +1,4 @@
-# BiasBuster - release 0.9.11 iframe
+# BiasBuster - release 0.9.12 iframe
 
 A set of tools which ultimate goal is to analyze biases in English. 
 Currently only handles KJZZ's radio broadcast. 
@@ -719,4 +719,11 @@ Scope creep ahead...
 - [x] 0.9.2   updated stopwords to level 5 + you can add many files with --inputStopWordsFiles
 - [x] 0.9.1   added wordCloud from https://github.com/amueller/word_cloud/blob/main/examples/simple.py
 - [x] 0.9.0   automated mp3 process with whisper-faster from https://github.com/Purfview/whisper-standalone-win
+
+## :beer: Buy me a beer
+Like my work? This tool helped you? Want to sponsor more awesomeness like this?
+
+<p align="center">
+ <a href="https://www.paypal.com/donate/?hosted_button_id=CD7P7PK3WP8WU"><img src="/assets/paypal-Donate-QR-Code.png" /></a>
+</p>
 

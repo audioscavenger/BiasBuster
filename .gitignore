@@ -1,5 +1,12 @@
-# ---> BiasBuster
+# -------------------------------- custom
+# --> gitsync tool
+**/backup
+gitsync.*
+commit.*.txt
+README.cmd
+# --------------------------------------------
 
+# ---> BiasBuster
 misInformation/*
 kjzz/*
 tmp/*
