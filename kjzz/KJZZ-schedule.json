@@ -1,0 +1,236 @@
+{
+  "00:00": {
+    "Mon": "BBC World Service",
+    "Tue": "BBC World Service",
+    "Wed": "BBC World Service",
+    "Thu": "BBC World Service",
+    "Fri": "BBC World Service",
+    "Sat": "BBC World Service",
+    "Sun": "BBC World Service"
+  },
+  "01:00": {
+    "Mon": "BBC World Service",
+    "Tue": "BBC World Service",
+    "Wed": "BBC World Service",
+    "Thu": "BBC World Service",
+    "Fri": "BBC World Service",
+    "Sat": "BBC World Service",
+    "Sun": "BBC World Service"
+  },
+  "02:00": {
+    "Mon": "BBC World Service",
+    "Tue": "BBC World Service",
+    "Wed": "BBC World Service",
+    "Thu": "BBC World Service",
+    "Fri": "BBC World Service",
+    "Sat": "BBC World Service",
+    "Sun": "BBC World Service"
+  },
+  "03:00": {
+    "Mon": "Morning Edition",
+    "Tue": "Morning Edition",
+    "Wed": "Morning Edition",
+    "Thu": "Morning Edition",
+    "Fri": "Morning Edition",
+    "Sat": "BBC World Service",
+    "Sun": "BBC World Service"
+  },
+  "04:00": {
+    "Mon": "Morning Edition",
+    "Tue": "Morning Edition",
+    "Wed": "Morning Edition",
+    "Thu": "Morning Edition",
+    "Fri": "Morning Edition",
+    "Sat": "BBC World Service",
+    "Sun": "BBC World Service"
+  },
+  "05:00": {
+    "Mon": "Morning Edition",
+    "Tue": "Morning Edition",
+    "Wed": "Morning Edition",
+    "Thu": "Morning Edition",
+    "Fri": "Morning Edition",
+    "Sat": "On the Media",
+    "Sun": "Documentary Specials"
+  },
+  "06:00": {
+    "Mon": "Morning Edition",
+    "Tue": "Morning Edition",
+    "Wed": "Morning Edition",
+    "Thu": "Morning Edition",
+    "Fri": "Morning Edition",
+    "Sat": "Weekend Edition Saturday",
+    "Sun": "Weekend Edition Sunday"
+  },
+  "07:00": {
+    "Mon": "Morning Edition",
+    "Tue": "Morning Edition",
+    "Wed": "Morning Edition",
+    "Thu": "Morning Edition",
+    "Fri": "Morning Edition",
+    "Sat": "Weekend Edition Saturday",
+    "Sun": "Weekend Edition Sunday"
+  },
+  "08:00": {
+    "Mon": "Morning Edition",
+    "Tue": "Morning Edition",
+    "Wed": "Morning Edition",
+    "Thu": "Morning Edition",
+    "Fri": "Morning Edition",
+    "Sat": "Weekend Edition Saturday",
+    "Sun": "Weekend Edition Sunday"
+  },
+  "09:00": {
+    "Mon": "The Show",
+    "Tue": "The Show",
+    "Wed": "The Show",
+    "Thu": "The Show",
+    "Fri": "The Show",
+    "Sat": "Weekend Edition Saturday",
+    "Sun": "Weekend Edition Sunday"
+  },
+  "10:00": {
+    "Mon": "Here and Now",
+    "Tue": "Here and Now",
+    "Wed": "Here and Now",
+    "Thu": "Here and Now",
+    "Fri": "Here and Now",
+    "Sat": "Planet Money, How I Built This",
+    "Sun": "Wait Wait... Don t Tell Me!"
+  },
+  "11:00": {
+    "Mon": "Here and Now",
+    "Tue": "Here and Now",
+    "Wed": "Here and Now",
+    "Thu": "Here and Now",
+    "Fri": "Here and Now",
+    "Sat": "Wait Wait... Don t Tell Me!",
+    "Sun": "TED Radio Hour"
+  },
+  "12:00": {
+    "Mon": "Here and Now",
+    "Tue": "Here and Now",
+    "Wed": "Here and Now",
+    "Thu": "Here and Now",
+    "Fri": "Science Friday",
+    "Sat": "Code Switch and Life Kit",
+    "Sun": "Freakonomics"
+  },
+  "12:30": {
+    "Mon": "Today Explained",
+    "Tue": "Today Explained",
+    "Wed": "Today Explained",
+    "Thu": "Today Explained",
+    "Fri": "Science Friday",
+    "Sat": "Code Switch and Life Kit",
+    "Sun": "Freakonomics"
+  },
+  "13:00": {
+    "Mon": "BBC Newshour",
+    "Tue": "BBC Newshour",
+    "Wed": "BBC Newshour",
+    "Thu": "BBC Newshour",
+    "Fri": "BBC Newshour",
+    "Sat": "Unexpected Elements",
+    "Sun": "RadioLab"
+  },
+  "14:00": {
+    "Mon": "The World",
+    "Tue": "The World",
+    "Wed": "The World",
+    "Thu": "The World",
+    "Fri": "The World",
+    "Sat": "This American Life",
+    "Sun": "Milk Street Radio"
+  },
+  "15:00": {
+    "Mon": "All Things Considered",
+    "Tue": "All Things Considered",
+    "Wed": "All Things Considered",
+    "Thu": "All Things Considered",
+    "Fri": "All Things Considered",
+    "Sat": "The Moth",
+    "Sun": "Reveal"
+  },
+  "16:00": {
+    "Mon": "All Things Considered",
+    "Tue": "All Things Considered",
+    "Wed": "All Things Considered",
+    "Thu": "All Things Considered",
+    "Fri": "All Things Considered",
+    "Sat": "All Things Considered",
+    "Sun": "All Things Considered"
+  },
+  "17:00": {
+    "Mon": "All Things Considered",
+    "Tue": "All Things Considered",
+    "Wed": "All Things Considered",
+    "Thu": "All Things Considered",
+    "Fri": "All Things Considered",
+    "Sat": "It s Been a Minute",
+    "Sun": "Snap Judgement"
+  },
+  "18:00": {
+    "Mon": "Marketplace",
+    "Tue": "Marketplace",
+    "Wed": "Marketplace",
+    "Thu": "Marketplace",
+    "Fri": "Marketplace",
+    "Sat": "Live Wire",
+    "Sun": "Those Lowdown Blues with Bob Corritore"
+  },
+  "18:30": {
+    "Mon": "BBC World Business Report",
+    "Tue": "BBC World Business Report",
+    "Wed": "BBC World Business Report",
+    "Thu": "BBC World Business Report",
+    "Fri": "BBC World Business Report",
+    "Sat": "Live Wire",
+    "Sun": "Those Lowdown Blues with Bob Corritore"
+  },
+  "19:00": {
+    "Mon": "Fresh Air",
+    "Tue": "Fresh Air",
+    "Wed": "Fresh Air",
+    "Thu": "Fresh Air",
+    "Fri": "Fresh Air",
+    "Sat": "Bullseye",
+    "Sun": "Those Lowdown Blues with Bob Corritore"
+  },
+  "20:00": {
+    "Mon": "On Point",
+    "Tue": "On Point",
+    "Wed": "On Point",
+    "Thu": "On Point",
+    "Fri": "On Point",
+    "Sat": "The Pulse",
+    "Sun": "Those Lowdown Blues with Bob Corritore"
+  },
+  "21:00": {
+    "Mon": "Latino USA",
+    "Tue": "Left, Right and Center",
+    "Wed": "Embidied",
+    "Thu": "The New York Radio Hour",
+    "Fri": "The Middle",
+    "Sat": "Climate One",
+    "Sun": "Those Lowdown Blues with Bob Corritore"
+  },
+  "22:00": {
+    "Mon": "Q With Tom Power",
+    "Tue": "Q With Tom Power",
+    "Wed": "Q With Tom Power",
+    "Thu": "Q With Tom Power",
+    "Fri": "Q With Tom Power",
+    "Sat": "No Small Endaevor",
+    "Sun": "Those Lowdown Blues with Bob Corritore"
+  },
+  "23:00": {
+    "Mon": "BBC World Service",
+    "Tue": "BBC World Service",
+    "Wed": "BBC World Service",
+    "Thu": "BBC World Service",
+    "Fri": "BBC World Service",
+    "Sat": "BBC World Service",
+    "Sun": "BBC World Service"
+  }
+}

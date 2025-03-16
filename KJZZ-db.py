@@ -1,7 +1,3 @@
-# TODO: now we have yearly schedules... handle that but how?
-# TODO: /kjzz is actually needed, or use ../../ for assets...
-# TODO: handle years navigation in index, we can keep iframes relative
-
 # BiasBuster
 # author:  AudioscavengeR
 # license: GPLv2
@@ -18,7 +14,7 @@
 # - Misinformation analysis heatmap, based on PDXBek/Misinformation
 
 
-# https://kjzz.org/kjzz-print-schedule
+# https://www.kjzz.org/schedule#weekly
 
 # python KJZZ-db.py -i -f kjzz\44
 # python KJZZ-db.py -i -f kjzz\45
@@ -42,7 +38,7 @@
 # python KJZZ-db.py -g week=43 --wordCloud --stopLevel 3 --show --max_words=10000
 # python KJZZ-db.py -g week=44 --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
 # python KJZZ-db.py -g week=43+title="TED Radio Hour" --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
-#   example: week=42+title="Freakonomics"+Day=Sun is about men/women
+#   example: year=2023+week=42+title="Freakonomics"+Day=Sun is about men/women
 # python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
 # for /l %a in (40,1,45) DO python KJZZ-db.py -g week=%a+title="TED Radio Hour" --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
 # python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
@@ -50,15 +46,10 @@
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
 # python KJZZ-db.py --html 42 --byChunk
-# python KJZZ-db.py --rebuildThumbnails 41
-# for /l %a in (40,1,47) DO python KJZZ-db.py --html %a --autoGenerate --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
+# python KJZZ-db.py --rebuildThumbnails 2023/41
+# for /l %a in (40,1,47) DO python KJZZ-db.py --html %a --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
 
 
-# TODO: now we have yearly schedules... handle that but how?
-# TODO: now we have yearly schedules... handle that but how?
-# TODO: now we have yearly schedules... handle that but how?
-# TODO: now we have yearly schedules... handle that but how?
-# TODO: now we have yearly schedules... handle that but how?
 
 # TODO: enable closed-captions by default: nothing works, asked on stackoverflow
 # similar question: https://stackoverflow.com/questions/17247931/video-js-how-do-i-make-subtitle-visible-by-default
@@ -78,9 +69,9 @@
 # egrep -i "diversity|equity|inclusion" *text
 
 
+# pip install wordcloud pngquant numpy pillow pillow-avif-plugin pillow-jxl-plugin jxlpy
 
-
-import getopt, sys, os, re, regex, io, inspect, string, copy
+import getopt, sys, os, re, regex, io, inspect, string, copy, mmap
 import glob, time, datetime, json, urllib, random, sqlite3
 from dateutil import parser
 from pathlib import Path
@@ -104,26 +95,6 @@ from rich.progress import track, Progress
 # pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
 # -------------------------------------------------
 
-
-# def root():
-  # parent()
-# def parent():
-  # child()
-# def child(stack=''):
-  # for i in reversed(range(0, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
-  # print("%s: " %(stack))
-
-
-# # example of progress bar:
-# with Progress() as progress:
-  # task = progress.add_task("twiddling thumbs", total=10)
-  # inputFiles = [1,2,3,4,5,6,7,8,9,0]
-  # for inputFile in inputFiles:
-    # progress.console.print(f"Working on job #{inputFile}")
-    # time.sleep(0.2)
-    # progress.advance(task)
-# exit()
-
 verbose = 1
 progress = ""
 
@@ -136,46 +107,56 @@ localSqlDb = Path("kjzz.db")
 # the db connection is global
 conn = None
 
+# model used is defined in BiasBuster-whisper_custom.cmd
 model = "small"
+biasBusterBatchCustom = 'BiasBuster-whisper_custom.cmd'
 sqlQuery = None
-pretty = False
+genHtml = False
 wordCloud = False
 misInformation = False
 gettext = None
+pretty = False
 listTitleWords2Exclude = ["Jazz", "Blues"]
-gettextKeys = ["date", "datetime", "week", "Day", "time", "title", "chunk"]
+gettextKeys = ["date", "datetime", "year", "week", "Day", "time", "title", "chunk"]
+dbScheduleKeys = ["start", "stop", "week", "Day", "title", "text", "model", "misInfo"]
 gettextDict = {}
 mergeRecords = True
 removeStopwords = True
 showPicture = False
 inputStopWords = []
+inputExt = 'text'
 outputFolder = Path("./kjzz")
 dataFolder = Path("./data")
 thesaurusFolder = Path("./data/SimpleWordlists")
 graphs = []   # bar pie line
-weekNumber = 0
-# TODO: now we have yearly schedules... handle that but how?
-# TODO: now we have yearly schedules... handle that but how?
-# TODO: now we have yearly schedules... handle that but how?
-# TODO: now we have yearly schedules... handle that but how?
-# TODO: now we have yearly schedules... handle that but how?
-jsonScheduleFile = os.path.realpath("kjzz/2023/KJZZ-schedule.json")
-indexTemplateFile = os.path.realpath("kjzz/2023/index_template.html")
-indexFile = os.path.realpath("kjzz/index.html")
+yearNumber = datetime.datetime.now().year
+# https://unix.stackexchange.com/questions/282609/how-to-use-the-date-command-to-display-week-number-of-the-year
+# here we build the values for the current chunk to download, that started within the last 59 minutes
+# calendar ISO:    %V = week 01-01  ISO week number, with Monday as first day of week (01..53)      << LIARS!! 2023-01-01-Sun is week 52 year 2022
+# calendar normal: %W = week 00-53  week number of year, with Monday as first day of week (00..53)  << the one we chose
+# calendar normal: %U = week 00-53  week number of year, with Sunday as first day of week (00..53)
+weekNumber = None
+jsonScheduleFile = os.path.realpath(os.path.join(outputFolder, "KJZZ-schedule.json"))
+indexTemplateFile = os.path.realpath(os.path.join(outputFolder, "index_template.html"))
+indexFile = os.path.realpath(os.path.join(outputFolder, "index.html"))
 byChunk = False
 printOut = False
 listLevel = []
 silent = False
-autoGenerate = False
 dryRun = False
 noPics = False
+avif_supported = False
+jxl_supported = False
+imgExt = 'png'
+imgExtValids = ['png','jpg','jpeg','webp','avif','jxl']
 missingPic = "../../lib/assets/missingPic.png"
 missingCloud = "../../lib/assets/missingCloud.png"
 voidPic = "../../lib/assets/1x1.png"
 rebuildThumbnail = False
 usePngquant = True
 useJpeg = False
-jpegQuality = 50
+imgQuality = 60
+thumbnailQuality = 50
 force = False
 # when uncertainty/sourcing >= BSoMeterTrigger then highlight it
 BSoMeterTrigger = 0.9
@@ -204,91 +185,91 @@ stopLevel = 3
 # 0: ['up', 'ever', 'yourself', 'therefore', 'cannot', 'could', 'new', "they've", 'theirs', "who's", 'u', 'an', 'am', 'get', 're', 'where', 'herself', 'same', 'was', "you'd", 'www', 'some', 'through', 'each', 'himself', 'once', 'me', 'have', 'our', 'this', 'or', "i'm", 'they', "hasn't", 'which', 'why', 'to', "how's", 'can', 'com', 'we', 'did', 'yours', 'the', "we're", 'more', 'shall', 'about', 'are', 'so', "they're", "he'd", 'otherwise', 'below', 'else', 'further', 'has', 'most', 'ours', 'ourselves', "why's", 'a', 'at', "we'd", 'between', "isn't", 'that', 'one', 'since', "doesn't", 'her', 'into', 'k', "couldn't", 'before', "she'd", "wasn't", 'it', "don't", 'during', 'only', 'hers', "when's", "shouldn't", "she's", 'in', 'my', 'no', 'however', 'r', "they'll", 'above', 'if', 'he', 'of', 'how', 'over', 'say', 'whom', "we've", "here's", 'been', "hadn't", 's', 'be', 'these', 'own', 'both', 'doing', 'itself', 'but', 'against', 'ought', 'http', 'nor', "weren't", "he's", 'does', 'i', 'and', "what's", "wouldn't", 'myself', 'just', 'out', "they'd", 'on', 'than', 'hence', 'themselves', 'then', 'very', "we'll", 'she', "it's", "you'll", 'its', 'is', "let's", 'were', "won't", 'what', 'by', "that's", 'again', 'had', 'too', "mustn't", "i've", "there's", 'as', "she'll", 'few', 'being', 'when', "aren't", 'should', "shan't", 'all', 'under', 'your', 'here', 'down', 'with', 'also', 'after', "you're", 'like', 'you', "where's", 'not', 'any', 'him', 'until', "you've", 'says', "didn't", 'such', "i'd", "i'll", 'them', 'do', 'while', "haven't", 'there', 'their', 'who', 'because', "he'll", "can't", 'from', 'having', 'for', 'off', 'other', 'would', 'those', 'yourselves', 'his'],
 # }
 
-# build from https://github.com/amueller/word_cloud/blob/master/wordcloud/wordcloud.py
+# usage/help build from https://github.com/amueller/word_cloud/blob/master/wordcloud/wordcloud.py
 wordCloudDict = {
   "max_words": {
     "input": True, 
     "default": 200, 
     "value": 1000, 
-    "usage": "int (default=1000)\n               The maximum number of words in the Cloud.", 
+    "usage": "int (default=1000)\n                                      The maximum number of words in the Cloud.", 
   },
   "width": {
     "input": True, 
     "default": 400, 
     "value": 2000, 
-    "usage": "int (default=2000)\n               Width of the canvas.", 
+    "usage": "int (default=2000)\n                                      Width of the canvas.", 
   },
   "height": {
     "input": True, 
     "default": 200, 
     "value": 1000, 
-    "usage": "int (default=1000)\n               Height of the canvas.", 
+    "usage": "int (default=1000)\n                                      Height of the canvas.", 
   },
   "min_word_length": {
     "input": True, 
     "default": 0, 
     "value": 3, 
-    "usage": "int, default=3\n               Minimum number of letters a word must have to be included.", 
+    "usage": "int, default=3\n                                      Minimum number of letters a word must have to be included.", 
   },
   "min_font_size": {
     "input": True, 
     "default": 4, 
     "value": 4, 
-    "usage": "int (default=4)\n               Smallest font size to use. Will stop when there is no more room in this size.", 
+    "usage": "int (default=4)\n                                      Smallest font size to use. Will stop when there is no more room in this size.", 
   },
   "max_font_size": {
     "input": True, 
     "default": 0, 
     "value": 400, 
-    "usage": " int or None (default=400)\n               Maximum font size for the largest word. If None, height of the image is used.", 
+    "usage": " int or None (default=400)\n                                      Maximum font size for the largest word. If None, height of the image is used.", 
   },
   "scale": {
     "input": True, 
     "default": 1.0, 
     "value": 1.0, 
-    "usage": "float (default=1.0)\n               Scaling between computation and drawing. For large word-cloud images,\n               using scale instead of larger canvas size is significantly faster, but\n               might lead to a coarser fit for the words.", 
+    "usage": "float (default=1.0)\n                                      Scaling between computation and drawing. For large word-cloud images,\n                                      using scale instead of larger canvas size is significantly faster, but\n                                      might lead to a coarser fit for the words.", 
   },
   "relative_scaling": {
     "input": True, 
     "default": 0.0, 
     "value": 'auto', 
-    "usage": "float (default='auto')\n               Importance of relative word frequencies for font-size.  With\n               relative_scaling=0, only word-ranks are considered.  With\n               relative_scaling=1, a word that is twice as frequent will have twice\n               the size.  If you want to consider the word frequencies and not only\n               their rank, relative_scaling around .5 often looks good.\n               If 'auto' it will be set to 0.5 unless repeat is true, in which\n               case it will be set to 0.", 
+    "usage": "float (default='auto')\n                                      Importance of relative word frequencies for font-size.  With\n                                      relative_scaling=0, only word-ranks are considered.  With\n                                      relative_scaling=1, a word that is twice as frequent will have twice\n                                      the size.  If you want to consider the word frequencies and not only\n                                      their rank, relative_scaling around .5 often looks good.\n                                      If 'auto' it will be set to 0.5 unless repeat is true, in which\n                                      case it will be set to 0.", 
   },
   "background_color": {
     "input": True, 
     "default": 'black', 
     "value": 'white', 
-    "usage": "color value (default='white')\n               Background color for the word cloud image.", 
+    "usage": "color value (default='white')\n                                      Background color for the word cloud image.", 
   },
   "normalize_plurals": {
     "input": True, 
     "default": True, 
     "value": True, 
-    "usage": "bool, default=True\n               Whether to remove trailing 's' from words. If True and a word\n               appears with and without a trailing 's', the one with trailing 's'\n               is removed and its counts are added to the version without\n               trailing 's' -- unless the word ends with 'ss'. Ignored if using\n               generate_from_frequencies.", 
+    "usage": "bool, default=True\n                                      Whether to remove trailing 's' from words. If True and a word\n                                      appears with and without a trailing 's', the one with trailing 's'\n                                      is removed but counts in the total -- unless the word ends with 'ss'.\n                                      Ignored if using --generate_from_frequencies.", 
   },
   "inputStopWordsFiles": {
     "input": True, 
     "default": [], 
     "value": [], 
-    "usage": "file, default=None\n               Text file containing one stopWord per line.\n               You can pass --inputStopWordsFiles multiple times.", 
+    "usage": "file, default=None\n                                      Text file containing one stopWord per line.\n                                      You can pass --inputStopWordsFiles multiple times.", 
   },
   "inputStopWords": {
     "input": False, 
     "default": [], 
     "value": [], 
-    "usage": "list, default=[]\n               Consolidated list of stopWords from inputStopWordsFiles.", 
+    "usage": "list, default=[]\n                                      Consolidated list of stopWords from inputStopWordsFiles.", 
   },
   "font_path": {
     "input": True, 
     "default": None, 
     "value": "fonts\\Quicksand-Bold.ttf", 
-    "usage": "str, default='fonts\\Quicksand-Bold.ttf'\n               Font path to the font that will be used (OTF or TTF).", 
+    "usage": "str, default='fonts\\Quicksand-Bold.ttf'\n                                      Path to the font to use for word clouds (OTF or TTF).", 
   },
   "collocation_threshold": {
     "input": True, 
     "default": 30, 
     "value": 30, 
-    "usage": "int, default=30\n               Bigrams must have a Dunning likelihood collocation score greater than this\n               parameter to be counted as bigrams. Default of 30 is arbitrary.\n               See Manning, C.D., Manning, C.D. and Schütze, H., 1999. Foundations of\n               Statistical Natural Language Processing. MIT press, p. 162\n               https://nlp.stanford.edu/fsnlp/promo/colloc.pdf#page=22", 
+    "usage": "int, default=30\n                                      Bigrams must have a Dunning likelihood collocation score greater than this\n                                      parameter to be counted as bigrams. Default of 30 is arbitrary.\n                                      See Manning, C.D., Manning, C.D. and Schütze, H., 1999. Foundations of\n                                      Statistical Natural Language Processing. MIT press, p. 162\n                                      https://nlp.stanford.edu/fsnlp/promo/colloc.pdf#page=22", 
   },
 }
 
@@ -381,17 +362,25 @@ class TimeDict:
 class Chunk:
   def __init__(self, inputFile, model=model, loadText=True, progress=""):
     self.inputFile = Path(inputFile)
+    info("Chunk inputFile: %s" %(self.inputFile), 3)
     self.model = model
     self.dirname = os.path.dirname(self.inputFile)
+    info("Chunk dirname: %s" %(self.dirname), 3)
     self.basename = os.path.basename(self.inputFile)
+    info("Chunk basename: %s" %(self.basename), 3)
     self.stem = Path(self.basename).stem
+    info("Chunk stem: %s" %(self.stem), 3)
     self.ext = Path(self.basename).suffix
     self.split = re.split(r"[_-]", self.stem) # ['KJZZ', '2023', '10', '09', 'Mon', '1330', '1400', 'BBC Newshour']
     if len(self.split) != 8:
       raise ValueError("Chunk: invalid name: %s" % (self.inputFile))
-    self.week = datetime.date(int(self.split[1]),int(self.split[2]),int(self.split[3])).isocalendar().week
-    self.YYYYMMDD = '-'.join([self.split[1],self.split[2],self.split[3]])
-    self.Day = self.split[4]
+    
+    self.YYYY     = int(self.split[1])
+    self.MM       = int(self.split[2])
+    self.DD       = int(self.split[3])
+    self.week     = datetime.date(self.YYYY,self.MM,self.DD).isocalendar().week
+    self.Day      = str(self.split[4])
+    self.YYYYMMDD = '-'.join(str(x) for x in [self.YYYY,self.MM,self.DD])
     # we want YYYY-MM-DD HH:MM:SS.SSS
     self.startHHMM = ':'.join([self.split[5][:2],self.split[5][2:]])
     self.startTime = ':'.join([self.split[5][:2],self.split[5][2:]]) + ":00.000"
@@ -400,17 +389,25 @@ class Chunk:
     self.stopTime = ':'.join([self.split[6][:2],self.split[6][2:]]) + ":00.000"
     self.stop = ' '.join([self.YYYYMMDD, self.stopTime])
     self.title = self.split[-1]
+    info("Chunk title: %s" %(self.title), 3)
     
+    if str(self.stem) == str(self.inputFile):
+      # We passed a Chunk instead of a file, so we need to rebuild the actual path
+      self.dirname    = Path(os.path.join(outputFolder,str(self.YYYY),str(self.week)))
+      self.ext        = inputExt
+      self.basename   = "%s.%s" %(self.inputFile, inputExt)
+      self.inputFile  = Path(os.path.join(self.dirname,self.basename))
+      info("Chunk inputFile rebuild: %s" %(self.inputFile), 3)
     # generally for 30mn chunks, text files are 25k on average
     if os.path.isfile(self.inputFile):
       self.size = os.path.getsize(self.inputFile)
       if self.size < minChunkSize:
         warning("%s [%.1fk] small size is sus" %(self.inputFile, self.size/1024), 0, progress)
       if loadText:
-        with open(self.inputFile, 'r', encoding="utf-8") as pointer:
-        # with io.open(self.inputFile, mode="r", encoding="utf-8") as pointer:
+        with open(self.inputFile, 'r', encoding="utf-8") as file:
+        # with io.open(self.inputFile, mode="r", encoding="utf-8") as file:
           # separate sentences properly:
-          text = pointer.read().replace('\n',' ')
+          text = file.read().replace('\n',' ')
           self.text = text.replace('. ','.\n')
           # ddebug(self.text)
     else:
@@ -446,6 +443,8 @@ class Chunk:
 # If you use the TEXT storage class to store date and time value, you need to use the ISO8601 string format as follows:
 # YYYY-MM-DD HH:MM:SS.SSS
 def db_init(localSqlDb):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   localSqlDb.touch()
   # localSqlDb.unlink()
   conn = sqlite3.connect(localSqlDb)
@@ -506,6 +505,8 @@ def db_init(localSqlDb):
     # progress.advance(task)
 
 def db_update(table, column, value, textConditions, localSqlDb, conn, commit, progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   # db_update('schedule', 'misInfo', str(misInfo), textConditions, localSqlDb, conn)
   if not conn:
     conn = sqlite3.connect(localSqlDb)
@@ -523,6 +524,8 @@ def db_update(table, column, value, textConditions, localSqlDb, conn, commit, pr
 
 
 def db_load(inputFiles, localSqlDb, conn, model, commit, progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   importedFiles = []
   if inputFiles:
     info("%s files found" %(len(inputFiles)), 1)
@@ -581,6 +584,8 @@ def db_load(inputFiles, localSqlDb, conn, model, commit, progress=""):
 
 
 def cursor(localSqlDb, conn, sql, data=None, progress=""):
+  # info("%s" %({**locals()}), 3, "", "blue")   # uncomment when needed, it's called like a million times
+  
   if not conn:
     conn = sqlite3.connect(localSqlDb)
   cur = conn.cursor()
@@ -603,7 +608,8 @@ def cursor(localSqlDb, conn, sql, data=None, progress=""):
 
 
 def sqlQueryPrintExec(sqlQuery, pretty=pretty):
-  info("sqlQuery: %s" % (sqlQuery), 2)
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   records = cursor(localSqlDb, conn, sqlQuery)
   # SQLite: %w = day of week 0-6 with Sunday==0
   # But we want Mon Tue etc so we replace text in each tuple.
@@ -636,6 +642,8 @@ def sqlQueryPrintExec(sqlQuery, pretty=pretty):
 # print(my_lst)
 
 def replaceNum2Days(record):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   # crap multi replace function but it's cheap
   if isinstance(record,str):
     newRecord = record
@@ -655,7 +663,9 @@ def replaceNum2Days(record):
 #
 
 
-def checkChunk(getTextDict, progress=""):
+def countChunk(getTextDict, progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   # gettextDict = {'start': '%Y-%m-%d %H:%M'}
   # gettextDict = {'week': '40', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
   sqlGettext = "SELECT count(*) from schedule where 1=1"
@@ -663,17 +673,21 @@ def checkChunk(getTextDict, progress=""):
   # build the actual query
   for key in gettextDict.keys():
     # build the SQL query:
-    sqlGettext += (" and %s = '%s'" % (key, gettextDict[key]))
+    if key == "year":
+      sqlGettext += (" and strftime('%Y',start)='%s'" % (gettextDict[key]))
+    else:
+      sqlGettext += (" and %s = '%s'" % (key, gettextDict[key]))
     
-    # reformat start time for the fileName: chunk has been build if the key is "chunk"
+    # reformat start time for the fileName: chunk name has been validated if the key is "start"
+    # BUG: what's the use for the below? Does updating gettextDict here update it globally???
     if key == "start":
       gettextDict[key] = parser.parse(gettextDict[key]).strftime("%Y-%m-%d %H:%M")
     
-  info("sqlGettext: %s" %(sqlGettext), 3, progress)
+  info("sqlGettext: %s" %(sqlGettext), 4, progress)
   
   records = cursor(localSqlDb, conn, sqlGettext)
   if len(records) == 0:
-    info("0 records for %s" %(gettextDict), 4, progress)
+    info("0 records for %s" %(gettextDict), 2, progress)
   
   return records[0][0]
 # gettext
@@ -682,16 +696,22 @@ def checkChunk(getTextDict, progress=""):
 
 # the db has:   start stop week day title text model misInfo
 # and we want:  start stop KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title misInfo
+# getChunks() reconstructs each chunk name in the results
 def getChunks(getTextDict, withText=False, progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   # gettextDict = {'start': '%Y-%m-%d %H:%M'}
-  # gettextDict = {'week': '40', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
+  # gettextDict = {'year': '2023', 'week': '40', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
   
   selectText = ''
   if withText: selectText = ', text'
 
   textConditions = ''
   for column, value in gettextDict.items():
-    textConditions += " and %s='%s'" %(column, value)
+    if column == "year":
+      textConditions += (" and strftime('%%Y',start)='%s'" % (value))
+    else:
+      textConditions += (" and %s = '%s'" % (column, value))
   
           # strftime('%%H:%%M',start)
         # , strftime('%%H:%%M',stop)
@@ -712,7 +732,7 @@ def getChunks(getTextDict, withText=False, progress=""):
   
   records = cursor(localSqlDb, conn, sqlListChunks)
   if len(records) == 0:
-    info("0 records for %s" %(gettextDict), 3, progress)
+    info("0 records for %s" %(gettextDict), 2, progress)
   
   return records
   # records = [
@@ -723,6 +743,8 @@ def getChunks(getTextDict, withText=False, progress=""):
 
 
 def printOutGetText(records, mergeRecords, pretty, dryRun):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   if mergeRecords:
     mergedText = ''
     for record in records: mergedText += record[1]
@@ -741,10 +763,12 @@ def printOutGetText(records, mergeRecords, pretty, dryRun):
 
 
 def genWordClouds(records, wordCloudTitle, mergeRecords, showPicture, wordCloudDict, outputFolder=outputFolder, dryRun=False, progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   # gettext = "week=43+title=Classic Jazz with Chazz Rayburn+Day=Mon"
   # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
   # records = (('2023-10-14 01:00.000', '2023-10-14 01:30.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...'),..)
-  # wordCloudTitle = "KJZZ week=43 title=BBC World Service Day=Sat"
+  # wordCloudTitle = "KJZZ year=2023 week=43 title=BBC World Service Day=Sat"
   
   if len(records) == 0: return []
   genWordCloudDicts = []
@@ -752,12 +776,13 @@ def genWordClouds(records, wordCloudTitle, mergeRecords, showPicture, wordCloudD
   
   if mergeRecords:
     for record in records: mergedText += record[4]
+    info("wordCloud: mergeRecords = %i characters" %(len(mergedText)), 3)
     genWordCloudDicts.append(genWordCloud(mergedText, wordCloudTitle, removeStopwords, stopLevel, wordCloudDict, showPicture, outputFolder, dryRun, progress))
   else:
     i = 1
     for record in records:
       info("wordCloud: image %s" % (i), 1, progress)
-      info("wordCloud: record = \n %s" %(record), 2, progress)
+      info("wordCloud: record = \n %s" %(record), 3, progress)
       genWordCloudDicts += genWordCloud(record[4], wordCloudTitle, removeStopwords, stopLevel, wordCloudDict, showPicture, outputFolder, dryRun, progress)
     i += 1
 
@@ -766,7 +791,9 @@ def genWordClouds(records, wordCloudTitle, mergeRecords, showPicture, wordCloudD
 
 
 def genWordCloud(text, wordCloudTitle, removeStopwords=True, level=0, wordCloudDict=wordCloudDict, showPicture=False, outputFolder=outputFolder, dryRun=False, progress=""):
-  # wordCloudTitle = "KJZZ week=43 title=BBC World Service Day=Sat"
+  info("%s" %({**locals()}), 3, "", "blue")
+  
+  # wordCloudTitle = "KJZZ year=2023 week=43 title=BBC World Service Day=Sat"
   info("Now generating: %s" %(wordCloudTitle), 2, progress)
   
   import numpy as np
@@ -801,7 +828,7 @@ def genWordCloud(text, wordCloudTitle, removeStopwords=True, level=0, wordCloudD
 
   # https://github.com/amueller/word_cloud/blob/main/examples/simple.py
   # we start by removing words from the wordCloudTitle of the show itself
-  # for a typical week schedule, normally wordCloudTitle would be == "KJZZ week= title= Day="
+  # for a typical week schedule, normally wordCloudTitle would be "KJZZ year=2023 week=01 title=The Tile Day=Fri"
   genWordCloudDict["stopWords"] = wordCloudTitle.replace("=", " ").split()
   genWordCloudDict["wordsList"] = text.split()
   genWordCloudDict["numWords"] = len(genWordCloudDict["wordsList"])
@@ -835,9 +862,10 @@ def genWordCloud(text, wordCloudTitle, removeStopwords=True, level=0, wordCloudD
     info("most 10 common words after: \n%s" % (Counter(genWordCloudDict["cleanWordsList"]).most_common(10)), 2, progress)
     genWordCloudDict["top100tuples"] = Counter(genWordCloudDict["cleanWordsList"]).most_common(100)
     info("%s words - %s stopWords (%s words removed) == %s total words" %(genWordCloudDict["numWords"], len(genWordCloudDict["stopWords"]), genWordCloudDict["numWords"] - len(genWordCloudDict["cleanWordsList"]), len(genWordCloudDict["cleanWordsList"])), 2, progress)
-    info("stopWords = %s" %(str(genWordCloudDict["stopWords"])), 3, progress)
+    info("stopWords = %s" %(str(genWordCloudDict["stopWords"])), 4, progress)
   else:
     info("%s words" %(genWordCloudDict["numWords"]), 1, progress)
+    
   # image 1: Display the generated image:
   # font_path="fonts\\Quicksand-Regular.ttf"
   # class WordCloud: https://github.com/amueller/word_cloud/blob/fa7ac29c6c96c713f51585818e289e8f99c0f211/wordcloud/wordcloud.py#L154C25-L154C25
@@ -950,10 +978,11 @@ def genWordCloud(text, wordCloudTitle, removeStopwords=True, level=0, wordCloudD
   # image.show()
   
   # always save BEFORE show
-  if genWordCloudDict["fileName"]: genWordCloudDict["outputFile"] = saveImage(outputFolder, genWordCloudDict["fileName"], plt, usePngquant, progress)
+  if genWordCloudDict["fileName"]: genWordCloudDict["outputFile"] = saveImage(outputFolder, genWordCloudDict["fileName"], plt, imgExt, imgQuality, usePngquant, progress)
   if genWordCloudDict["outputFile"]:
     genWordCloudDict["outputFileName"] = os.path.basename(genWordCloudDict["outputFile"])
-    genWordCloudDict["outputThumbnailFile"] = saveThumbnail(genWordCloudDict["outputFile"], outputFolder, "thumbnail-" + genWordCloudDict["outputFileName"], usePngquant)
+    genWordCloudDict["stem"] = Path(genWordCloudDict["outputFile"]).stem
+    genWordCloudDict["outputThumbnailFile"] = saveThumbnail(genWordCloudDict["outputFile"], outputFolder, "thumbnail-" + genWordCloudDict["stem"], imgExt, imgQuality, usePngquant)
 
   if showPicture: plt.show()
   plt.close()
@@ -962,6 +991,8 @@ def genWordCloud(text, wordCloudTitle, removeStopwords=True, level=0, wordCloudD
 
 
 def loadStopWordsDict():
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   from wordcloud import STOPWORDS
   # https://stackoverflow.com/questions/2831212/python-sets-vs-lists
   # z=set()
@@ -990,6 +1021,8 @@ def loadStopWordsDict():
 
 
 def loadDictHeatMap(dictHeatMap, withSynonyms=withSynonyms):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   synonymsFile = os.path.join(thesaurusFolder, 'Thesaurus-Synonyms-Common.txt')
   # only the synonyms of sourcing and uncertainty seem to make sense, and look the most closely related
   heatFactorSynonymsFor = set({"sourcing", "uncertainty"})
@@ -1046,6 +1079,8 @@ def loadDictHeatMap(dictHeatMap, withSynonyms=withSynonyms):
 
 
 def genMisInformation(records, mergeRecords, graphTitle, graphs, showPicture=False, dryRun=False):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   # gettext = "week=43+title=Classic Jazz with Chazz Rayburn+Day=Mon"
   # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
   # records = [('2023-10-14 01:00.000', '2023-10-14 01:30.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...')..]
@@ -1068,7 +1103,7 @@ def genMisInformation(records, mergeRecords, graphTitle, graphs, showPicture=Fal
       
       # shortcut: pre-load retrieved misInfo values into "heat" when they exist. 
       # dictHeatMapBlank.keys() are assumed to be in same order as the misInfo list items
-      # BUG: We also assume all chunks of a processed segment have been processed and no item in misInfo is=None
+      # BUG: We also assume all chunks of a processed program have been processed and no item in misInfo is=None
       if misInfoText is not None and not force:
         for index, heatFactor in enumerate(dictHeatMap.keys()):
           if dictHeatMap[heatFactor]["heat"] is None:
@@ -1100,7 +1135,7 @@ def genMisInformation(records, mergeRecords, graphTitle, graphs, showPicture=Fal
 
       # shortcut: pre-load retrieved misInfoText values into "heat" when they exist. 
       # dictHeatMapBlank.keys() are assumed to be in same order as the misInfo list items
-      # BUG: We also assume all chunks of a processed segment have been processed and no item in misInfo is=None
+      # BUG: We also assume all chunks of a processed program have been processed and no item in misInfo is=None
       if misInfoText is not None and not force:
         for index, heatFactor in enumerate(dictHeatMap.keys()):
           dictHeatMap[heatFactor]["heat"] = json.loads(misInfoText)[index]
@@ -1133,6 +1168,8 @@ def genMisInformation(records, mergeRecords, graphTitle, graphs, showPicture=Fal
 
 
 def genMisinfoBarGraph(text, graphTitle, dictHeatMap, wordCloudDict=wordCloudDict, graphs=defaultGraphs, showPicture=False, dryRun=False, progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   info("%s" %(graphTitle), 2)
   textWordsLen = len(text.strip().split())
   if len(graphs) == 0: graphs=defaultGraphs
@@ -1168,6 +1205,8 @@ def genMisinfoBarGraph(text, graphTitle, dictHeatMap, wordCloudDict=wordCloudDic
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
 # def genMisinfoHeatMap(textArray, Ylabels, graphTitle, dictHeatMaps, wordCloudDict=wordCloudDict, showPicture=False, dryRun=False, progress=""):
 def genMisinfoHeatMap(records, graphTitle, dictHeatMaps, wordCloudDict=wordCloudDict, showPicture=False, dryRun=False, progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   # records = [('2023-10-14 01:00:00.000', '2023-10-14 01:30:00.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...'),..]
   
   info("%s showPicture=%s dryRun=%s" %(graphTitle, showPicture, dryRun), 1, progress)
@@ -1234,6 +1273,8 @@ def genMisinfoHeatMap(records, graphTitle, dictHeatMaps, wordCloudDict=wordCloud
 
 
 def readInputFolder(inputFolder):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   if os.path.isdir(inputFolder):
     info(("listing folder %s ...") % (inputFolder), 1)
     # inputFiles = sorted([os.fsdecode(file) for file in os.listdir(inputFolder) if os.fsdecode(file).endswith(".text")])
@@ -1253,6 +1294,8 @@ def readInputFolder(inputFolder):
 
 
 def readInputFile(inputTextFile):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   if os.path.isfile(inputTextFile):
     if (os.path.getsize(inputTextFile) > 0):
       info("inputTextFile %s passed" % (inputTextFile), 1)
@@ -1267,6 +1310,8 @@ def readInputFile(inputTextFile):
 
 
 def graph_line(X, Y, title="", fileName="", progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   import numpy as np
   import pandas as pd
   import matplotlib
@@ -1285,7 +1330,7 @@ def graph_line(X, Y, title="", fileName="", progress=""):
   plt.xlabel('date')
 
   # always save BEFORE show
-  if fileName: outputFile = saveImage(outputFolder, fileName, plt, usePngquant, progress)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, progress)
 
   if showPicture: plt.show()
   plt.close()
@@ -1295,6 +1340,8 @@ def graph_line(X, Y, title="", fileName="", progress=""):
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph bar --show
 def graph_bar(X, Y, title="", fileName="", progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   import numpy as np
   import pandas as pd
   import matplotlib
@@ -1313,7 +1360,7 @@ def graph_bar(X, Y, title="", fileName="", progress=""):
   plt.xlabel('date')
 
   # always save BEFORE show
-  if fileName: outputFile = saveImage(outputFolder, fileName, plt, usePngquant, progress)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, progress)
 
   if showPicture: plt.show()
   plt.close()
@@ -1323,6 +1370,8 @@ def graph_bar(X, Y, title="", fileName="", progress=""):
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show
 def graph_pie(X, Y, title="", fileName="", progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   import numpy as np
   import pandas as pd
   import matplotlib
@@ -1349,7 +1398,7 @@ def graph_pie(X, Y, title="", fileName="", progress=""):
        # )
        
   # always save BEFORE show
-  if fileName: outputFile = saveImage(outputFolder, fileName, plt, usePngquant, progress)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, progress)
 
   if showPicture: plt.show()
   plt.close()
@@ -1358,6 +1407,8 @@ def graph_pie(X, Y, title="", fileName="", progress=""):
 
 
 def graph_heatMapTestHighlight(progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   import numpy as np
   import pandas as pd
   import matplotlib
@@ -1383,7 +1434,7 @@ def graph_heatMapTestHighlight(progress=""):
   ax.tick_params(length=0)
 
   # always save BEFORE show
-  if fileName: outputFile = saveImage(outputFolder, fileName, plt, usePngquant, progress)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, progress)
 
   if showPicture: plt.show()
   plt.close()
@@ -1393,6 +1444,8 @@ def graph_heatMapTestHighlight(progress=""):
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
 def graph_heatMap(arrays, Xlabels, Ylabels, graphTitle="", fileName="", showPicture=False, progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   import numpy as np
   import pandas as pd
   import matplotlib
@@ -1482,7 +1535,7 @@ def graph_heatMap(arrays, Xlabels, Ylabels, graphTitle="", fileName="", showPict
   fig.tight_layout()
 
   # always save BEFORE show
-  if fileName: outputFile = saveImage(outputFolder, fileName, plt, usePngquant, progress)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, progress)
 
   if showPicture: plt.show()
   plt.close()
@@ -1490,50 +1543,111 @@ def graph_heatMap(arrays, Xlabels, Ylabels, graphTitle="", fileName="", showPict
 # graph_heatMap
 
 
-def saveImage(outputFolder, fileName, plt, usePngquant=usePngquant, progress=""):
-  if useJpeg:
-    outputFileName = fileName + ".jpg"
-    outputFile = os.path.join(outputFolder, outputFileName)
-    plt.savefig(outputFile, pil_kwargs={
-                            'quality': jpegQuality,
-                            'subsampling': 10
-                            })
+def saveImage(outputFolder, stem, img, output_ext=imgExt, quality=imgQuality, usePngquant=usePngquant, progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
+  outputFileName = "%s.%s" %(stem, output_ext)
+  outputFile = os.path.join(outputFolder, outputFileName)
+  # output_ext = Path(image_path).suffix
+  metadata = None
+  kwargs = dict()
+  
+  info('image to save: "%s"' %(outputFile), 4, progress)
+  
+  # TODO: see if convert_hdr_to_8bit=False make a change
+  # https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html
+  if output_ext in ['avif', 'webp', 'jxl']:
+    if save_metadata: kwargs["exif"] = self.genMetadataEXIF(img, prompt, extra_pnginfo)
+    if quality == 100:
+      kwargs["lossless"] = True
+    else:
+      kwargs["quality"] = quality
+    kwargs["optimize"] = self.optimize_image
+  if output_ext in ['j2k', 'jp2', 'jpc', 'jpf', 'jpx', 'j2c']:
+    if save_metadata: kwargs["exif"] = self.genMetadataEXIF(img, prompt, extra_pnginfo)
+    if quality < 100:
+      kwargs["irreversible"] = True
+      # there is no such thing as compression level in JPEG2000. Read https://comprimato.com/blog/2017/06/22/bitrate-control-quality-layers-jpeg2000/
+      # kwargs["quality_mode"] = 'rates' or 'dB'
+      # kwargs["quality_layers"] = [0,1,2] no refence online. i tried all values from 0 to 100 and no change in filesize
+    else:
+      kwargs["quality"] = quality
+    kwargs["optimize"] = self.optimize_image
+  elif output_ext in ['jpg', 'jpeg']:
+    if save_metadata: kwargs["exif"] = self.genMetadataEXIF(img, prompt, extra_pnginfo)
+    # https://stackoverflow.com/questions/19303621/why-is-the-quality-of-jpeg-images-produced-by-pil-so-poor
+    kwargs["subsampling"] = 0
+    kwargs["quality"] = quality
+    kwargs["optimize"] = self.optimize_image
+  elif output_ext in ['tiff']:
+    # tiff: no quality
+    kwargs["optimize"] = self.optimize_image
+  elif output_ext in ['png', 'gif']:
+    if save_metadata: kwargs["pnginfo"] = self.genMetadataPng(img, prompt, extra_pnginfo)
+  
+    # png/gif: no quality, rather we convert quality to compression level in the 0-9 range
+    old_min = 0
+    old_max = 90
+    new_min = 0
+    new_max = 9
+    if quality >= 91: quality = 90
+    png_compress_level = round( ( (quality - old_min) / (old_max - old_min) ) * (new_max - new_min) + new_min )
+    
+    kwargs["compress_level"] = png_compress_level
+    # BUG: PIL will compress at level 9 when PNG optimize_image = True
+    # kwargs["optimize"] = self.optimize_image
+  # elif output_ext in ['bmp']:
+    # nothing to add
+  
+  if isinstance(img, Image.Image):
+    # img is a PIL Image
+    if output_ext in ['jpg', 'jpeg']:
+      # remove transparency:
+      if img.mode != 'RGB': img = img.convert('RGB')
+    img.save(outputFile, **kwargs)
   else:
-    outputFileName = fileName + ".png"
-    outputFile = os.path.join(outputFolder, outputFileName)
-    plt.savefig(outputFile, bbox_inches='tight')
-    if usePngquant:
-      import pngquant
-      pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
-      pngquant.quant_image(image=outputFile)
+    # img is actually a plt
+    img.savefig(outputFile, 
+                bbox_inches='tight', 
+                pil_kwargs=kwargs, 
+                )
+  
   info('image saved: "%s" [%.0fk]' %(outputFile, os.path.getsize(outputFile)/1024), 1, progress)
+  optimizePng(outputFile, output_ext, usePngquant=usePngquant)
+  
   return outputFile
 # saveImage
 
 
-def saveThumbnail(inputFile, outputFolder, thumbnailFileName, usePngquant=usePngquant, progress=""):
-  import PIL
-
-  # I would love this to work instead of reloading the file we just produced:
-  # PILoutputFile = PIL.Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
-  PILoutputFile = PIL.Image.open(inputFile)
-  PILoutputFile.thumbnail((256, 256), PIL.Image.Resampling.LANCZOS)   # looks okay
-  # PILoutputFile = thumbnail.resize((256,256), PIL.Image.LANCZOS)    # does not look good
+def saveThumbnail(inputFile, outputFolder, stem, output_ext=imgExt, quality=imgQuality, usePngquant=usePngquant, progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
   
+  thumbnailFileName = "%s.%s" %(stem, output_ext)
   thumbnailFile = os.path.join(outputFolder, thumbnailFileName)
-  if useJpeg:
-    PILoutputFile.save(thumbnailFile , "JPEG", quality=jpegQuality, optimize=True)
-  else:
-    PILoutputFile.save(thumbnailFile)
-    if usePngquant:
-      import pngquant
-      # for clean, electronically generated graphs, pngquant will always give better results than jpeg 50%
-      pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
-      pngquant.quant_image(image=thumbnailFile)
-
+  
+  # I would love this to work instead of reloading the file we just produced:
+  # img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
+  img = Image.open(inputFile)
+  img.thumbnail((256, 256), Image.Resampling.LANCZOS)   # looks okay
+  # img = img.resize((256,256), Image.LANCZOS)          # formerly ANTIALIAS, does not look good at all
+  
+  saveImage(outputFolder, stem, img, output_ext, quality, usePngquant, progress)
+  
   info('thumbnail saved: "%s" [%.0fk]' %(thumbnailFile, os.path.getsize(thumbnailFile)/1024), 2, progress)
   return thumbnailFile
-#
+# saveThumbnail
+
+
+
+def optimizePng(outputFile, output_ext, usePngquant=usePngquant):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
+  if output_ext in ['png'] and usePngquant:
+    # for clean, electronically generated graphs, pngquant will always give better results than jpeg 50%
+    pngquant.config(min_quality=1, max_quality=20, speed=1, ndeep=2)
+    pngquant.quant_image(image=outputFile)
+    info('optimizePng: "%s" [%.0fk]' %(outputFile, os.path.getsize(outputFile)/1024), 2, progress)
+# optimizePng
 
 
 
@@ -1564,21 +1678,25 @@ def getPrevKey(HHMMList, key):
     return None
 
 
-def rebuildThumbnails(inputFolder, outputFolder, dryRun=False, progress=""):
-  pngPath = '%s/KJZZ*.png' %(inputFolder)
-  pngList = glob.glob(pngPath, recursive=False)
-  # print(pngList)
+def rebuildThumbnails(inputFolder, outputFolder, imgExt, dryRun=False, progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
+  imgPath = os.path.normpath('%s/KJZZ*.%s' %(inputFolder, imgExt))
+  imgList = glob.glob(imgPath, recursive=False)
+  # print(imgList)
 
   with Progress() as progress:
-    task = progress.add_task("Thumbnail gen", total=len(pngList))
-    for png in pngList:
-      outputThumbnailFile = saveThumbnail(png, outputFolder, "thumbnail-" + os.path.basename(png), usePngquant)
+    task = progress.add_task("Thumbnail gen", total=len(imgList))
+    for img in imgList:
+      outputThumbnailFile = saveThumbnail(img, outputFolder, "thumbnail-" + Path(img).stem, imgExt, imgQuality, usePngquant)
       progress.advance(task)
   
 # rebuildThumbnails
 
 
 def genHtmlHead(pageTitle, title):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   dictTemplate = dict(pageTitle=pageTitle, title=title, rand=random.randint(0,99))
   template = string.Template(('''
 <!doctype html>
@@ -1593,7 +1711,7 @@ def genHtmlHead(pageTitle, title):
 
   <link rel="stylesheet" type="text/css" href="../../lib/assets/fonts/css/fontawesome.min.css">
   <link rel="stylesheet" type="text/css" href="../../lib/assets/fonts/css/regular.min.css">
-  <link rel="stylesheet" type="text/css" href="../../lib/css/style-child.css?${rand}">
+  <link rel="stylesheet" type="text/css" href="../../lib/css/style-iframe.css?${rand}">
 
 </head>
 '''))
@@ -1602,31 +1720,33 @@ def genHtmlHead(pageTitle, title):
 # genHtmlHead
 
 
-def genHtmlNavBar(weekNumber, byChunk):
-  addByChunk = '-byChunk'
-  addNotByChunk = '-bySegment'
-  switchTo = 'byChunk'
-  if byChunk:
-    addByChunk = '-bySegment'
-    addNotByChunk = '-byChunk'
-    switchTo = 'bySegment'
+# def genHtmlNavBar(yearNumber, weekNumber, byChunk):
+  # addByChunk = '-byChunk'
+  # addNotByChunk = '-bySegment'
+  # switchTo = 'byChunk'
+  # if byChunk:
+    # addByChunk = '-bySegment'
+    # addNotByChunk = '-byChunk'
+    # switchTo = 'bySegment'
 
-  dictTemplate = dict(weekNumber=weekNumber, prevWeekNumber=(weekNumber-1), nextWeekNumber=(weekNumber+1), addNotByChunk=addNotByChunk, addByChunk=addByChunk, switchTo=switchTo)
-  template = string.Template(('''
-<table><thead>
-  <tr class="navbar">
-    <td><span><a class="prevWeek" href="../${prevWeekNumber}/index${addNotByChunk}.html">&larr; week ${prevWeekNumber}</a></span></td>
-    <td colspan="6"><span>KJZZ week ${weekNumber}<a href="index${addByChunk}.html">&nbsp;&nbsp;&nbsp;${switchTo}</a></span></td>
-    <td><span><a class="nextWeek" href="../${nextWeekNumber}/index${addNotByChunk}.html">week ${nextWeekNumber}&rarr;</a></span></td>
-  </tr>
-</thead></table>
-'''))
-  return template.substitute(dictTemplate)
+  # dictTemplate = dict(yearNumber=yearNumber, prevYear=(yearNumber-1), nextYear=(yearNumber+1), weekNumber=weekNumber, prevWeek=(weekNumber-1), nextWeek=(weekNumber+1), addNotByChunk=addNotByChunk, addByChunk=addByChunk, switchTo=switchTo)
+  # template = string.Template(('''
+# <table><thead>
+  # <tr class="navbar">
+    # <td><span><a class="prevWeek" href="../${prevWeek}/index${addNotByChunk}.html">&larr; week ${prevWeek}</a></span></td>
+    # <td colspan="6"><span>KJZZ ${yearNumber} week ${weekNumber}<a href="index${addByChunk}.html">&nbsp;&nbsp;&nbsp;${switchTo}</a></span></td>
+    # <td><span><a class="nextWeek" href="../${nextWeek}/index${addNotByChunk}.html">week ${nextWeek}&rarr;</a></span></td>
+  # </tr>
+# </thead></table>
+# '''))
+  # return template.substitute(dictTemplate)
 
-# genHtmlNavBar
+# # genHtmlNavBar
 
 
 def genHtmlModal():
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   return '''
 <div id="modal-root">
   <div id="modal-bg" onclick="onClickModalBackdrop(this)"></div>
@@ -1641,6 +1761,8 @@ def genHtmlModal():
 # genHtmlModal
 
 def genHtmlThead():
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   dictTemplate = dict()
   template = string.Template(('''
 <thead>
@@ -1655,6 +1777,8 @@ def genHtmlThead():
 
 
 def genHtmlChunk(rowspan, classChunkExist, title, plays, texts, segmentImg=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   dictTemplate = dict(rowspan=rowspan, classChunkExist=classChunkExist, title=title, plays=plays, texts=texts, segmentImg=segmentImg)
   template = string.Template(('''
 <td rowspan="${rowspan}" ${classChunkExist}>
@@ -1680,8 +1804,8 @@ def genHtmlChunk(rowspan, classChunkExist, title, plays, texts, segmentImg=""):
       # <a href="KJZZ_2023-10-08_Sun_2330-0000_BBC World Service.text"><i class="fa-regular fa-file-lines" ></i></a>
     # </span>
   # </div>
-  # <div onclick="showModal('KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png');">
-    # <img src="thumbnail-KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" alt="KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" class="chunkExist" decoding="async" onerror="this.src='../../lib/assets/missingCloud.png'" loading="lazy" />
+  # <div onclick="showModal('KJZZ year=2023 week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png');">
+    # <img src="thumbnail-KJZZ year=2023 week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" alt="KJZZ year=2023 week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" class="chunkExist" decoding="async" onerror="this.src='../../lib/assets/missingCloud.png'" loading="lazy" />
   # </div>
 # </td>
 
@@ -1689,9 +1813,11 @@ def genHtmlChunk(rowspan, classChunkExist, title, plays, texts, segmentImg=""):
 
 
 def genHtmlFooter():
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   dictTemplate = dict(rand=random.randint(0,99))
   template = string.Template(('''
-<script defer type="application/javascript" src="../../lib/js/ui-child.js?${rand}"></script>
+<script defer type="application/javascript" src="../../lib/js/ui-iframe.js?${rand}"></script>
 '''))
   return template.substitute(dictTemplate)
 
@@ -1710,13 +1836,15 @@ def genHtmlSegmentImg(imgFileName, classChunkExist):
 '''))
   return template.substitute(dictTemplate)
 
-# <div onclick="showModal('KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png');">
-  # <img src="thumbnail-KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" alt="KJZZ week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" class="chunkExist" decoding="async" onerror="this.src='../../lib/assets/missingCloud.png'" loading="lazy" />
+# <div onclick="showModal('KJZZ year=2023 week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png');">
+  # <img src="thumbnail-KJZZ year=2023 week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" alt="KJZZ year=2023 week=40 title=BBC World Service Day=Sun words=8628 maxw=1000 minf=4 maxf=400 scale=1.0 relscale=auto.png" class="chunkExist" decoding="async" onerror="this.src='../../lib/assets/missingCloud.png'" loading="lazy" />
 # </div>
 # genHtmlSegmentImg
 
 
-def genHtmlPlayButton(weekNumber, startTime, stopTime, fileStem, misInfoText, misInfoLabels, classTooltipPosition, progress=""):
+def genHtmlPlayButton(yearNumber, weekNumber, startTime, stopTime, fileStem, misInfoText, misInfoLabels, classTooltipPosition, progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   # misInfoText = '[0.7, 0.4, 0.4, 2.9]' or None
   colorClass = ''
   BSoMeterTable = ''
@@ -1755,9 +1883,9 @@ def genHtmlPlayButton(weekNumber, startTime, stopTime, fileStem, misInfoText, mi
   tooltip = tooltipTemplate.substitute(dictTooltipTemplate)
 
 
-  dictTemplate = dict(weekNumber=weekNumber, fileStem=fileStem, colorClass=colorClass, tooltip=tooltip)
+  dictTemplate = dict(yearNumber=yearNumber, weekNumber=weekNumber, fileStem=fileStem, colorClass=colorClass, tooltip=tooltip)
   template = string.Template(('''
-      <i class="fa-regular fa-circle-play tooltip ${colorClass}" onclick="play('${weekNumber}/${fileStem}.mp3');">
+      <i class="fa-regular fa-circle-play tooltip ${colorClass}" onclick="play('${yearNumber}/${weekNumber}/${fileStem}.mp3');">
 ${tooltip}
       </i>
 '''))
@@ -1767,6 +1895,8 @@ ${tooltip}
 
 
 def genHtmlTextButton(fileStem, progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
   dictTemplate = dict(fileStem=fileStem)
   template = string.Template(('''
       <a href="${fileStem}.text">
@@ -1778,20 +1908,23 @@ def genHtmlTextButton(fileStem, progress=""):
 # genHtmlTextButton
 
 
-def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False, progress=""):
+def generateHtml(jsonScheduleFile, outputFolder, yearNumber, weekNumber, byChunk=False, progress=""):
+  info("%s" %({**locals()}), 3, "", "blue")
+  
+  outputFolder = os.path.normpath(os.path.join(outputFolder, str(yearNumber), str(weekNumber)))
   
   # old school:
-  # pngList = []
+  # imgList = []
   # for file in os.listdir(outputFolder):
     # if file.endswith('.png'):
-      # pngList.append(file)
+      # imgList.append(file)
 
   # better school:
-  pngPath = '%s/KJZZ week=%s*.png' %(os.path.join(outputFolder, str(weekNumber)), weekNumber)
-  pngList = glob.glob(pngPath, recursive=False)
+  imgPath = os.path.normpath('%s/KJZZ year=%s week=%s*.%s' %(outputFolder, yearNumber, weekNumber, imgExt))
+  imgList = glob.glob(imgPath, recursive=False)
 
-  # regexp = re.compile("^KJZZ week=%s.*title=%s.*Day=%s" %(weekNumber, "The Moth", "Sat"))
-  # print(list(filter(regexp.match, pngList)))
+  # regexp = re.compile("^KJZZ year=%s week=%s.*title=%s.*Day=%s" %(yearNumber, weekNumber, "The Moth", "Sat"))
+  # print(list(filter(regexp.match, imgList)))
   # exit()
 
   # load json
@@ -1804,16 +1937,16 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False, progress=
   # recreate index.html from template
   with open(indexTemplateFile, 'r', encoding="utf-8") as fd: indexTemplate = string.Template(fd.read())
   # with io.open(indexTemplateFile, mode="r", encoding="utf-8") as fd:  indexTemplate = string.Template(fd.read())
-  dictTemplate = dict(weekNumber=weekNumber, prevWeek=(weekNumber-1), nextWeek=(weekNumber+1), titleData="BiasBuster: KJZZ", title="KJZZ week %s" %(weekNumber), rand=random.randint(0,99))
+  dictTemplate = dict(yearNumber=yearNumber, prevYear=(yearNumber-1), nextYear=(yearNumber+1), weekNumber=weekNumber, prevWeek=(weekNumber-1), nextWeek=(weekNumber+1), titleData="BiasBuster: KJZZ", title="KJZZ %s week %s" %(yearNumber, weekNumber), rand=random.randint(0,99))
   with open(indexFile, 'w', encoding="utf-8") as fd:
     fd.write(indexTemplate.substitute(dictTemplate))
     info("outputFile: %s" %(indexFile), 1, progress)
 
 
 
-  # how do my table compare to https://kjzz.org/kjzz-print-schedule ? let me know in the comments!
+  # how do my table compare to https://www.kjzz.org/schedule#weekly? let me know in the comments!
   # build weekNumber's index:
-  html  = genHtmlHead("BiasBuster: KJZZ week %s" %(weekNumber), "KJZZ week %s" %(weekNumber))
+  html  = genHtmlHead("BiasBuster: KJZZ %s week %s" %(yearNumber, weekNumber), "KJZZ %s week %s" %(yearNumber, weekNumber))
   html += '<body>\n'
   html += genHtmlModal()
   
@@ -1849,7 +1982,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False, progress=
     for key, startTime in enumerate(reversedHHMMList):
       rowspanDict[startTime] = {}
       for Day in DayList:
-        # title should be renamed "segment", really.
+        # title should be renamed "program", really.
         title = jsonSchedule[startTime][Day]
         classChunkExist = ''
         plays = ''
@@ -1860,7 +1993,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False, progress=
         info("Processing: %s %s %s %s" %(key, startTime, Day, title), 2, progress)
 
         # we need getTextDict to get chunk names for the play buttons, and to build the missing wordClouds
-        gettext = "week=%s+title=%s+Day=%s" %(weekNumber, title, Day)
+        gettext = "year=%s+week=%s+title=%s+Day=%s" %(yearNumber, weekNumber, title, Day)
         getTextDict = buildGetTextDict(gettext)
 
         # without +1, jsonSchedule[reversedHHMMList[key+1]] will error out with IndexError: list index out of range
@@ -1872,14 +2005,14 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False, progress=
           # By default we start with a normal, chunked cell of 30mn:
           # Also we should not have to filter by week anymore since version 0.9.6 
           # , we generate both html and png under each ./week subfolder
-          regexp = re.compile(".*KJZZ week=%s.*title=%s.*Day=%s" %(weekNumber, title, Day))
+          regexp = re.compile(".*KJZZ year=%s week=%s.*title=%s.*Day=%s" %(yearNumber, weekNumber, title, Day))
           
           # 1. Is it in the list we build at the beginning?
-          thatWordCloudPngList = list(filter(regexp.match, pngList))
+          thatWordCloudPngList = list(filter(regexp.match, imgList))
           # 2. Was it generated at some point?
           #    Remember, we process every startTime in reversedHHMMList, so we may have already generated it
           if len(thatWordCloudPngList) == 0:
-            thisPngPath = '%s/KJZZ week=%s title=%s Day=%s*.png' %(os.path.join(outputFolder, str(weekNumber)), weekNumber, title, Day)
+            thisPngPath = '%s/KJZZ year=%s week=%s title=%s Day=%s*.png' %(outputFolder, yearNumber, weekNumber, title, Day)
             thatWordCloudPngList = glob.glob(thisPngPath, recursive=False)
 
           # now we are certain that we need to generate the wordCloud
@@ -1892,13 +2025,14 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False, progress=
             if not any(word in title for word in listTitleWords2Exclude):
               records = getChunks(getTextDict, True, progress)
               # records = [('2023-10-14 01:00:00.000', '2023-10-14 01:30:00.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...'),..]
-              # each record is a 30mn chunk of a segment
+              # each record is a 30mn chunk of a program
               if len(records) > 0:
                 wordCloudTitle = "KJZZ " + gettext.replace("+", " ")
                 # we only print info if we actually generate the wordCloud as i t takes time:
-                if autoGenerate: info('Generate wordCloud "%s" ...' %(wordCloudTitle), 1, progress)
+                if not noPics: info('Generate wordCloud "%s" ...' %(wordCloudTitle), 1, progress)
                                   # genWordClouds(records, title, mergeRecords, showPicture, wordCloudDict, outputFolder=outputFolder, dryRun=False, progress="")
-                genWordCloudDicts = genWordClouds(records, wordCloudTitle, True, showPicture, wordCloudDict, os.path.join(outputFolder, str(weekNumber)), not autoGenerate, progress)
+                info('genWordCloudDicts=genWordClouds wordCloudTitle="%s"' %(wordCloudTitle), 3)
+                genWordCloudDicts = genWordClouds(records, wordCloudTitle, True, showPicture, wordCloudDict, os.path.join(outputFolder, str(weekNumber)), not noPics, progress)
                 # we should only have 1 item since we mergeRecords
                 if len(genWordCloudDicts) > 0:
                   classChunkExist = 'class="chunkExist"'
@@ -1923,13 +2057,13 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False, progress=
 
             # fontawesome incons: https://fontawesome.com/search?m=free&o=r
             for record in records:
-              # This is by segment (title), not byChunk: we therefore list all chunks for that segment.
+              # This is by program (title), not byChunk: we therefore list all chunks for that program.
               # Also, no \n between them or it will translate into a white space
               startDict   = TimeDict(record[0])
               stopDict    = TimeDict(record[1])
               chunkName   = record[2]
               misInfoText = record[3]
-              plays += genHtmlPlayButton(weekNumber, startDict.HHMM, stopDict.HHMM, chunkName, misInfoText, dictHeatMapBlank.keys(), classTooltipPosition, progress)
+              plays += genHtmlPlayButton(yearNumber, weekNumber, startDict.HHMM, stopDict.HHMM, chunkName, misInfoText, dictHeatMapBlank.keys(), classTooltipPosition, progress)
               texts += genHtmlTextButton(chunkName, progress)
 
           rowspanDict[startTime][Day] = genHtmlChunk(rowspan[Day], classChunkExist, title, plays, texts, segmentImg)
@@ -1959,7 +2093,7 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False, progress=
               # ('01:30', '02:00', 'KJZZ_2023-10-14_Sat_0130-0200_BBC World Service', None),
               # ...
             
-            # if checkChunk(getTextDict, progress):
+            # if countChunk(getTextDict, progress):
             # print(getTextDict)
             # print(records)
             for record in records:
@@ -2019,8 +2153,13 @@ def genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk=False, progress=
 # genHtml
 
 
+# buildGetTextDict() will validate the query conditions passed and produce a clean gettextDict
 def buildGetTextDict(gettext, gettextDict=gettextDict):
-  # gettext = "week=43+title=Classic Jazz with Chazz Rayburn+Day=Mon"
+  info("%s" %({**locals()}), 3, "", "blue")
+  
+  # gettext = "year=2023+week=41+title=All Things Considered"
+  # gettext = "week=41+title=All Things Considered+Day=Fri"
+  # gettext = "chunk=KJZZ_2023-10-13_Fri_1700-1730_All Things Considered"
   
   if gettext.find("chunk=") > -1:
     chunkName = re.split(r"[=]",gettext)[1]
@@ -2028,6 +2167,7 @@ def buildGetTextDict(gettext, gettextDict=gettextDict):
     # we already defined a class that will gently split the name for us
     # python KJZZ-db.py --gettext chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v
     chunk = Chunk(chunkName)
+    # chunk name is not in the db, only the exact start time is needed anyway
     gettextDict["start"]  = chunk.start
   else:
     conditions = re.split(r"[+]",gettext)
@@ -2037,14 +2177,32 @@ def buildGetTextDict(gettext, gettextDict=gettextDict):
         gettextDict[key] = re.split(r"[=]", condition)[1]
       else:
         error("%s is invalid in %s" %(key, condition), 0)
-        info("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"", 0)
+        info("valid conditions: %s" %(gettextKeys), 0)
+        info("example: year=2023+week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"", 0)
         info("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"", 0)
         exit(9)
     # for
   #
-  return gettextDict  # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
-  # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
+  info("gettextDict: %s" %(gettextDict), 3)
+  return gettextDict  # gettextDict = {'week': '41', 'title': All Things Considered', 'Day': 'Fri'}
+  # gettextDict = {'week': '41', 'title': All Things Considered', 'Day': 'Fri'}
 # buildGetTextDict
+
+
+def getValueFromVariableInBatchFile(batfile, variable):
+  try:
+    file = open('BiasBuster-whisper_custom.cmd', 'r')
+    data = file.read()
+    file.close()
+    
+    found = re.search('\nset %s=([-_\w]+)\n' %(variable), data)
+    if found:
+      value = found.group(1)
+      return value
+  except getopt.error as err:
+    # output error, and return with an error code
+    error(err, 3)
+#
 
 
 def error(message, RC=1, progress=""):
@@ -2069,12 +2227,18 @@ def warning(message, RC=0, progress=""):
   if RC: exit(RC)
 #
 
-def info(message, verbosity=0, progress=""):
+def info(message, verbosity=0, progress="", color="white"):
   stack = ''
   infoPattern = "info   : %s[white]%s%s[/]"
   if verbosity >1:
     for i in reversed(range(1, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
     infoPattern = f"info   : %-30s[white]%s%s[/]"
+    if verbosity >2:
+      infoPattern = f"debug  : %-30s[white]%s%s[/]"
+    if verbosity >3:
+      infoPattern = f"debug  : %-30s[magenta]%s%s[/]"
+    if color != 'white':
+      infoPattern = f"debug  : [magenta]%-30s["+color+"]%s%s[/]"
     
   # if verbose >= verbosity: print ("info   : %-30s[white]%s%s[/]" %(stack, " ", message), file=sys.stderr)
   if verbose >= verbosity:
@@ -2089,60 +2253,87 @@ def ddebug(*kwargs):
 #
 
 
-def usage(RC=99):
-  usage  = (("usage: python %s --help") % (sys.argv[0]))+os.linesep
-  usage += ("Required at least: --import / --query / --gettext / --listLevel")+os.linesep
-  usage += ("")+os.linesep
-  usage += ("  --import < --text \"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text\" | --folder inputFolder >")+os.linesep
-  usage += ("    -m, --model *%s medium large...\n                   Model that you used with whisper, to transcribe the text to import." %(model))+os.linesep
-  usage += ("    -p, --pretty\n                   Convert \\n to carriage returns and convert json ouyput to text.\n                   Ignored when outputing pictures.")+os.linesep
-  usage += ("    --output *%s\\\n                   Folder where to output PICtures.\n                   Will be %s\\week\\ when gettext has week=n" %(outputFolder, outputFolder))+os.linesep
-  usage += ("    --show\n                   Opens the PICtures upon generation.")+os.linesep
-  usage += ("    --rebuildThumbnails <week>\n                   Will (re)generate only PICtures thumbnails for that week, if main PICtures exist.")+os.linesep
-  usage += ("    --noPngquant\n                   Disable pngquant compression")+os.linesep
-  usage += ("    --useJpeg\n                   Produces jpeg PICtures instead of png.")+os.linesep
-  usage += ("    --jpegQuality <*50>\n                   0-100 jpeg quality for PICtures.")+os.linesep
-  usage += ("    --dryRun\n                   Will not generate PICtures, will not import or update the database.")+os.linesep
-  usage += ("    --noPics\n                   Will not generate PICtures.")+os.linesep
-  usage += ("    --force\n                   Will regenerate existing PICtures.")+os.linesep
-  usage += ("")+os.linesep
-  usage += ("  --db *%s    Path to the local SQlite db." %(localSqlDb))+os.linesep
-  usage += ("  -q, --query < title | first | last | last10 | byDay | byTitle | chunkLast10 >\n                   Quick and dirty way to see what's in the db.")+os.linesep
-  usage += ("")+os.linesep
-  usage += ("  --html [--byChunk --printOut --autoGenerate] <week>\n                   PICture: generate week number's schedule as an html table.")+os.linesep
-  usage += ("                   Outputs html file: %s/week00[-byChunk].html" %(outputFolder))+os.linesep
-  usage += ("                   --byChunk  Outputs schedule by 30mn chucks, no rowspan, no PICtures.")+os.linesep
-  usage += ("                   --printOut Will output html on the prompt.")+os.linesep
-  usage += ("                   --autoGenerate Will loop generate all wordCloud PICtures to show in html for that week.")+os.linesep
-  usage += ("")+os.linesep
-  usage += ("  -g, --gettext < selector=value : chunk= | date= | datetime= | week= | Day= | time= | title= >")+os.linesep
-  usage += ("                   Outputs all text from the selector:")+os.linesep
-  usage += ("                   chunk=\"KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title\" (run %s -q chunkLast10 to get some values)" % (sys.argv[0]))+os.linesep
-  usage += ("                   date=2023-10-08[+time=HH:MM]")+os.linesep
-  usage += ("                   datetime=\"2023-10-08 HH:MM\"")+os.linesep
-  usage += ("                   week=42 (iso week with Mon first)")+os.linesep
-  usage += ("                   Day=Fri (Ddd)")+os.linesep
-  usage += ("                   title=\"title of the show\", see https://kjzz.org/kjzz-print-schedule")+os.linesep
-  usage += ("          example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"\n                   Will get text from that chunk of programming only. Chunks are 30mn long.")+os.linesep
-  usage += ("          example: week=41+Day=Fri+title=\"All Things Considered\"\n                   Same as above but will get text from the entire episode.")+os.linesep
-  usage += ("   *--printOut\n                   Will output selected text on the prompt (default if no other option passed).")+os.linesep
-  usage += ("    --noMerge\n                   Do not merge 30mn chunks of the same title within the same timeframe.")+os.linesep
-  usage += ("    --misInformation\n                   PICture: generate misInformation graph or heatmap for all 4 factors:\n                   explanatory/retractors/sourcing/uncertainty")+os.linesep
-  usage += ("      --graphs *bar,*pie,line \n                   What graph(s) you want. Ignored with --noMerge: a heatMap will be generated instead.")+os.linesep
-  usage += ("    --wordCloud\n                   PICture: generate word cloud from gettext output. Will not output any text.")+os.linesep
-  usage += ("      --stopLevel  0 1 2 *3\n                   Add various levels of stopwords")+os.linesep
-  usage += ("        --listLevel <0[,1,..]> to just show the stopWords in that level(s).")+os.linesep+os.linesep
+def usage(RC=99, usagePart=""):
+  usage          = """ usage: python %s --help
+  Requires at least: --import / --query / --gettext / --listLevel  (add --help for help on those functions only)
+  -v, -vv, -vvv                     increase verbosity.
+  --silent                          Suppress all messages.
+  --dryRun                          Will not generate PICtures, not commit imports, not output or modify anything.
+  --db path\sqlite.db (%s)
+                                    Path to the local SQlite db.""" %(sys.argv[0], localSqlDb)
+  
+  usageQuery     = """
+  -q, --query < title | first | last | last10 | byDay | byTitle | chunkLast10 | "select .. from schedule">
+                                    Quick way to see what's in the db."""
+  
+  usageImport    = """
+  --import < --folder inputFolder | --text "KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text" >
+    -m, --model *%s small medium large...
+                                    Model that you used with whisper, to transcribe the text to import.""" %(model)
+  
+  usageHtml      = """
+  --html [--byChunk --printOut] <2023|2023/41>
+                                    PICture: generate yearly or year/week schedule as an html table.
+                                    Outputs html file: "%s/2023/41/index[-bySegment|byChunk].html"
+    --byChunk                       Outputs schedule by 30mn chucks, no rowspan, no PICtures.
+    --printOut                      Will output html on the prompt.""" %(outputFolder)
+  
+  usageGettext   = """
+  -g, --gettext < selector=value : chunk= | date= | datetime= | year= | week= | Day= | time= | title= >
+                    Outputs all text from the selector:
+                    chunk="KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title" (run "python %s -q chunkLast10" to get an idea.
+                    date=2023-10-08[+time=HH:MM]
+                    datetime="2023-10-08 HH:MM"
+                    year=2023
+                    week=42 (iso week with Mon first)
+                    Day=Fri (Ddd)
+                    title="title of the show", see https://kjzz.org/kjzz-print-schedule
+                          example:  chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered"
+                                    Will get text from that chunk of programming only. Chunks are 30mn long.
+                          example:  year=2023+week=41+Day=Fri+title="All Things Considered"
+                                    Same as above but will get text from the entire program for Friday week 41 of 2023.
+                          example:  year=2023+title="All Things Considered"
+                                    Same as above but will get text from a single program for the entire year.""" %(sys.argv[0])
+  usageGettext  += """
+    -p, --pretty                    Convert \ to carriage returns and convert json output to text.
+                                    Ignored when outputing pictures.
+   *--printOut                      Will output selected text on the prompt (default if no other option passed).
+    --noMerge                       Do not merge 30mn chunks of the same title within the same timeframe.
+    --output *./%-18s  Folder where to output PICtures.
+                                    Will be %s/YYYY/W/ when gettext has year=YYYY+week=W"
+    --show                          Opens the PICtures upon generation.
+    --rebuildThumbnails <year|year/week>
+                                    Will regenerate thumbnails only, if word clouds exists.
+    --imgExt <*png|jpg|webp|avif>   Use this format instead of %s.
+    --noPngquant                    Disable pngquant compression (only for png, indeed).
+    --imgQuality <*50>              0-100 compression quality.
+    --noPics                        Will not generate PICtures.
+    --force                         Will overwrite existing PICtures.
+
+    --misInformation                PICture: generate misInformation graph or heatmap for all 4 factors:
+                                            explanatory/retractors/sourcing/uncertainty
+                                            see https://github.com/PDXBek/Misinformation/
+      --graphs *bar,*pie,line         What graph(s) you want. Ignored with --noMerge: a heatMap (per chunk) will be generated instead.
+    --wordCloud                     PICture: generate word cloud from gettext output. Will not output any text.
+      --stopLevel  0 1 2 *3           Add various levels of stopwords.
+        --listLevel <0[,1,..]>          to show the stopWords in which level(s).""" %(outputFolder, outputFolder, imgExt)
   for key, item in wordCloudDict.items():
-    if item["input"]: usage += ("      --%s *%s %s" %(key, item["value"], item["usage"]))+os.linesep
-  usage += ("")+os.linesep
-  usage += ("  -v, --verbose\n                   -vv -vvv increase verbosity.")+os.linesep
-  usage += ("  --silent\n                   Not verbose.")+os.linesep
+    if item["input"]: usageGettext += ("      --%s *%s  %s" %(key, item["value"], item["usage"]))+os.linesep
+  
   # usage += ("            --inputStopWordsFiles file.txt (add words from file on top of other levels)")+os.linesep
   # usage += ("            --max_words *4000")+os.linesep
   # usage += ("            --font_path *\"fonts\\Quicksand-Bold.ttf\"")+os.linesep
-  # usage += ("       --gettext week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"")+os.linesep
   
-  print(usage)
+  usage += usageQuery
+  usage += usageImport
+  usage += usageHtml
+  usage += usageGettext
+  
+  if    usagePart == "usageQuery":    print(usageQuery)
+  elif  usagePart == "usageImport":   print(usageImport)
+  elif  usagePart == "usageHtml":     print(usageHtml)
+  elif  usagePart == "usageGettext":  print(usageGettext)
+  else: print(usage)
   exit(RC)
 #
 
@@ -2154,28 +2345,32 @@ def usage(RC=99):
 argumentList = sys.argv[1:]
 # define short Options
 options = "hviq:g:d:t:f:m:p"
-# define Long options
-long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "keepStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation", "output=", "graphs=", "html=", "byChunk", "printOut", "listLevel=", "silent", "noPics", "dryRun", "autoGenerate", "rebuildThumbnails=", "noPngquant", "useJpeg", "jpegQuality=", "force"]
+# define Long options, add "=" if they take values
+long_options = ["help", "verbose", "import", "text=", "db=", "folder=", "model=", "query=", "pretty", "gettext=", "wordCloud", "noMerge", "keepStopwords", "stopLevel=", "font_path=", "show", "max_words=", "misInformation", "output=", "graphs=", "html=", "byChunk", "printOut", "listLevel=", "silent", "noPics", "dryRun", "rebuildThumbnails=", "noPngquant", "imgExt=", "imgQuality=", "force"]
 wordCloudDictToParams = [(lambda x: '--' + x)(x) for x in wordCloudDict.keys()]
 wordCloudDictToOptions = [(lambda x: x + '=')(x) for x in wordCloudDict.keys()]
 long_options += wordCloudDictToOptions
+
+model = getValueFromVariableInBatchFile(biasBusterBatchCustom, 'model')
+
 
 try:
   # Parsing argument
   arguments, values = getopt.getopt(argumentList, options, long_options)
   # print (arguments) # [('-f', '41'), ('--model', 'small'), ('--verbose', ''), ('-h', '')]
   # print (values)    # []
-
+  # exit()
+  
   # checking critical arguments
+  if arguments[0][0] in ("-h", "--help"):
+    usage(0)
   for currentArgument, currentValue in arguments:
-    if currentArgument in ("-h", "--help"):
-      usage(0)
-    elif currentArgument in ("-v", "--verbose"):
+    if currentArgument in ("-v", "--verbose"):
       if not silent: verbose += 1
     elif currentArgument in ("--silent"):
       silent = True
       verbose  = -1
-
+  
   # checking each argument
   info(("[bright_black]%-20s:[/] %s") % ('argument', 'value'), 2)
   info(("[bright_black]%-20s:[/] %s") % ('----------------', '----------------'), 2)
@@ -2189,7 +2384,9 @@ try:
       
     # QUERY THE DB
     elif currentArgument in ("-q", "--query"):
-      if currentValue in ("last10","10"):
+      if currentValue in ("-h", "--help"):
+        usage(0, "usageQuery")
+      elif currentValue in ("last10","10"):
         sqlQuery = sqlListLast10text
       elif currentValue in ("last"):
         sqlQuery = sqlLastText
@@ -2207,16 +2404,23 @@ try:
         sqlQuery = currentValue
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
     
+    # genHtml
+    elif currentArgument in ("--html"):
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
+      genHtml = True
+      if currentValue not in ("-h", "--help"):
+        currentValues = os.path.normpath(currentValue).split(os.sep)
+        yearNumber, *weekNumber = [int(item) for item in currentValues]
+        weekNumber = weekNumber[0] if weekNumber else ''
+    elif currentArgument in ("--byChunk"):
+      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
+      byChunk = True
+    
     # OUTPUT and PROCESS STUFF
     elif currentArgument in ("-g", "--gettext"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       gettext = currentValue
-      if not gettext:
-        error("gettext takes an argument: the program to get the text from!", 0)
-        info("example: week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"", 0)
-        info("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\" (mutually exclusive to the others)", 0)
-        exit(8)
-
+    
     elif currentArgument in ("-p", "--pretty"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       pretty = True
@@ -2253,15 +2457,17 @@ try:
     elif currentArgument in ("--graphs"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       graphs = currentValue.split(',')
-    elif currentArgument in ("--html"):
+    elif currentArgument in ("--imgExt"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
-      weekNumber = int(currentValue)
-    elif currentArgument in ("--jpegQuality"):
+      ext = str(currentValue).lower()
+      if ext in imgExtValids:
+        imgExt = ext
+        if imgExt not in ['png']: usePngquant = False
+      else:
+        warning("imgExt takes only %s, defaulting to %s" %(imgExtValids, imgExt), 0)
+    elif currentArgument in ("--imgQuality"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
-      jpegQuality = int(currentValue)
-    elif currentArgument in ("--byChunk"):
-      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
-      byChunk = True
+      imgQuality = int(currentValue)
     elif currentArgument in ("--printOut"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       printOut = True
@@ -2272,16 +2478,15 @@ try:
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       dryRun = True
       noPics = True
-    elif currentArgument in ("--autoGenerate"):
-      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
-      autoGenerate = True
     elif currentArgument in ("--listLevel"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       listLevel = currentValue.split(',')
     elif currentArgument in ("--rebuildThumbnails"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       rebuildThumbnail = True
-      weekNumber = int(currentValue)
+      currentValues = os.path.normpath(currentValue).split(os.sep)
+      yearNumber, *weekNumber = [int(item) for item in currentValues]
+      weekNumber = weekNumber[0] if weekNumber else ''
     elif currentArgument in ("--silent"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       silent = True
@@ -2293,15 +2498,11 @@ try:
     elif currentArgument in ("--noPngquant"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, False), 2)
       usePngquant = False
-    elif currentArgument in ("--useJpeg"):
-      info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
-      useJpeg = True
-      usePngquant = False
     elif currentArgument in ("--misInformation"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       wordCloud = False
       misInformation = True
-
+    
       # wget https://raw.githubusercontent.com/PDXBek/Misinformation/master/lists/explanatory.csv -O heatMap.explanatory.csv
       # wget https://raw.githubusercontent.com/PDXBek/Misinformation/master/lists/retractors.csv  -O heatMap.retractors.csv
       # wget https://raw.githubusercontent.com/PDXBek/Misinformation/master/lists/sourcing.csv    -O heatMap.sourcing.csv
@@ -2314,6 +2515,17 @@ try:
       if isinstance(wordCloudDict[currentArgumentClean]["default"],float):  wordCloudDict[currentArgumentClean]["value"] = float(currentValue)
       if isinstance(wordCloudDict[currentArgumentClean]["default"],list):   wordCloudDict[currentArgumentClean]["value"].append(currentValue)
       if isinstance(wordCloudDict[currentArgumentClean]["default"],str):    wordCloudDict[currentArgumentClean]["value"] = currentValue
+    
+  # info("currentArgument:%s" %(currentArgument))
+  # info("currentValue:%s" %(currentValue))
+  if currentArgument in ("-h", "--help") or currentValue in ("-h", "--help"):
+    if    sqlQuery:     usage(0, "usageQuery")
+    elif  importChunks: usage(0, "usageImport")
+    elif  genHtml:      usage(0, "usageHtml")
+    elif  gettext:      usage(0, "usageGettext")
+    else: usage(0)
+    
+  
 except getopt.error as err:
   # output error, and return with an error code
   error(err, 3)
@@ -2321,7 +2533,7 @@ except getopt.error as err:
 
 
 ####################################### MANDATORIES #######################################
-if (not importChunks and not sqlQuery and not gettext and not weekNumber and not listLevel):
+if (not importChunks and not sqlQuery and not gettext and not yearNumber and not listLevel):
   error("must pass at least --import / --query / --gettext / --listLevel", 10)
 ####################################### MANDATORIES #######################################
 
@@ -2338,8 +2550,53 @@ if listLevel:
   exit()
 #
 
+# load heavy modules only when necessary
+if rebuildThumbnail or wordCloud or misInformation:
+  # Avif is included in requirements.txt
+  try:
+    import pillow_avif
+  except:
+    info("%s is not supported. To add it: pip install pillow pillow-avif-plugin" %('AVIF'), 2)
+    pass
+  else:
+    info("%s is supported" %('AVIF'), 2)
+    avif_supported = True
+
+  # Jxl requires jxlpy wheel to be compiled, and a valid MSVC environment, which is complex task
+  try:
+    # jxlpy is in early stages of development. None one has ever compiled it on Windows AFAIK
+    # from jxlpy import JXLImagePlugin
+    # from imagecodecs import (jpegxl_encode, jpegxl_decode, jpegxl_check, jpegxl_version, JPEGXL)
+    import pillow_jxl
+  except:
+    info("%s is not supported. To add it: pip install jxlpy" %('JXL'), 2)
+    pass
+  else:
+    info("%s is supported" %('JXL'), 2)
+    jxl_supported = True
+
+  # PIL must be loaded after pillow plugins
+  from PIL import Image, ExifTags
+  
+  if imgExt in ['png'] and usePngquant:
+    import pngquant
+
+
 if rebuildThumbnail:
-  rebuildThumbnails(os.path.join(outputFolder, str(weekNumber)), os.path.join(outputFolder, str(weekNumber)), dryRun)
+  if weekNumber:
+    inputFolder = os.path.normpath(os.path.join(outputFolder, str(yearNumber), str(weekNumber)))
+    outputFolder = inputFolder
+    rebuildThumbnails(inputFolder, outputFolder, dryRun)
+  else:
+    yearFolder = os.path.normpath(os.path.join(outputFolder, str(yearNumber)))
+    # outputFolder = './kjzz'
+    # yearNumber = 2023
+    # weekFolders = [f for f in os.listdir(yearFolder) if os.path.isdir(f)]     # f is just folder name so isdir() cannot work we would need to join paths again
+    weekFolders = [f for f in pathlib.Path(yearFolder).iterdir() if f.is_dir()] # [WindowsPath('kjzz/2023/40'), ..]
+    for weekFolder in weekFolders:
+      rebuildThumbnails(weekFolder, weekFolder, dryRun)
+    # for
+  # if
   exit()
 
 def importInputStopWords(wordCloudDict):
@@ -2417,10 +2674,10 @@ if sqlQuery: sqlQueryPrintExec(sqlQuery, pretty)
 
 
 #################################### genHtml
-if weekNumber:
-  html = genHtml(jsonScheduleFile, outputFolder, weekNumber, byChunk)
-  # also generate the other one but do not return its value
-  genHtml(jsonScheduleFile, outputFolder, weekNumber, not byChunk)
+if genHtml:
+  html = generateHtml(jsonScheduleFile, outputFolder, yearNumber, weekNumber, byChunk)
+  # also generate the other one but do not save its value
+  generateHtml(jsonScheduleFile, outputFolder, yearNumber, weekNumber, not byChunk)
 
   if printOut: print(html)
 # weekNumber:
@@ -2433,9 +2690,14 @@ if gettext:
 
   ################### Process inputStopWordsFiles if any:
   # gettext = "week=43+title=Classic Jazz with Chazz Rayburn+Day=Mon"
-  # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
+  #   gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
+  # gettext = "year=2023+week=43+title=Classic Jazz with Chazz Rayburn+Day=Mon"
+  #   gettextDict = {'year': '2023', 'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
   gettextDict = buildGetTextDict(gettext)
-  wordCloudTitle = "KJZZ " + gettext.replace("+", " ")
+  if not "chunk" in gettextDict:
+    wordCloudTitle = "KJZZ " + gettext.replace("+", " ")
+  else:
+    wordCloudTitle = gettextDict.chunk
   
   records = getChunks(gettextDict, True, progress)
   # records = (('2023-10-14 01:00.000', '2023-10-14 01:30.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...'),..)
@@ -2444,13 +2706,14 @@ if gettext:
 
     ################## wordCloud
     # first we check if week number was passed in the gettext to infer outputFolder
+    # ddebug bug: YYYY is missing in outputFolder
     if "week" in gettextDict: outputFolder = os.path.join(outputFolder, str(gettextDict['week']))
     # then we check if a wordCloud is requested:
     if wordCloud:
       genWordCloudDicts = genWordClouds(records, wordCloudTitle, mergeRecords, showPicture, wordCloudDict, outputFolder, dryRun)
 
     ################## misInformation
-    # then we check if a misInformation is requested:
+    # then we check if misInformation is requested:
     elif misInformation:
       genMisinfoDicts = genMisInformation(records, mergeRecords, wordCloudTitle, graphs, showPicture, dryRun)
 
@@ -2509,6 +2772,28 @@ if gettext:
 exit()
 
 
+
+
+
+
+# def root():
+  # parent()
+# def parent():
+  # child()
+# def child(stack=''):
+  # for i in reversed(range(0, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
+  # print("%s: " %(stack))
+
+
+# # example of progress bar:
+# with Progress() as progress:
+  # task = progress.add_task("twiddling thumbs", total=10)
+  # inputFiles = [1,2,3,4,5,6,7,8,9,0]
+  # for inputFile in inputFiles:
+    # progress.console.print(f"Working on job #{inputFile}")
+    # time.sleep(0.2)
+    # progress.advance(task)
+# exit()
 
 
 

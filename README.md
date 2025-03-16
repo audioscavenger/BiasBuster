@@ -1,11 +1,11 @@
-# BiasBuster - release 0.9.12 iframe
+# BiasBuster - WIP 0.9.13 testing in progress... please wait
 
-A set of tools which ultimate goal is to analyze biases in English. 
-Currently only handles KJZZ's radio broadcast. 
+A set of tools which ultimate goal is to analyze biases in English Public Broadcasts.
+Currently only handles KJZZ's radio broadcast.
 Under active developement since 10/1/2023.
 
 BiasBuster provides an cron 24/7 stream downloader, a SQLite database, 
-and a Python script to output visual statistics and html schedules to present all that.
+and a Python script to output visual statistics and html pages to present all that within the broadcaster's schedule.
 
 <div align="center"> 
   <img src="https://img.shields.io/github/forks/audioscavenger/BiasBuster?style=for-the-badge">
@@ -18,17 +18,18 @@ and a Python script to output visual statistics and html schedules to present al
 
 ![BiasBuster overview](assets/BiasBuster.svg)
 
-The transcription is done on GPU and produces text files and captions in various formats.
-They are then crunched by a python script that fills a database, and outputs html files and word clouds, etc.
+The transcription is done with Whisper on GPU and produces text files and captions in various formats.
+They are then processed by a python script that updates SQLite, and outputs html files and word cloud images, etc.
 PNG files are compressed by pngquant to save space.
 
 This project comes in 2 parts: 
-- A bash script that runs every 30mn to download mp3 chunks of, well, 30mn each
-- A Windows part:
-  - A batch that calls whisper-faster to transcribe mp3 to text
-  - A python script that loads transcriptions into a SQLite database, and outputs html, statistics, word clouds etc
+- A Linux side:
+  - kjzz.sh: cron downloads mp3 chunks based off the json schedule; appends/restarts downloads
+- A Windows side:
+  - BiasBuster-whisper.cmd: calls whisper-faster to transcribe mp3 to text; model distil-large-v3 recommended.
+  - KJZZ-db.py: process and loads transcriptions into SQLite, outputs html, statistics, word clouds etc
 
-The Windows part could run on Linux as well, whisper also can use CPU (slower), and the processing batch should be rewritten in bash.
+The Windows part could run on Linux as well. The whisper part can use CPU (slower), and the processing batch should be rewritten in bash easily.
 
 ![week46 example](assets/week46%20example.png)
 
@@ -43,20 +44,26 @@ Currently, this application only downloads KJZZ's broadcast, available at https:
 You can certainly rewrite it for Windows if you like.
 
 ### Usage
-The script accepts 2 parameters:
-- *start*:  starts the download according to KJZZ-schedule.json
-- *stop*:   kills current download if you want to
+Script usage:
+- *disable*:  disable automated downloads (equivalent to `rm kjzz.start`)
+- *enable*:   enable automated downloads (equivalent to `touch kjzz.start`)
+- *start*:    starts the download according to `KJZZ-schedule.json` (that should be in cron.d)
+- *stop*:     kills current download if you want to (cron will restart it if still in cron.d)
+- *--help*:   display some help and debug info
 
-`kjzz.sh` will download chunks of 30mn, minus the musical programs of the night (sleep). Simply schedule CRON with this one line, to get 30mn long mp3 files under ISO week number folders (week starts Monday):
+`kjzz.sh` will download chunks of 30mn, excluding the musical programs of the night (sleep). Simply schedule CRON with this one line, to get 30mn mp3 file chunks under YEAR/ISO week number folders (week starts Monday):
 `# 0,1,30,31 * * * *   root /path/BiasBuster/kjzz.sh start`
 
-This script will create a pid lock file with its runing PID, ensuring not 2 runs at the same time. When you run the script, it will tell you if it's running or not. Example:
+This script will create a pid lock file with its runing PID, ensuring only one runs at a time. When you call the script, it will tell you if it's running or not. Example:
 `./kjzz.sh`
-```
-                             16:23
-filename=KJZZ_2023-10-20_Fri_1600-1630_All Things Considered.mp3
-kjzzDownloader 1859415 is appending "KJZZ_2023-10-20_Fri_1600-1630_All Things Considered.mp3" for the next 6 mm = 374 s. stop it?
-```
+![kjzz.sh output example](assets/kjzz.sh.png)
+
+`./kjzz.sh --help`
+![kjzz.sh --help output example](assets/kjzz.sh--help.png)
+
+`./kjzz.sh` while asleep (musical programs excluded by hard-coded keywords: *Blues* and *Jazz*)
+![kjzz.sh --help output example](assets/kjzz.sh-sleep.png)
+
 
 ### KJZZ schedule: KJZZ-schedule.json
 This schedule comes from their official website at https://kjzz.org/kjzz-print-schedule
@@ -76,8 +83,11 @@ The structure is pretty simple, and simply lists by hour then by Day, the title 
   ...
 ```
 
-The schedule does not look like it's going to change until next year. 
-No handling of multi-schedules or other radio broadcasts yet.
+The latest schedule `KJZZ-schedule.json` shall be placed at the root of the project, then under YEAR/ folder, then named KJZZ-schedule-YYYYMMDD.json if it changes at that date.
+- The schedule changes every year or so, keep an eye at https://kjzz.org/kjzz-print-schedule and update the json.
+  - To add an updated schedule, simply add a new `KJZZ-schedule.json` under YEAR/ folder
+  - To add an updated schedule to , simply add a new `KJZZ-schedule.json` under YEAR/ folder
+- No handling of other radio broadcasts yet.
 
 
 ## Windows part 1: BiasBuster-whisper.cmd
@@ -86,29 +96,80 @@ The whole point of using Windows is to put this GTX 3090 to good use.
 Whisper-Faster is compiled and ready to use. 
 
 I tried my best to compile whisper, whisper-bin-x64, and whisper-cpp, but failed miserably. 
-Compiling it apparently requires you to install 6GB of CUDA SDK on Windows. My C: drive is full, sorry.
+Compiling it on Windows apparently requires you to install 6GB of CUDA SDK. My C: drive is full, sorry.
+Another project called [Whisper JAX](https://github.com/sanchit-gandhi/whisper-jax) claim to be even 6x faster but works only on Linux.
 
-Here is how to transcribe the mp3 downloaded:
+### How to use this script:
 
 1. Have a CUDA GPU
 2. install Whisper-Faster from https://github.com/Purfview/whisper-standalone-win
 3. add cuBLAS.and.cuDNN as required
-4. update `BiasBuster-whisper.cmd` to point to Whisper-Faster folder
-5. copy `BiasBuster-whisper.cmd` as a shortcut in the sendTo folder (access by typing `shell:sendTo`)
+4. update `BiasBuster-whisper_custom.cmd` to point to Whisper-Faster folder and binary, update the defaults as you need
+5. Optional: copy `BiasBuster-whisper.cmd` as a shortcut in the sendTo folder (access by typing `shell:sendTo`)
 6. download mp3 from your Cloud server
 7. right-click the folder and select _BiasBuster-whisper_
-8. watch the magic of AI transcription - JK it's machine learning.
+8. watch the magic of Machine Learning transcription (Machine/Deep Learning is not AI)
 
 ![BiasBuster-whisper.cmd](assets/BiasBuster-whisper.cmd)
 
-The script as it is, will produce all text and caption files whisper-faster cam produce.
-This this project only uses `.text` extensions to load into the database, 
-and `.vtt` when playing the chunks.
+* The script as it is, will produce all text and caption files whisper-faster can produce.
+  - vtt + text account for rougly 15MB per week.
+* The python app only use `.text` extensions to load into the database, 
+* The html pages generated only use `.vtt` as subtitles when playing the chunks.
+  - each 30mn mp3 chunk is 27.5MB at 128kbs
+  - OpenPlayerJS is integrated within the html pages (created by kjzz-db.py), and will load those `vtt` caption files.
 
-- vtt + text account for rougly 15MB per week.
-- OpenPlayerJS is integrated within the html pages (created by kjzz-db.py), and will load those `vtt` caption files.
-- In the future we could simply save only the vtt into the database, to save space. But a dynamic page would be necessary.
+In the future we could simply save only the vtt into the database. But a dynamic page would be necessary.
 
+### Whisper vs Whisper-Faster vs Faster-Whisper-XXL
+- Whisper is from OpenAI
+- Whisper-Faster is a Windows-compiled version using not OpenAI models, faster then the above
+- Faster-Whisper-XXL is the latest Windows-compiled using latest models, faster then the above
+
+### Which models to use?
+- time vs quality is to be considered. Time is money (in the form of electricity bills).
+- Quality is relative and all models make mistakes, some less then others.
+- Pure english models struggle a little more with KJZZ in particular because so many speakers (especially BBC reporting) are foreign with thick accents.
+- Overall, `small` gave the best results consistently, in regard to time spent.
+- latest distil-v3 seems to beat all of them in regard to the time saved (2x faster then small).
+
+### Models comparison
+I made a comparison of outputs for the first chunk I ever downloaded: [a 30mn BBC World Service program](assets/compare/KJZZ_2023-10-08_Sun_2300-2330_BBC%20World%20Service.mp3).
+I ran some models on it and here are the conclusions, with `small` from Whisper-Faster 0.9.0 being the baseline:
+
+1. small-wf-0.9.0 vs small-fw-xxl-1.1.0
+- 97 seconds for both.
+- xxl has much better punctuation with much more commas, and correct spelling of acronyms: UN vs U.N. etc.
+- xxl has very few sentences missing.
+- 0.9.0 miss many starting sentence words such as So, Do, etc.
+This is a no-brainer, switch to small-fw-xxl-1.1.0
+
+2. small-fw-xxl-1.1.0 vs medium-fw-xxl-1.1.0
+- 97 vs 168 seconds.
+- missing acronyms improvements from small, I do not trust it.
+- Plus it's 2x slower.
+Can be discarded.
+
+3. small-fw-xxl-1.1.0 vs turbo-fw-xxl-1.1.0
+- 97 vs 65 seconds.
+- Outputs are very similar, turbo being faster.
+- turbo **hallucinates** and added all these sentences at the end of the program, while only speechless music was playing:
+  ```
+  We'll be right back in the story.
+  I'll see you.
+  Thanks.
+  And this is the first sentence.
+  ```
+- turbo misses long sentences and replace them by `...`
+I do not recommend turbo.
+
+4. small-fw-xxl-1.1.0 vs distil-large-v3-fw-xxl-1.1.0
+- 97 vs 48 seconds.
+- just like medium, distil also misses the correct acronyms spelling.
+- aside from being 2x faster then small, it makes similar mistakes at different positions.
+- mistakes visible especially with forgein speakers with thick accent.
+Distil output looks better overall, but I am biased by the 2x speed improvement over Small. I recommend it nonetheless.
+,=
 
 
 ## Windows part 2: KJZZ-db.py
@@ -175,7 +236,7 @@ Required at least: --import / --query / --gettext / --listLevel
 
   -g, --gettext < selector=value : chunk= | date= | datetime= | week= | Day= | time= | title= >
                    Outputs all text from the selector:
-                   chunk="KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title" (run KJZZ-db.py -q chunkLast10 to get some values)
+                   chunk="KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title" (run "python KJZZ-db.py -q chunkLast10" to get some values)
                    date=2023-10-08[+time=HH:MM]
                    datetime="2023-10-08 HH:MM"
                    week=42 (iso week with Mon first)
@@ -380,15 +441,15 @@ You can also combine the keys with *+*, examples:
   'himself', 'are', "didn't", 'did', 'do', 'from', "when's", "how's", 'during', 'then', "she's", 'them', 'has', 'it',
   "that's", "doesn't", 'those', 'me', 'her', 'into', "they'll", 'he', 'our', 'there', 'www', 'before', 'would', "they'd",
   "you'll", 'also', 'that', 'were', 'is', "wouldn't", 'com', 'these', 'else', "you're", "you've", "don't"}
-1: more stopWords related to broadcasting speech
+1: more stopWords related to broadcasting speech. They compose 50% of modern speech structure's glue and have lost all meaning for Word Cloud analysis.
   {'mean', 'new', 'kind', 'case', 'called', 'report', 'things', 'need', 'morning', 'become', 'live', 'even', 'okay',
   'many', 'point', 'trying', 'lot', 'come', 'came', 'really', 'week', 'going', 'always', 'got', 'think', 're', 'good',
   'day', 'almost', 'first', 'two', 'comes', 'part', 'went', 'still', 'little', 'today', 'well', 'actually', 'take',
   'years', 'another', 'right', 'next', 'look', 'one', 'see', 'will', 'thing', 'know', 'back', 'said', 'says', 'last',
   'yeah', 'made', 'say', 'never', 'number', 'coming', 'want', 'something', 'show', 'talk', 'way', 'much', 'sort',
   'edition', 'time', 'year', 'around', 'now', 'let', 'work', 'hour', 'people'}
-2: specific stopWords for KJZZ station
-{'month', 'donation', 'thank', 'gift', 'NPR', 'org', 'you', 'help', 'please', 'doubled', 'news', 'KJZZ',
+2: specific stopWords for KJZZ readio station
+{'month', 'donation', 'thank', 'gift', 'NPR', 'org', 'org', 'you', 'help', 'please', 'doubled', 'news', 'KJZZ', 'KJZ',
 'sustaining', 'member', 'make', 'contribution', 'call', 'give', 'BBC', 'support', 'drive'}
 ```
 
@@ -581,10 +642,7 @@ This project is under [GPL-2.0](https://github.com/audioscavenger/BiasBuster/blo
 Scope creep ahead...
 
 - [ ] WIP
-  - [ ] ui
-  - [ ] python
-  - [ ] db
-- [ ] WIP 0.9.12
+  - [ ] misc
   - [ ] db
     - [ ] add statistics table or more columns for each chunk?
     - [ ] how to store statistics for segments rather then chunks?
@@ -610,6 +668,8 @@ Scope creep ahead...
     - [ ] extract presenters' names
     - [ ] should the case matter for title?
     - [ ] add bias_score.py from https://github.com/auroracramer/language-model-bias
+    - [ ] add metadata in EXIF
+    - [ ] check if AVIF/WebP would be a better choice then png for word clouds
   - [ ] misc
     - [ ] BUG: 0 bytes mp3 will crash the batch completely
     - [ ] BUG: streams sometimes interrupt for reasons. Must find a way to restart the download
@@ -625,6 +685,35 @@ Scope creep ahead...
     - [ ] automate mp3 downloads from cloud + process + uploads from/to cloud server
   - [ ] future
     - [ ] dynamic page in PHP or nodeJS/typeScript
+- [x] release 0.9.13 downloader
+  - [x] kjzz.sh
+    - [x] major bug discovered in isoweek values of %V%G versus %W%U/%Y: we switched to %W as strftime('%W','2025-01-01') gives same values
+    - [x] schedules format is KJZZ-schedule.json, KJZZ-schedule-20240101.json, KJZZ-schedule-20240415.json
+    - [x] moved all schedules to the ROOT
+    - [x] updated KJZZ-schedule.json for 2024 and 2025
+    - [x] kjzz.sh now handle multiple schedule updates
+    - [x] kjzz.sh now has 3 more parameters and shows previous/next program with --help
+    - [x] kjzz.sh does not log each download anymore, I fail to see the point in keeping them
+  - [x] Windows part 1
+    - [x] BiasBuster-whisper.cmd updated paramaters for latest Faster-Whisper-XXL r245.2 distil-large-v3
+  - [x] python
+    - [ ] revamp of --help
+    - [ ] revamp of --help
+    - [ ] test --text if it needs folder path or not
+    - [ ] test weekNumber 1 vs 01
+    - [ ] detect multiple schedules and load the right one as needed
+    - [x] removed autoGenerate option, we always generate pics with --hrml unless --noPics is present
+    - [x] saveImage() now works for PIL and pyplot
+    - [x] saveImage() from save_image_extended: now accepts avif webp jxl etc
+    - [x] inputFile detection and Chunk class now handle yearNumber
+    - [x] add yearNumber to weekNumber handling
+  - [x] ui
+    - [ ] upgrade OpenPlayerJS
+    - [ ] fix closed captions not showing up anymore
+    - [x] add yearNumber navigation
+    - [x] rename ui-child / style-child to ui-iframe / style-iframe
+    - [x] updated index.html and index_template.html with year navigation
+- [x] release 0.9.12 bugfixes
 - [x] release 0.9.11 iframe
   - [x] ui
     - [x] disabled link checker as this is not production ready
@@ -724,6 +813,7 @@ Scope creep ahead...
 Like my work? This tool helped you? Want to sponsor more awesomeness like this?
 
 <p align="center">
- <a href="https://www.paypal.com/donate/?hosted_button_id=CD7P7PK3WP8WU"><img src="/assets/paypal-Donate-QR-Code.png" /></a>
+ <p><a href="https://www.paypal.com/donate/?hosted_button_id=CD7P7PK3WP8WU"><img src="/assets/paypal-Donate-QR-Code.png" /></a></p>
+ <p>Paypal Donation QR code</p>
 </p>
 

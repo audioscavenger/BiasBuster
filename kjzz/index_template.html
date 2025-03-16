@@ -9,13 +9,15 @@
   <title data-l10n-id="${titleData}">${title}</title>
 
   <!-- must add type= for css and js or you get was blocked due to MIME type ("text/html") mismatch (X-Content-Type-Options: nosniff). -->
-  <link rel="stylesheet" type="text/css" href="../../lib/assets/fonts/css/fontawesome.min.css">
-  <link rel="stylesheet" type="text/css" href="../../lib/assets/fonts/css/regular.min.css">
+  <link rel="stylesheet" type="text/css" href="lib/assets/fonts/css/fontawesome.min.css">
+  <link rel="stylesheet" type="text/css" href="lib/assets/fonts/css/regular.min.css">
   <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/openplayerjs@1.12.1/dist/openplayer.min.css">
-  <link rel="stylesheet" type="text/css" href="../../lib/css/style.css?${rand}">
+  <link rel="stylesheet" type="text/css" href="lib/css/style.css?${rand}">
 
   <!-- TODO: see if preload helps -->
-  <!-- <link rel="preload" href="49/index-byChunk.html" as="document"> -->
+  <link rel="prefetch" type="text/html" href="${yearNumber}/${prevWeek}/index-bySegment.html" as="document" crossorigin >
+  <link rel="prefetch" type="text/html" href="${yearNumber}/${weekNumber}/index-byChunk.html" as="document" crossorigin >
+  <link rel="prefetch" type="text/html" href="${yearNumber}/${nextWeek}/index-bySegment.html" as="document" crossorigin >
 
 </head>
 <body>
@@ -25,29 +27,34 @@
 <div class="container">
 
   <div class="navBar">
-    <a class="prevWeek" data-year="${prevYear}" data-week="${prevWeek}" data-action="prevWeek" href="${prevWeek}/index-bySegment.html" target="iframe" onclick="updateNavBar(this);"><span>◀ week ${prevWeek}</span></a>
+    <span class="left"><a class="prevWeek" data-year="${yearNumber}" data-week="${prevWeek}" data-action="prevWeek" href="${yearNumber}/${prevWeek}/index-bySegment.html" target="iframe" onclick="updateNavBar(this);"><span>◀️ week ${prevWeek}</span></a></span>
     <span class="center">
-      <span>KJZZ week ${weekNumber}</span>
-      <a id="swapSchedule" data-year="${yearNumber}" data-week="${weekNumber}" data-action="bySegment" href="${weekNumber}/index-byChunk.html" target="iframe" onclick="updateNavBar(this);" ><span>byChunk</span></a>
+      <a class="prevYear" data-year="${prevYear}" data-week="${weekNumber}" data-action="prevYear" href="${prevYear}/${weekNumber}/index-bySegment.html" target="iframe" onclick="updateNavBar(this);"><span>◀️ ${prevYear}</span></a>
+      <span class="title">KJZZ ${yearNumber} week ${weekNumber}</span>
+      <a class="nextYear" data-year="${nextYear}" data-week="${weekNumber}" data-action="nextYear" href="${nextYear}/${weekNumber}/index-bySegment.html" target="iframe" onclick="updateNavBar(this);"><span>${nextYear} ▶️</span></a>
+      <a id="swapSchedule" data-year="${yearNumber}" data-week="${weekNumber}" data-action="bySegment" href="${yearNumber}/${weekNumber}/index-byChunk.html" target="iframe" onclick="updateNavBar(this);" ><span>byChunk 🔁</span></a>
     </span>
-    <a class="nextWeek" data-year="${nextYear}" data-week="${nextWeek}" data-action="nextWeek" href="${nextWeek}/index-bySegment.html" target="iframe" onclick="updateNavBar(this);"><span>week ${nextWeek} ▶</span></a>
+    <span class="right"><a class="nextWeek" data-year="${yearNumber}" data-week="${nextWeek}" data-action="nextWeek" href="${yearNumber}/${nextWeek}/index-bySegment.html" target="iframe" onclick="updateNavBar(this);"><span>week ${nextWeek} ▶️</span></a></span>
   </div>
 
   <template id="navBar">
-    <a class="prevWeek" data-year="{{prevYear}}" data-week="{{prevWeek}}" data-action="prevWeek" href="{{prevWeek}}/index-{{bySegment}}.html" target="iframe" onclick="updateNavBar(this);"><span>◀ week {{prevWeek}}</span></a>
+    <span class="left"><a class="prevWeek" data-year="{{yearNumber}}" data-week="{{prevWeek}}" data-action="prevWeek" href="{{yearNumber}}/{{prevWeek}}/index-{{bySegment}}.html" target="iframe" onclick="updateNavBar(this);"><span>◀️ week {{prevWeek}}</span></a></span>
     <span class="center">
-      <span>KJZZ week {{weekNumber}}</span>
-      <a id="swapSchedule" data-year="{{yearNumber}}" data-week="{{weekNumber}}" data-action="{{flip}}" href="{{weekNumber}}/index-{{byChunk}}.html" target="iframe" onclick="updateNavBar(this);"><span>{{byChunk}}</span></a>
+      <a class="prevYear" data-year="{{prevYear}}" data-week="{{weekNumber}}" data-action="prevYear" href="{{prevYear}}/{{weekNumber}}/index-{{bySegment}}.html" target="iframe" onclick="updateNavBar(this);"><span>◀️ {{prevYear}}</span></a>
+      <span class="title">KJZZ {{yearNumber}} week {{weekNumber}}</span>
+      <a class="nextYear" data-year="{{nextYear}}" data-week="{{weekNumber}}" data-action="nextYear" href="{{nextYear}}/{{weekNumber}}/index-{{bySegment}}.html" target="iframe" onclick="updateNavBar(this);"><span>{{nextYear}} ▶️</span></a>
+      <a id="swapSchedule" data-year="{{yearNumber}}" data-week="{{weekNumber}}" data-action="{{flip}}" href="{{yearNumber}}/{{weekNumber}}/index-{{byChunk}}.html" target="iframe" onclick="updateNavBar(this);"><span>{{byChunk}} 🔁</span></a>
     </span>
-    <a class="nextWeek" data-year="{{nextYear}}" data-week="{{nextWeek}}" data-action="nextWeek" href="{{nextWeek}}/index-{{bySegment}}.html" target="iframe" onclick="updateNavBar(this);"><span>week {{nextWeek}} ▶</span></a>
+    <span class="right"><a class="nextWeek" data-year="{{yearNumber}}" data-week="{{nextWeek}}" data-action="nextWeek" href="{{yearNumber}}/{{nextWeek}}/index-{{bySegment}}.html" target="iframe" onclick="updateNavBar(this);"><span>week {{nextWeek}} ▶️</span></a></span>
   </template>
 
+  <!-- <iframe id="iframe" name="iframe" src="${yearNumber}/${weekNumber}/index-bySegment.html" title="KJZZ ${yearNumber} week ${weekNumber}" loading="lazy" onclick="swapWordRecurse(this.parentNode.parentNode, 'byChunk', 'bySegment');"></iframe> -->
   <!-- this iframe creates this warning: -->
   <!-- Content-Security-Policy: Ignoring ‘x-frame-options’ because of ‘frame-ancestors’ directive. -->
   <!-- Solution: https://stackoverflow.com/questions/30731290/how-to-set-x-frame-options-allow-from-in-nginx-correctly -->
   <!-- add_header X-Frame-Options "ALLOW-FROM domain.com"; -->
   <!-- add_header Content-Security-Policy "frame-ancestors domain.com"; -->
-  <iframe id="iframe" name="iframe" src="${weekNumber}/index-bySegment.html" title="KJZZ week ${weekNumber}" loading="lazy" onclick="swapWordRecurse(this.parentNode.parentNode, 'byChunk', 'bySegment');"></iframe>
+  <iframe id="iframe" name="iframe" src="${yearNumber}/${weekNumber}/index-bySegment.html" title="KJZZ ${yearNumber} week ${weekNumber}" loading="lazy"></iframe>
 
   <div class="audio">
     <audio id="player" class="op-player__media">
@@ -58,7 +65,7 @@
 </div>
 
 <script defer type="application/javascript" src="https://cdn.jsdelivr.net/npm/openplayerjs@latest/dist/openplayer.min.js"></script>
-<script defer type="application/javascript" src="../../lib/js/OpenPlayerJS.js?${rand}"></script>
-<script defer type="application/javascript" src="../../lib/js/ui.js?${rand}"></script>
+<script defer type="application/javascript" src="lib/js/OpenPlayerJS.js?${rand}"></script>
+<script defer type="application/javascript" src="lib/js/ui.js?${rand}"></script>
 </body>
 </html>
