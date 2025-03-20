@@ -1,4 +1,4 @@
-# BiasBuster - WIP 0.9.13 testing in progress... please wait
+# BiasBuster - WIP 0.9.14 testing in progress... please wait
 
 A set of tools which ultimate goal is to analyze biases in English Public Broadcasts.
 Currently only handles KJZZ's radio broadcast.
@@ -192,6 +192,7 @@ This Python script does the following:
   - [ ] generate gender bias analysis
   - [ ] generate html week pages that are useful
   - [x] generate html week pages that are interactive
+  - [ ] find out how to expose hidden agendas like gender paygap, climate change, Trump bashing, etc
   - [ ] see roadmap ...
 
 
@@ -201,120 +202,101 @@ KJZZ-db.py needs at least `--import / --query / --gettext / --listLevel`.
 `python KJZZ-db.py --help`
 
 ```
-usage: python KJZZ-db.py --help
-Required at least: --import / --query / --gettext / --listLevel
+ usage: python KJZZ-db.py --help
+  Requires at least: --import / --query / --gettext / --listLevel  (add --help for help on those functions only)
+  -v, -vv, -vvv                     increase verbosity.
+  --silent                          Suppress all messages.
+  --dryRun                          Will not generate PICtures, not commit imports, not output or modify anything.
+  --db path\sqlite.db (kjzz.db)
+                                    Path to the local SQlite db.
+  -q, --query < title | first | last | last10 | byDay | byTitle | chunkLast10 | "select .. from schedule">
+                                    Quick way to see what's in the db.
+  --import < --folder inputFolder | --text "KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text" >
+    -m, --model *distil-large-v3 small medium large...
+                                    Model that you used with whisper, to transcribe the text to import.
+  --html [--byChunk --printOut] <2023|2023/41>
+                                    PICture: generate yearly or year/week schedule as an html table.
+                                    Outputs html file: "kjzz/2023/41/index[-bySegment|byChunk].html"
+    --byChunk                       Outputs schedule by 30mn chucks, no rowspan, no PICtures.
+    --printOut                      Will output html on the prompt.
+  -g, --gettext < selector=value : chunk= | date= | datetime= | year= | week= | Day= | time= | title= >
+                    Outputs all text from the selector:
+                    chunk="KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title" (run "python KJZZ-db.py -q chunkLast10" to get an idea.
+                    date=2023-10-08[+time=HH:MM]
+                    datetime="2023-10-08 HH:MM"
+                    year=2023
+                    week=42 (iso week with Mon first)
+                    Day=Fri (Ddd)
+                    title="title of the show", see https://kjzz.org/kjzz-print-schedule
+                          example:  chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered"
+                                    Will get text from that chunk of programming only. Chunks are 30mn long.
+                          example:  year=2023+week=41+Day=Fri+title="All Things Considered"
+                                    Same as above but will get text from the entire program for Friday week 41 of 2023.
+                          example:  year=2023+title="All Things Considered"
+                                    Same as above but will get text from a single program for the entire year.
+    -p, --pretty                    Convert \ to carriage returns and convert json output to text.
+                                    Ignored when outputing pictures.
+   *--printOut                      Will output selected text on the prompt (default if no other option passed).
+    --noMerge                       Do not merge 30mn chunks of the same title within the same timeframe.
+    --output *./kjzz                Folder where to output PICtures.
+                                    Will be kjzz/YYYY/W/ when gettext has year=YYYY+week=W"
+    --show                          Opens the PICtures upon generation.
+    --rebuildThumbnails <year|year/week>
+                                    Will (re)generate only PICtures thumbnails for that year or week, off existing PICtures.
+    --imgExt <*png|jpg|webp|avif>   Use this format instead of png.
+    --noPngquant                    Disable pngquant compression (only for png, indeed).
+    --imgQuality <*50>              0-100 compression quality.
+    --noPics                        Will not generate PICtures.
+    --force                         Will overwrite existing PICtures.
 
-  --import < --text "KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text" | --folder inputFolder >
-    -m, --model *small medium large...
-                   Model that you used with whisper, to transcribe the text to import.
-    -p, --pretty
-                   Convert \n to carriage returns and does json2text.
-                   Ignored when outputing pictures.
-    --output *kjzz
-                   Folder where to output pictures..
-    --show
-                   Opens the picture upon generation.
-    --rebuildThumbnails <week>
-                   Will (re)generate PICtures thumbnails only for that week.
-    --dryRun
-                   Will not generate PICtures, will not import or update the database.
-    --noPics
-                   Will not generate PICtures.
-    --force
-                   Will regenerate existing PICtures.
-
-  --db *kjzz.db    Path to the local SQlite db.
-  -q, --query < title | first | last | last10 | byDay | byTitle | chunkLast10 >
-                   Quick and dirty way to see what's in the db.
-
-  --html [--byChunk --printOut --autoGenerate] <week>
-                   PICture: generate week number's schedule as an html table.
-                   Outputs html file: kjzz/week00[-byChunk].html
-                   --byChunk  Outputs schedule by 30mn chucks, no rowspan, no picture.
-                   --printOut Will output html on the prompt.
-                   --autoGenerate Will loop generate all wordCloud PICtures to show in html for that week.
-
-  -g, --gettext < selector=value : chunk= | date= | datetime= | week= | Day= | time= | title= >
-                   Outputs all text from the selector:
-                   chunk="KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title" (run "python KJZZ-db.py -q chunkLast10" to get some values)
-                   date=2023-10-08[+time=HH:MM]
-                   datetime="2023-10-08 HH:MM"
-                   week=42 (iso week with Mon first)
-                   Day=Fri (Ddd)
-                   title="title of the show", see https://kjzz.org/kjzz-print-schedule
-          example: chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered"
-                   Will get text from that chunk of programming only. Chunks are 30mn long.
-          example: week=41+Day=Fri+title="All Things Considered"
-                   Same as above but will get text from the entire episode.
-   *--printOut
-                   Will output selected text on the prompt (default if no other option passed).
-    --noMerge
-                   Do not merge 30mn chunks of the same title within the same timeframe.
-    --misInformation
-                   PICture: generate misInformation graph or heatmap for all 4 factors:
-                   explanatory/retractors/sourcing/uncertainty
-      --graphs *bar,*pie,line
-                   What graph(s) you want. Ignored with --noMerge: a heatMap will be generated instead.
-    --wordCloud
-                   PICture: generate word cloud from gettext output. Will not output any text.
-      --noPngquant
-                   Disable pngquant compression
-      --useJpeg
-                   Produces jpeg instead of png
-      --jpegQuality <*50>
-                   0-100 jpeg quality
-      --stopLevel  0 1 2 *3
-                   add various levels of stopwords
-        --listLevel <0[,1 ..]> to just show the words in that level(s).
-
-      --max_words *1000 int (default=1000)
-               The maximum number of words in the Cloud.
-      --width *2000 int (default=2000)
-               Width of the canvas.
-      --height *1000 int (default=1000)
-               Height of the canvas.
-      --min_word_length *3 int, default=3
-               Minimum number of letters a word must have to be included.
-      --min_font_size *4 int (default=4)
-               Smallest font size to use. Will stop when there is no more room in this size.
-      --max_font_size *400  int or None (default=400)
-               Maximum font size for the largest word. If None, height of the image is used.
-      --scale *1.0 float (default=1.0)
-               Scaling between computation and drawing. For large word-cloud images,
-               using scale instead of larger canvas size is significantly faster, but
-               might lead to a coarser fit for the words.
-      --relative_scaling *auto float (default='auto')
-               Importance of relative word frequencies for font-size.  With
-               relative_scaling=0, only word-ranks are considered.  With
-               relative_scaling=1, a word that is twice as frequent will have twice
-               the size.  If you want to consider the word frequencies and not only
-               their rank, relative_scaling around .5 often looks good.
-               If 'auto' it will be set to 0.5 unless repeat is true, in which
-               case it will be set to 0.
-      --background_color *white color value (default='white')
-               Background color for the word cloud image.
-      --normalize_plurals *True bool, default=True
-               Whether to remove trailing 's' from words. If True and a word
-               appears with and without a trailing 's', the one with trailing 's'
-               is removed and its counts are added to the version without
-               trailing 's' -- unless the word ends with 'ss'. Ignored if using
-               generate_from_frequencies.
-      --inputStopWordsFiles *[] file, default=None
-               Text file containing one stopWord per line.
-               You can pass --inputStopWordsFiles multiple times.
-      --font_path *fonts\Quicksand-Bold.ttf str, default='fonts\Quicksand-Bold.ttf'
-               Font path to the font that will be used (OTF or TTF).
-      --collocation_threshold *30 int, default=30
-               Bigrams must have a Dunning likelihood collocation score greater than this
-               parameter to be counted as bigrams. Default of 30 is arbitrary.
-               See Manning, C.D., Manning, C.D. and Schütze, H., 1999. Foundations of
-               Statistical Natural Language Processing. MIT press, p. 162
-               https://nlp.stanford.edu/fsnlp/promo/colloc.pdf#page=22
-
-  -v, --verbose
-                   -vv -vvv increase verbosity.
-  --silent
-                   Not verbose.
+    --misInformation                PICture: generate misInformation graph or heatmap for all 4 factors:
+                                            explanatory/retractors/sourcing/uncertainty
+                                            see https://github.com/PDXBek/Misinformation/
+      --graphs *bar,*pie,line         What graph(s) you want. Ignored with --noMerge: a heatMap (per chunk) will be generated instead.
+    --wordCloud                     PICture: generate word cloud from gettext output. Will not output any text.
+      --stopLevel  0 1 2 *3           Add various levels of stopwords.
+        --listLevel <0[,1,..]>          to show the stopWords in which level(s).      --max_words *1000  int (default=1000)
+                                      The maximum number of words in the Cloud.
+      --width *2000  int (default=2000)
+                                      Width of the canvas.
+      --height *1000  int (default=1000)
+                                      Height of the canvas.
+      --min_word_length *3  int, default=3
+                                      Minimum number of letters a word must have to be included.
+      --min_font_size *4  int (default=4)
+                                      Smallest font size to use. Will stop when there is no more room in this size.
+      --max_font_size *400   int or None (default=400)
+                                      Maximum font size for the largest word. If None, height of the image is used.
+      --scale *1.0  float (default=1.0)
+                                      Scaling between computation and drawing. For large word-cloud images,
+                                      using scale instead of larger canvas size is significantly faster, but
+                                      might lead to a coarser fit for the words.
+      --relative_scaling *auto  float (default='auto')
+                                      Importance of relative word frequencies for font-size.  With
+                                      relative_scaling=0, only word-ranks are considered.  With
+                                      relative_scaling=1, a word that is twice as frequent will have twice
+                                      the size.  If you want to consider the word frequencies and not only
+                                      their rank, relative_scaling around .5 often looks good.
+                                      If 'auto' it will be set to 0.5 unless repeat is true, in which
+                                      case it will be set to 0.
+      --background_color *white  color value (default='white')
+                                      Background color for the word cloud image.
+      --normalize_plurals *True  bool, default=True
+                                      Whether to remove trailing 's' from words. If True and a word
+                                      appears with and without a trailing 's', the one with trailing 's'
+                                      is removed but counts in the total -- unless the word ends with 'ss'.
+                                      Ignored if using --generate_from_frequencies.
+      --inputStopWordsFiles *[]  file, default=None
+                                      Text file containing one stopWord per line.
+                                      You can pass --inputStopWordsFiles multiple times.
+      --font_path *fonts\Quicksand-Bold.ttf  str, default='fonts\Quicksand-Bold.ttf'
+                                      Path to the font to use for word clouds (OTF or TTF).
+      --collocation_threshold *30  int, default=30
+                                      Bigrams must have a Dunning likelihood collocation score greater than this
+                                      parameter to be counted as bigrams. Default of 30 is arbitrary.
+                                      See Manning, C.D., Manning, C.D. and Schütze, H., 1999. Foundations of
+                                      Statistical Natural Language Processing. MIT press, p. 162
+                                      https://nlp.stanford.edu/fsnlp/promo/colloc.pdf#page=22
 ```
 
 ## Import new data
@@ -375,7 +357,7 @@ Outputs how many 30mn chunks are stored, by title and by Day:
 
 `python KJZZ-db.py -q title --pretty`
 
-Outputs alphabetically sorted list of all programing in the database, useful for loops for instance:
+Outputs alphabetically sorted list of all programming in the database, useful for loops for instance:
 ```
 "All Things Considered"
 "BBC Newshour"
@@ -405,21 +387,22 @@ Adding _pretty_ will flatten the output as simple text:
 ```
 
 ## gettext
-`-g, --gettext` * chunk= | date= | datetime= | week= | Day= | time= | title= *
+`-g, --gettext` * chunk= | date= | datetime= | year= | week= | Day= | time= | title= *
 
 validKeys = they will be used as parameters for the SQL query:
 - chunk="KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title"
 - date=2023-10-08[+time=HH:MM]
 - datetime="2023-10-08 HH:MM"
+- year=2023
 - week=42 (iso week with Mon first)
 - Day=Fri (Ddd)
 - title="title of the show", see https://kjzz.org/kjzz-print-schedule
 
 
-You can also combine the keys with *+*, examples:
-- ALL of BBC Newshour for week 41: `--gettext week=41+title="BBC Newshour"`
+You _should_ combine keys with *+*, examples:
+- ALL of BBC Newshour for 2023 week 41: `--gettext year=2023+week=41+title="BBC Newshour"`
 - ALL programs for a specific day [and time]: `--gettext date=2023-10-08[+time=HH:MM]`
-- ALL programs for a specific week: `--gettext week=42`
+- ALL programs for a specific week: `--gettext year=2023+week=42`
 - Specific date and time (30mn chunk): `--gettext datetime="2023-10-08 HH:MM"`
 
 --stopLevel 3 is used by default; Look in the script what words the various levels contain, or type this to find out:
@@ -457,21 +440,21 @@ You can also combine the keys with *+*, examples:
 `python KJZZ-db.py --gettext chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -p`
 
 
-### Get the text for a particular program, ALL dates (slow)
+### Get the text for a particular program, ALL years, ALL weeks (slow)
 `python KJZZ-db.py --gettext title="All Things Considered" -p`
 
 
 ### Generate a word Cloud for a program, on a specific week and Day
-`python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud`--show --max_words=1000
+`python KJZZ-db.py -g year=2023+week=42+title="Freakonomics"+Day=Sun --wordCloud`--show --max_words=1000
 
 Same but If you know the actual date:
-`python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud`--show --max_words=1000
+`python KJZZ-db.py -g date=2023-10-08+title="Freakonomics"+Day=Sun --wordCloud`--show --max_words=1000
 
 
-### Generate a word Cloud for a particular chunk of program
-`python KJZZ-db.py -g chunk="KJZZ_2023-10-19_Thu_1500-1530_All Things Considered" -v --wordCloud`
+### Generate a word Cloud for a particular chunk of program +++verbose
+`python KJZZ-db.py -g chunk="KJZZ_2023-10-19_Thu_1500-1530_All Things Considered" -vvv --wordCloud`
 
-Verbose outpout:
+Sample -vvv verbose outpout:
 ```
 wordCloud:     True
 localSqlDb kjzz.db passed
@@ -557,7 +540,7 @@ Now, there is a much easier way to generate all those wordCloud pictures.
 
 Automatically: this command will generate week's 42 schedule html page, linking available wordCloud pictures:
 
-`python KJZZ-db.py --html 42 --autoGenerate --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt`
+`python KJZZ-db.py --html 42 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt`
 ![week41 example](assets/week41%20example.png)
 
 
@@ -593,9 +576,9 @@ If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
   - seaborn
   - wordcloud
   - pngquant
-- Windows software:
-  - busybox.exe
-  - whisper-faster from https://github.com/Purfview/whisper-standalone-win
+- Windows software needed:
+  - [busybox.exe](https://busybox.net/)
+  - [whisper-faster](https://github.com/Purfview/whisper-standalone-win)
 
 
 # Acknowledgements
@@ -685,7 +668,21 @@ Scope creep ahead...
     - [ ] automate mp3 downloads from cloud + process + uploads from/to cloud server
   - [ ] future
     - [ ] dynamic page in PHP or nodeJS/typeScript
-- [x] release 0.9.13 downloader
+- [x] release 0.9.14 WIP
+  - [x] ui
+    - [ ] add date picker or at least indicate min and max available
+    - [ ] upgrade OpenPlayerJS
+    - [ ] fix closed captions not showing up anymore
+  - [x] python
+    - [x] simplified generateHtml()
+    - [x] added genTitle and using gettextDict everywhere
+    - [x] variabilize station name
+    - [ ] test --text if it needs folder path or not
+    - [ ] test weekNumber 1 vs 01
+    - [ ] detect multiple schedules and load the right one as needed
+    - [ ] should we remove the donation drive stopWords from stopWords.kjzz.txt? After all it represents how much they hammer it
+    - [ ] should we include stopWords.ranks.nl by default?
+- [x] release 0.9.13 WIP
   - [x] kjzz.sh
     - [x] major bug discovered in isoweek values of %V%G versus %W%U/%Y: we switched to %W as strftime('%W','2025-01-01') gives same values
     - [x] schedules format is KJZZ-schedule.json, KJZZ-schedule-20240101.json, KJZZ-schedule-20240415.json
@@ -697,19 +694,13 @@ Scope creep ahead...
   - [x] Windows part 1
     - [x] BiasBuster-whisper.cmd updated paramaters for latest Faster-Whisper-XXL r245.2 distil-large-v3
   - [x] python
-    - [ ] revamp of --help
-    - [ ] revamp of --help
-    - [ ] test --text if it needs folder path or not
-    - [ ] test weekNumber 1 vs 01
-    - [ ] detect multiple schedules and load the right one as needed
+    - [x] revamp of --help
     - [x] removed autoGenerate option, we always generate pics with --hrml unless --noPics is present
     - [x] saveImage() now works for PIL and pyplot
     - [x] saveImage() from save_image_extended: now accepts avif webp jxl etc
     - [x] inputFile detection and Chunk class now handle yearNumber
     - [x] add yearNumber to weekNumber handling
   - [x] ui
-    - [ ] upgrade OpenPlayerJS
-    - [ ] fix closed captions not showing up anymore
     - [x] add yearNumber navigation
     - [x] rename ui-child / style-child to ui-iframe / style-iframe
     - [x] updated index.html and index_template.html with year navigation
@@ -787,7 +778,7 @@ Scope creep ahead...
   - [x] default stopLevel is indeed 4 not 0
   - [x] added automatic missing pictures where necessary
   - [x] added html progress bar
-  - [x] added --autoGenerate and --dryRun
+  - [x] added and --dryRun
   - [x] frozen table headers
   - [x] added prev/next links
   - [x] perfected table generation
@@ -795,7 +786,7 @@ Scope creep ahead...
   - [x] added --silent
   - [x] default verbose = 1
   - [x] standardised logging
-- [x] 0.9.6   WIP web ui - actually just generates an html page of the week's programing
+- [x] 0.9.6   WIP web ui - actually just generates an html page of the week's programming
   - [x] added options --html --byChunk
   - [x] added home-made html table generator from json schedule
   - [x] html table has an okay look and shows existing wordClouds

@@ -1,9 +1,9 @@
 # BiasBuster
 # author:  AudioscavengeR
 # license: GPLv2
-# version: 0.9.12 release iframe
+# version: 0.9.14 WIP
 
-# BUG: jpeg produced by plt.savefig have a wide border
+# BUG: images produced by plt.savefig have a wide border
 
 # Object: Identify and challenge bias in language wording, primarily directed at KJZZ's radio broadcast.
 # BiasBuster provides an automated stream downloader, a SQLite database, and Python functions to output visual statistics.
@@ -17,34 +17,28 @@
 # https://www.kjzz.org/schedule#weekly
 
 # python KJZZ-db.py -i -f kjzz\44
-# python KJZZ-db.py -i -f kjzz\45
-# python KJZZ-db.py -q title
-# python KJZZ-db.py -q chunkLast10 -p
-# python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v --wordCloud
-# python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
-# python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
-# python KJZZ-db.py -g title="All Things Considered" -v --wordCloud
-# python KJZZ-db.py -g title="BBC Newshour" -v --wordCloud
-# python KJZZ-db.py -g title="BBC World Business Report" -v --wordCloud
-# python KJZZ-db.py -g title="BBC World Service" -v --wordCloud
-# python KJZZ-db.py -g title="Fresh Air" -v --wordCloud
-# python KJZZ-db.py -g title="Here and Now" -v --wordCloud
-# python KJZZ-db.py -g title="Marketplace" -v --wordCloud
-# python KJZZ-db.py -g title="Morning Edition" -v --wordCloud
-# python KJZZ-db.py -g title="The Show" -v --wordCloud
-# python KJZZ-db.py -g week=42+Day=Mon+title="The Show" -v --wordCloud --stopLevel 3
-# python KJZZ-db.py -g week=42+Day=Mon+title="All Things Considered" --wordCloud --stopLevel 3 --show
-# python KJZZ-db.py -g week=42 --wordCloud --stopLevel 3 --show --max_words=10000
-# python KJZZ-db.py -g week=43 --wordCloud --stopLevel 3 --show --max_words=10000
-# python KJZZ-db.py -g week=44 --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
-# python KJZZ-db.py -g week=43+title="TED Radio Hour" --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
-#   example: year=2023+week=42+title="Freakonomics"+Day=Sun is about men/women
-# python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
-# for /l %a in (40,1,45) DO python KJZZ-db.py -g week=%a+title="TED Radio Hour" --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
-# python KJZZ-db.py -g week=42+title="Freakonomics"+Day=Sun --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
 
-# python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show
-# python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
+# python KJZZ-db.py -q title
+# python KJZZ-db.py -q chunkFirst10
+# python KJZZ-db.py -q chunkLast10 -p
+# python KJZZ-db.py -q "select count(*) from schedule" -p
+
+# python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v --wordCloud
+# python KJZZ-db.py -g title="BBC Newshour" -v --wordCloud
+# python KJZZ-db.py -g year=2023+week=42+Day=Mon+title="The Show" -v --wordCloud --stopLevel 3
+# python KJZZ-db.py -g year=2023+week=42+Day=Mon+title="All Things Considered" --wordCloud --stopLevel 3 --show
+# python KJZZ-db.py -g year=2023+week=42 --wordCloud --stopLevel 3 --show --max_words=10000
+# python KJZZ-db.py -g year=2023+week=43 --wordCloud --stopLevel 3 --show --max_words=10000
+# python KJZZ-db.py -g year=2023+week=44 --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
+# python KJZZ-db.py -g year=2023+week=43+title="TED Radio Hour" --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
+#   example: year=2023+week=42+title="Freakonomics"+Day=Sun is about men/women
+# python KJZZ-db.py -g year=2023+week=42+title="Freakonomics"+Day=Sun --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
+# for /l %a in (40,1,45) DO python KJZZ-db.py -g year=2023+week=%a+title="TED Radio Hour" --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
+# python KJZZ-db.py -g year=2023+week=42+title="Freakonomics"+Day=Sun --wordCloud --stopLevel 3 --show --max_words=1000 --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
+
+# python KJZZ-db.py --gettext year=2023+week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show
+# python KJZZ-db.py --gettext year=2023+week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
+
 # python KJZZ-db.py --html 42 --byChunk
 # python KJZZ-db.py --rebuildThumbnails 2023/41
 # for /l %a in (40,1,47) DO python KJZZ-db.py --html %a --inputStopWordsFiles data\stopWords.ranks.nl.uniq.txt --inputStopWordsFiles data\stopWords.Wordlist-Adjectives-All.txt
@@ -71,11 +65,12 @@
 
 # pip install wordcloud pngquant numpy pillow pillow-avif-plugin pillow-jxl-plugin jxlpy
 
-import getopt, sys, os, re, regex, io, inspect, string, copy, mmap
+import getopt, sys, os, re, regex, io, inspect, string, copy
 import glob, time, datetime, json, urllib, random, sqlite3
 from dateutil import parser
 from pathlib import Path
 from collections import Counter
+from string import Template
 
 # 3rd party modules:
 # https://github.com/Textualize/rich
@@ -98,12 +93,17 @@ from rich.progress import track, Progress
 verbose = 1
 progress = ""
 
+STATION = 'KJZZ'
+station = 'kjzz'
+titleDataDefault = "BiasBuster: %s" %(STATION)
+stationScheduleUrl = 'https://kjzz.org/kjzz-print-schedule'
+
 importChunks = False
 inputFolder = None
 inputFiles = []
 inputJsonFile = None
 inputTextFile = None
-localSqlDb = Path("kjzz.db")
+localSqlDb = Path("./%s.db" %(station))
 # the db connection is global
 conn = None
 
@@ -117,15 +117,17 @@ misInformation = False
 gettext = None
 pretty = False
 listTitleWords2Exclude = ["Jazz", "Blues"]
-gettextKeys = ["date", "datetime", "year", "week", "Day", "time", "title", "chunk"]
+validGettextKeys = ["date", "datetime", "year", "week", "Day", "time", "title", "chunk"]
 dbScheduleKeys = ["start", "stop", "week", "Day", "title", "text", "model", "misInfo"]
-gettextDict = {}
+gettextDictBlank = {}
+validTitleKeys = ['year', 'week', 'Day', 'title']
+
 mergeRecords = True
 removeStopwords = True
 showPicture = False
 inputStopWords = []
 inputExt = 'text'
-outputFolder = Path("./kjzz")
+outputFolder = Path("./%s" %(station))
 dataFolder = Path("./data")
 thesaurusFolder = Path("./data/SimpleWordlists")
 graphs = []   # bar pie line
@@ -136,7 +138,7 @@ yearNumber = datetime.datetime.now().year
 # calendar normal: %W = week 00-53  week number of year, with Monday as first day of week (00..53)  << the one we chose
 # calendar normal: %U = week 00-53  week number of year, with Sunday as first day of week (00..53)
 weekNumber = None
-jsonScheduleFile = os.path.realpath(os.path.join(outputFolder, "KJZZ-schedule.json"))
+jsonScheduleFile = os.path.realpath(os.path.join(outputFolder, "%s-schedule.json") %(STATION))
 indexTemplateFile = os.path.realpath(os.path.join(outputFolder, "index_template.html"))
 indexFile = os.path.realpath(os.path.join(outputFolder, "index.html"))
 byChunk = False
@@ -144,20 +146,26 @@ printOut = False
 listLevel = []
 silent = False
 dryRun = False
+
+force = False
 noPics = False
 avif_supported = False
 jxl_supported = False
+save_metadata = False
 imgExt = 'png'
 imgExtValids = ['png','jpg','jpeg','webp','avif','jxl']
-missingPic = "../../lib/assets/missingPic.png"
-missingCloud = "../../lib/assets/missingCloud.png"
-voidPic = "../../lib/assets/1x1.png"
-rebuildThumbnail = False
 usePngquant = True
 useJpeg = False
 imgQuality = 60
+
 thumbnailQuality = 50
-force = False
+thumbnailPrefix = "thumbnail-"
+rebuildThumbnail = False
+
+missingPic = "../../lib/assets/missingPic.png"
+missingCloud = "../../lib/assets/missingCloud.png"
+voidPic = "../../lib/assets/1x1.png"
+
 # when uncertainty/sourcing >= BSoMeterTrigger then highlight it
 BSoMeterTrigger = 0.9
 BSoMeterLevel2 = 0.93
@@ -310,17 +318,23 @@ sqlCountsByTitle = """ SELECT title, Day, count(title)
   # ('All Things Considered', 'Wed', 6),
   # ('BBC Newshour', 'Fri', 2),
 
-# spit out chunk names, useful list what's available
+# spit out chunk names, to list what's available
 # KJZZ_2023-10-09_Mon_0000-0030_BBC World Service
 # https://www.sqlite.org/lang_datefunc.html
 # https://www.sqlshack.com/sql-convert-date-functions-and-formats/
 # python KJZZ-db.py -q chunkLast10 -p
 # %w 		day of week 0-6 with Sunday==0 but we want Mon Tue etc
-sqlListChunksLast10 = """ SELECT 'KJZZ_' || strftime('%Y-%m-%d_%w_%H%M-',start) || strftime('%H%M_',stop) || title
+sqlListChunksFirst10 = Template(""" SELECT '${STATION}_' || strftime('%Y-%m-%d_%w_%H%M-',start) || strftime('%H%M_',stop) || title
+          from schedule 
+          ORDER BY start ASC
+          LIMIT 10
+          """).safe_substitute(STATION=STATION)
+
+sqlListChunksLast10 = Template(""" SELECT '${STATION}_' || strftime('%Y-%m-%d_%w_%H%M-',start) || strftime('%H%M_',stop) || title
           from schedule 
           ORDER BY start DESC
           LIMIT 10
-          """
+          """).safe_substitute(STATION=STATION)
 # [
   # ('KJZZ_2023-10-13_41_1700-1730_All Things Considered',),
   # ('KJZZ_2023-10-13_41_1630-1700_All Things Considered',),
@@ -443,7 +457,7 @@ class Chunk:
 # If you use the TEXT storage class to store date and time value, you need to use the ISO8601 string format as follows:
 # YYYY-MM-DD HH:MM:SS.SSS
 def db_init(localSqlDb):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   localSqlDb.touch()
   # localSqlDb.unlink()
@@ -467,6 +481,7 @@ def db_init(localSqlDb):
     cur.execute(queryScheduleTable)
     info("queryScheduleTable %s: success" %(localSqlDb), 1)
   except Exception as error:
+    # sqlite3.OperationalError: table schedule already exists
     if not str(error).find("already exists"):
       info("queryScheduleTable %s: %s" %(localSqlDb, error), 1)
     else:
@@ -505,7 +520,7 @@ def db_init(localSqlDb):
     # progress.advance(task)
 
 def db_update(table, column, value, textConditions, localSqlDb, conn, commit, progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   # db_update('schedule', 'misInfo', str(misInfo), textConditions, localSqlDb, conn)
   if not conn:
@@ -524,7 +539,7 @@ def db_update(table, column, value, textConditions, localSqlDb, conn, commit, pr
 
 
 def db_load(inputFiles, localSqlDb, conn, model, commit, progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   importedFiles = []
   if inputFiles:
@@ -584,7 +599,7 @@ def db_load(inputFiles, localSqlDb, conn, model, commit, progress=""):
 
 
 def cursor(localSqlDb, conn, sql, data=None, progress=""):
-  # info("%s" %({**locals()}), 3, "", "blue")   # uncomment when needed, it's called like a million times
+  info("%.156s" %({**locals()}), 3, "", "blue")   # uncomment when needed, it's called like a million times
   
   if not conn:
     conn = sqlite3.connect(localSqlDb)
@@ -608,7 +623,7 @@ def cursor(localSqlDb, conn, sql, data=None, progress=""):
 
 
 def sqlQueryPrintExec(sqlQuery, pretty=pretty):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   records = cursor(localSqlDb, conn, sqlQuery)
   # SQLite: %w = day of week 0-6 with Sunday==0
@@ -642,7 +657,7 @@ def sqlQueryPrintExec(sqlQuery, pretty=pretty):
 # print(my_lst)
 
 def replaceNum2Days(record):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   # crap multi replace function but it's cheap
   if isinstance(record,str):
@@ -663,8 +678,8 @@ def replaceNum2Days(record):
 #
 
 
-def countChunk(getTextDict, progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+def countChunk(gettextDict, progress=""):
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   # gettextDict = {'start': '%Y-%m-%d %H:%M'}
   # gettextDict = {'week': '40', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
@@ -697,8 +712,8 @@ def countChunk(getTextDict, progress=""):
 # the db has:   start stop week day title text model misInfo
 # and we want:  start stop KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title misInfo
 # getChunks() reconstructs each chunk name in the results
-def getChunks(getTextDict, withText=False, progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+def getChunks(gettextDict, withText=False, progress=""):
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   # gettextDict = {'start': '%Y-%m-%d %H:%M'}
   # gettextDict = {'year': '2023', 'week': '40', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
@@ -716,17 +731,17 @@ def getChunks(getTextDict, withText=False, progress=""):
           # strftime('%%H:%%M',start)
         # , strftime('%%H:%%M',stop)
   # let's return actual times instead, it's more useful
-  sqlListChunks = """ SELECT 
+  sqlListChunks = Template(""" SELECT 
           start
         , stop
-        , 'KJZZ_' || strftime('%%Y-%%m-%%d_',start) || Day || strftime('_%%H%%M-',start) || strftime('%%H%%M_',stop) || title
+        , '${STATION}_' || strftime('%%Y-%%m-%%d_',start) || Day || strftime('_%%H%%M-',start) || strftime('%%H%%M_',stop) || title
         , misInfo
-        %s
+        ${selectText}
           from schedule 
           where 1=1
-          %s
+          ${textConditions}
           ORDER BY start ASC;
-          """ %(selectText, textConditions)
+          """).safe_substitute(STATION=STATION, selectText=selectText, textConditions=textConditions)
   
   info("sqlListChunks: %s" %(sqlListChunks), 4, progress)
   
@@ -743,7 +758,7 @@ def getChunks(getTextDict, withText=False, progress=""):
 
 
 def printOutGetText(records, mergeRecords, pretty, dryRun):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   if mergeRecords:
     mergedText = ''
@@ -762,8 +777,8 @@ def printOutGetText(records, mergeRecords, pretty, dryRun):
 
 
 
-def genWordClouds(records, wordCloudTitle, mergeRecords, showPicture, wordCloudDict, outputFolder=outputFolder, dryRun=False, progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+def genWordClouds(records, gettextDict, mergeRecords, showPicture, wordCloudDict, outputFolder=outputFolder, dryRun=False, progress=""):
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   # gettext = "week=43+title=Classic Jazz with Chazz Rayburn+Day=Mon"
   # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
@@ -777,23 +792,25 @@ def genWordClouds(records, wordCloudTitle, mergeRecords, showPicture, wordCloudD
   if mergeRecords:
     for record in records: mergedText += record[4]
     info("wordCloud: mergeRecords = %i characters" %(len(mergedText)), 3)
-    genWordCloudDicts.append(genWordCloud(mergedText, wordCloudTitle, removeStopwords, stopLevel, wordCloudDict, showPicture, outputFolder, dryRun, progress))
+    genWordCloudDicts.append(genWordCloud(mergedText, gettextDict, removeStopwords, stopLevel, wordCloudDict, showPicture, outputFolder, dryRun, progress))
   else:
     i = 1
     for record in records:
       info("wordCloud: image %s" % (i), 1, progress)
       info("wordCloud: record = \n %s" %(record), 3, progress)
-      genWordCloudDicts += genWordCloud(record[4], wordCloudTitle, removeStopwords, stopLevel, wordCloudDict, showPicture, outputFolder, dryRun, progress)
+      genWordCloudDicts += genWordCloud(record[4], gettextDict, removeStopwords, stopLevel, wordCloudDict, showPicture, outputFolder, dryRun, progress)
     i += 1
 
   return genWordCloudDicts
 # wordCloud
 
 
-def genWordCloud(text, wordCloudTitle, removeStopwords=True, level=0, wordCloudDict=wordCloudDict, showPicture=False, outputFolder=outputFolder, dryRun=False, progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+def genWordCloud(text, gettextDict, removeStopwords=True, level=0, wordCloudDict=wordCloudDict, showPicture=False, outputFolder=outputFolder, dryRun=False, progress=""):
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   # wordCloudTitle = "KJZZ year=2023 week=43 title=BBC World Service Day=Sat"
+  wordCloudTitle  = genTitle(gettextDict)
+  fileName        = genTitle(gettextDict, "-")
   info("Now generating: %s" %(wordCloudTitle), 2, progress)
   
   import numpy as np
@@ -811,17 +828,16 @@ def genWordCloud(text, wordCloudTitle, removeStopwords=True, level=0, wordCloudD
   # print(STOPWORDS)
 
   genWordCloudDict = {
+    "fileName": fileName, 
+    "outputFile": "", 
     "cleanWordsList": [], 
-    "fileName": "", 
     "level": level, 
     "numWords": 0, 
-    "outputFile": "", 
     "removeStopwords": removeStopwords, 
     "stopWords": [], 
     "text": text, 
     "top100tuples": [], 
     "wordCloudDict": wordCloudDict, 
-    "wordCloudTitle": "", 
     "wordCloudTitle": wordCloudTitle, 
     "wordsList": [], 
   }
@@ -841,7 +857,7 @@ def genWordCloud(text, wordCloudTitle, removeStopwords=True, level=0, wordCloudD
     wordCloudDict["scale"]["value"], 
     wordCloudDict["relative_scaling"]["value"], 
   )
-  genWordCloudDict["fileName"] = genWordCloudDict["wordCloudTitle"].replace(": ", "=").replace(":", "")
+  # genWordCloudDict["fileName"] = genWordCloudDict["wordCloudTitle"].replace(": ", "=").replace(":", "")
   genWordCloudDict["outputFileName"] = ""
   genWordCloudDict["outputFile"] = ""
   if dryRun: return genWordCloudDict
@@ -978,11 +994,12 @@ def genWordCloud(text, wordCloudTitle, removeStopwords=True, level=0, wordCloudD
   # image.show()
   
   # always save BEFORE show
-  if genWordCloudDict["fileName"]: genWordCloudDict["outputFile"] = saveImage(outputFolder, genWordCloudDict["fileName"], plt, imgExt, imgQuality, usePngquant, progress)
+  if genWordCloudDict["fileName"]:
+    genWordCloudDict["outputFile"] = saveImage(outputFolder, genWordCloudDict["fileName"], plt, imgExt, imgQuality, usePngquant, False, progress)
   if genWordCloudDict["outputFile"]:
     genWordCloudDict["outputFileName"] = os.path.basename(genWordCloudDict["outputFile"])
     genWordCloudDict["stem"] = Path(genWordCloudDict["outputFile"]).stem
-    genWordCloudDict["outputThumbnailFile"] = saveThumbnail(genWordCloudDict["outputFile"], outputFolder, "thumbnail-" + genWordCloudDict["stem"], imgExt, imgQuality, usePngquant)
+    genWordCloudDict["outputThumbnailFile"] = saveThumbnail(genWordCloudDict["outputFile"], outputFolder, thumbnailPrefix + genWordCloudDict["stem"], imgExt, imgQuality, usePngquant)
 
   if showPicture: plt.show()
   plt.close()
@@ -991,7 +1008,7 @@ def genWordCloud(text, wordCloudTitle, removeStopwords=True, level=0, wordCloudD
 
 
 def loadStopWordsDict():
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   from wordcloud import STOPWORDS
   # https://stackoverflow.com/questions/2831212/python-sets-vs-lists
@@ -1021,7 +1038,7 @@ def loadStopWordsDict():
 
 
 def loadDictHeatMap(dictHeatMap, withSynonyms=withSynonyms):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   synonymsFile = os.path.join(thesaurusFolder, 'Thesaurus-Synonyms-Common.txt')
   # only the synonyms of sourcing and uncertainty seem to make sense, and look the most closely related
@@ -1078,12 +1095,15 @@ def loadDictHeatMap(dictHeatMap, withSynonyms=withSynonyms):
 # loadDictHeatMap
 
 
-def genMisInformation(records, mergeRecords, graphTitle, graphs, showPicture=False, dryRun=False):
-  info("%s" %({**locals()}), 3, "", "blue")
+def genMisInformation(records, mergeRecords, gettextDict, graphs, showPicture=False, dryRun=False):
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   # gettext = "week=43+title=Classic Jazz with Chazz Rayburn+Day=Mon"
   # gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
   # records = [('2023-10-14 01:00.000', '2023-10-14 01:30.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...')..]
+  
+  graphTitle = genTitle(gettextDict)
+  
   if len(records) == 0: return []
   mergedText = ''
   dictHeatMap = loadDictHeatMap(dictHeatMapBlank, withSynonyms)
@@ -1168,7 +1188,7 @@ def genMisInformation(records, mergeRecords, graphTitle, graphs, showPicture=Fal
 
 
 def genMisinfoBarGraph(text, graphTitle, dictHeatMap, wordCloudDict=wordCloudDict, graphs=defaultGraphs, showPicture=False, dryRun=False, progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   info("%s" %(graphTitle), 2)
   textWordsLen = len(text.strip().split())
@@ -1205,7 +1225,7 @@ def genMisinfoBarGraph(text, graphTitle, dictHeatMap, wordCloudDict=wordCloudDic
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
 # def genMisinfoHeatMap(textArray, Ylabels, graphTitle, dictHeatMaps, wordCloudDict=wordCloudDict, showPicture=False, dryRun=False, progress=""):
 def genMisinfoHeatMap(records, graphTitle, dictHeatMaps, wordCloudDict=wordCloudDict, showPicture=False, dryRun=False, progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   # records = [('2023-10-14 01:00:00.000', '2023-10-14 01:30:00.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...'),..]
   
@@ -1273,7 +1293,7 @@ def genMisinfoHeatMap(records, graphTitle, dictHeatMaps, wordCloudDict=wordCloud
 
 
 def readInputFolder(inputFolder):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   if os.path.isdir(inputFolder):
     info(("listing folder %s ...") % (inputFolder), 1)
@@ -1294,7 +1314,7 @@ def readInputFolder(inputFolder):
 
 
 def readInputFile(inputTextFile):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   if os.path.isfile(inputTextFile):
     if (os.path.getsize(inputTextFile) > 0):
@@ -1310,7 +1330,7 @@ def readInputFile(inputTextFile):
 
 
 def graph_line(X, Y, title="", fileName="", progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   import numpy as np
   import pandas as pd
@@ -1330,7 +1350,7 @@ def graph_line(X, Y, title="", fileName="", progress=""):
   plt.xlabel('date')
 
   # always save BEFORE show
-  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, progress)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, False, progress)
 
   if showPicture: plt.show()
   plt.close()
@@ -1340,7 +1360,7 @@ def graph_line(X, Y, title="", fileName="", progress=""):
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph bar --show
 def graph_bar(X, Y, title="", fileName="", progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   import numpy as np
   import pandas as pd
@@ -1360,7 +1380,7 @@ def graph_bar(X, Y, title="", fileName="", progress=""):
   plt.xlabel('date')
 
   # always save BEFORE show
-  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, progress)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, False, progress)
 
   if showPicture: plt.show()
   plt.close()
@@ -1370,7 +1390,7 @@ def graph_bar(X, Y, title="", fileName="", progress=""):
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --graph pie --show
 def graph_pie(X, Y, title="", fileName="", progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   import numpy as np
   import pandas as pd
@@ -1398,7 +1418,7 @@ def graph_pie(X, Y, title="", fileName="", progress=""):
        # )
        
   # always save BEFORE show
-  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, progress)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, False, progress)
 
   if showPicture: plt.show()
   plt.close()
@@ -1407,7 +1427,7 @@ def graph_pie(X, Y, title="", fileName="", progress=""):
 
 
 def graph_heatMapTestHighlight(progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   import numpy as np
   import pandas as pd
@@ -1434,7 +1454,7 @@ def graph_heatMapTestHighlight(progress=""):
   ax.tick_params(length=0)
 
   # always save BEFORE show
-  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, progress)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, False, progress)
 
   if showPicture: plt.show()
   plt.close()
@@ -1444,7 +1464,7 @@ def graph_heatMapTestHighlight(progress=""):
 
 # python KJZZ-db.py --gettext week=42+title="Morning Edition"+Day=Mon --misInformation --noMerge   --show
 def graph_heatMap(arrays, Xlabels, Ylabels, graphTitle="", fileName="", showPicture=False, progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   import numpy as np
   import pandas as pd
@@ -1535,7 +1555,7 @@ def graph_heatMap(arrays, Xlabels, Ylabels, graphTitle="", fileName="", showPict
   fig.tight_layout()
 
   # always save BEFORE show
-  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, progress)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, False, progress)
 
   if showPicture: plt.show()
   plt.close()
@@ -1543,8 +1563,8 @@ def graph_heatMap(arrays, Xlabels, Ylabels, graphTitle="", fileName="", showPict
 # graph_heatMap
 
 
-def saveImage(outputFolder, stem, img, output_ext=imgExt, quality=imgQuality, usePngquant=usePngquant, progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+def saveImage(outputFolder, stem, img, output_ext=imgExt, quality=imgQuality, usePngquant=usePngquant, save_metadata=False, progress=""):
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   outputFileName = "%s.%s" %(stem, output_ext)
   outputFile = os.path.join(outputFolder, outputFileName)
@@ -1604,13 +1624,22 @@ def saveImage(outputFolder, stem, img, output_ext=imgExt, quality=imgQuality, us
     if output_ext in ['jpg', 'jpeg']:
       # remove transparency:
       if img.mode != 'RGB': img = img.convert('RGB')
-    img.save(outputFile, **kwargs)
+    try:
+      img.save(outputFile, **kwargs)
+    except Exception as error:
+      # traceback.print_exc()
+      error("error saving %s: %s" %(outputFile, error), 1)
   else:
     # img is actually a plt
-    img.savefig(outputFile, 
-                bbox_inches='tight', 
-                pil_kwargs=kwargs, 
-                )
+    try:
+      img.savefig(outputFile, 
+                  bbox_inches='tight', 
+                  pil_kwargs=kwargs, 
+                  )
+    except Exception as error:
+      # traceback.print_exc()
+      error("error saving %s: %s" %(outputFile, error), 1)
+    
   
   info('image saved: "%s" [%.0fk]' %(outputFile, os.path.getsize(outputFile)/1024), 1, progress)
   optimizePng(outputFile, output_ext, usePngquant=usePngquant)
@@ -1619,8 +1648,8 @@ def saveImage(outputFolder, stem, img, output_ext=imgExt, quality=imgQuality, us
 # saveImage
 
 
-def saveThumbnail(inputFile, outputFolder, stem, output_ext=imgExt, quality=imgQuality, usePngquant=usePngquant, progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+def saveThumbnail(inputFile, outputFolder, stem, output_ext=imgExt, quality=imgQuality, usePngquant=usePngquant, save_metadata=False, progress=""):
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   thumbnailFileName = "%s.%s" %(stem, output_ext)
   thumbnailFile = os.path.join(outputFolder, thumbnailFileName)
@@ -1631,7 +1660,7 @@ def saveThumbnail(inputFile, outputFolder, stem, output_ext=imgExt, quality=imgQ
   img.thumbnail((256, 256), Image.Resampling.LANCZOS)   # looks okay
   # img = img.resize((256,256), Image.LANCZOS)          # formerly ANTIALIAS, does not look good at all
   
-  saveImage(outputFolder, stem, img, output_ext, quality, usePngquant, progress)
+  saveImage(outputFolder, stem, img, output_ext, quality, usePngquant, False, save_metadata, progress)
   
   info('thumbnail saved: "%s" [%.0fk]' %(thumbnailFile, os.path.getsize(thumbnailFile)/1024), 2, progress)
   return thumbnailFile
@@ -1640,7 +1669,7 @@ def saveThumbnail(inputFile, outputFolder, stem, output_ext=imgExt, quality=imgQ
 
 
 def optimizePng(outputFile, output_ext, usePngquant=usePngquant):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   if output_ext in ['png'] and usePngquant:
     # for clean, electronically generated graphs, pngquant will always give better results than jpeg 50%
@@ -1679,23 +1708,24 @@ def getPrevKey(HHMMList, key):
 
 
 def rebuildThumbnails(inputFolder, outputFolder, imgExt, dryRun=False, progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
-  imgPath = os.path.normpath('%s/KJZZ*.%s' %(inputFolder, imgExt))
+  # no need to provide --force, thumbnails should always be rebuild and that's what this function does
+  imgPath = os.path.normpath('%s/%s*.%s' %(inputFolder, STATION, imgExt))
   imgList = glob.glob(imgPath, recursive=False)
   # print(imgList)
 
   with Progress() as progress:
     task = progress.add_task("Thumbnail gen", total=len(imgList))
     for img in imgList:
-      outputThumbnailFile = saveThumbnail(img, outputFolder, "thumbnail-" + Path(img).stem, imgExt, imgQuality, usePngquant)
+      outputThumbnailFile = saveThumbnail(img, outputFolder, thumbnailPrefix + Path(img).stem, imgExt, imgQuality, usePngquant)
       progress.advance(task)
   
 # rebuildThumbnails
 
 
 def genHtmlHead(pageTitle, title):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   dictTemplate = dict(pageTitle=pageTitle, title=title, rand=random.randint(0,99))
   template = string.Template(('''
@@ -1745,7 +1775,7 @@ def genHtmlHead(pageTitle, title):
 
 
 def genHtmlModal():
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   return '''
 <div id="modal-root">
@@ -1761,7 +1791,7 @@ def genHtmlModal():
 # genHtmlModal
 
 def genHtmlThead():
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   dictTemplate = dict()
   template = string.Template(('''
@@ -1777,7 +1807,7 @@ def genHtmlThead():
 
 
 def genHtmlChunk(rowspan, classChunkExist, title, plays, texts, segmentImg=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   dictTemplate = dict(rowspan=rowspan, classChunkExist=classChunkExist, title=title, plays=plays, texts=texts, segmentImg=segmentImg)
   template = string.Template(('''
@@ -1813,7 +1843,7 @@ def genHtmlChunk(rowspan, classChunkExist, title, plays, texts, segmentImg=""):
 
 
 def genHtmlFooter():
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   dictTemplate = dict(rand=random.randint(0,99))
   template = string.Template(('''
@@ -1825,7 +1855,7 @@ def genHtmlFooter():
 
 
 def genHtmlSegmentImg(imgFileName, classChunkExist):
-  thumbnailFileName = "thumbnail-%s" %(imgFileName)
+  thumbnailFileName = "%s%s" %(thumbnailPrefix, imgFileName)
 
   # removed onerror, too slow: onerror="this.src='../../lib/assets/missingCloud.png';" 
   dictTemplate = dict(imgFileName=imgFileName, thumbnailFileName=thumbnailFileName, classChunkExist=classChunkExist)
@@ -1843,7 +1873,7 @@ def genHtmlSegmentImg(imgFileName, classChunkExist):
 
 
 def genHtmlPlayButton(yearNumber, weekNumber, startTime, stopTime, fileStem, misInfoText, misInfoLabels, classTooltipPosition, progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   # misInfoText = '[0.7, 0.4, 0.4, 2.9]' or None
   colorClass = ''
@@ -1895,7 +1925,7 @@ ${tooltip}
 
 
 def genHtmlTextButton(fileStem, progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   dictTemplate = dict(fileStem=fileStem)
   template = string.Template(('''
@@ -1909,9 +1939,11 @@ def genHtmlTextButton(fileStem, progress=""):
 
 
 def generateHtml(jsonScheduleFile, outputFolder, yearNumber, weekNumber, byChunk=False, progress=""):
-  info("%s" %({**locals()}), 3, "", "blue")
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
+  # outputFolder = './kjzz'
   outputFolder = os.path.normpath(os.path.join(outputFolder, str(yearNumber), str(weekNumber)))
+  # outputFolder = './kjzz/2023/42'
   
   # old school:
   # imgList = []
@@ -1919,14 +1951,14 @@ def generateHtml(jsonScheduleFile, outputFolder, yearNumber, weekNumber, byChunk
     # if file.endswith('.png'):
       # imgList.append(file)
 
-  # better school:
-  imgPath = os.path.normpath('%s/KJZZ year=%s week=%s*.%s' %(outputFolder, yearNumber, weekNumber, imgExt))
-  imgList = glob.glob(imgPath, recursive=False)
-
-  # regexp = re.compile("^KJZZ year=%s week=%s.*title=%s.*Day=%s" %(yearNumber, weekNumber, "The Moth", "Sat"))
-  # print(list(filter(regexp.match, imgList)))
-  # exit()
-
+  # 0.9.14: we test is_file for each image, it's simpler believe me
+  # # better school:
+  # # imgPath = os.path.normpath('%s/%s year=%s week=%s*.%s' %(STATION, outputFolder, yearNumber, weekNumber, imgExt))
+  # imgPath = os.path.normpath("%s/%s*.%s" %(outputFolder, STATION, imgExt))
+  # imgList = glob.glob(imgPath, recursive=False)
+  
+  htmlTitle = "%s %s week %s" %(STATION, yearNumber, weekNumber)
+  
   # load json
   with open(jsonScheduleFile, 'r', encoding="utf-8") as fd: jsonSchedule = json.load(fd)
   # # alternatively, the old way:
@@ -1937,7 +1969,7 @@ def generateHtml(jsonScheduleFile, outputFolder, yearNumber, weekNumber, byChunk
   # recreate index.html from template
   with open(indexTemplateFile, 'r', encoding="utf-8") as fd: indexTemplate = string.Template(fd.read())
   # with io.open(indexTemplateFile, mode="r", encoding="utf-8") as fd:  indexTemplate = string.Template(fd.read())
-  dictTemplate = dict(yearNumber=yearNumber, prevYear=(yearNumber-1), nextYear=(yearNumber+1), weekNumber=weekNumber, prevWeek=(weekNumber-1), nextWeek=(weekNumber+1), titleData="BiasBuster: KJZZ", title="KJZZ %s week %s" %(yearNumber, weekNumber), rand=random.randint(0,99))
+  dictTemplate = dict(yearNumber=yearNumber, prevYear=(yearNumber-1), nextYear=(yearNumber+1), weekNumber=weekNumber, prevWeek=(weekNumber-1), nextWeek=(weekNumber+1), titleData=titleDataDefault, title=htmlTitle, rand=random.randint(0,99))
   with open(indexFile, 'w', encoding="utf-8") as fd:
     fd.write(indexTemplate.substitute(dictTemplate))
     info("outputFile: %s" %(indexFile), 1, progress)
@@ -1946,7 +1978,7 @@ def generateHtml(jsonScheduleFile, outputFolder, yearNumber, weekNumber, byChunk
 
   # how do my table compare to https://www.kjzz.org/schedule#weekly? let me know in the comments!
   # build weekNumber's index:
-  html  = genHtmlHead("BiasBuster: KJZZ %s week %s" %(yearNumber, weekNumber), "KJZZ %s week %s" %(yearNumber, weekNumber))
+  html  = genHtmlHead("BiasBuster: %s" %(htmlTitle), htmlTitle)
   html += '<body>\n'
   html += genHtmlModal()
   
@@ -1992,9 +2024,12 @@ def generateHtml(jsonScheduleFile, outputFolder, yearNumber, weekNumber, byChunk
         if Day in ['Mon', 'Tue']: classTooltipPosition = 'tooltipBottomRight'
         info("Processing: %s %s %s %s" %(key, startTime, Day, title), 2, progress)
 
-        # we need getTextDict to get chunk names for the play buttons, and to build the missing wordClouds
-        gettext = "year=%s+week=%s+title=%s+Day=%s" %(yearNumber, weekNumber, title, Day)
-        getTextDict = buildGetTextDict(gettext)
+        # we need gettextDict to get chunk names for the play buttons, and also to build the missing wordClouds
+        gettext = "year=%s+week=%s+Day=%s+title=%s" %(yearNumber, weekNumber, Day, title)
+        gettextDict = buildGettextDict(gettext, gettextDictBlank)
+        imgFileStem = genTitle(gettextDict, "-")
+        imgBasename = "%s.%s" %(imgFileStem, imgExt)
+        imgFilePath = os.path.join(outputFolder, imgBasename)
 
         # without +1, jsonSchedule[reversedHHMMList[key+1]] will error out with IndexError: list index out of range
         # with +1,    we will not process the last startTime == 23:00
@@ -2004,54 +2039,60 @@ def generateHtml(jsonScheduleFile, outputFolder, yearNumber, weekNumber, byChunk
         if not byChunk:
           # By default we start with a normal, chunked cell of 30mn:
           # Also we should not have to filter by week anymore since version 0.9.6 
-          # , we generate both html and png under each ./week subfolder
-          regexp = re.compile(".*KJZZ year=%s week=%s.*title=%s.*Day=%s" %(yearNumber, weekNumber, title, Day))
+          # , we generate both html and png under each ./year/week subfolder
           
-          # 1. Is it in the list we build at the beginning?
-          thatWordCloudPngList = list(filter(regexp.match, imgList))
-          # 2. Was it generated at some point?
-          #    Remember, we process every startTime in reversedHHMMList, so we may have already generated it
-          if len(thatWordCloudPngList) == 0:
-            thisPngPath = '%s/KJZZ year=%s week=%s title=%s Day=%s*.png' %(outputFolder, yearNumber, weekNumber, title, Day)
-            thatWordCloudPngList = glob.glob(thisPngPath, recursive=False)
-
-          # now we are certain that we need to generate the wordCloud
-          # Note: there is a bug when using force: since we process by HHMMList, we may regenerate same segments multiple times
-          if len(thatWordCloudPngList) == 0 or force:
-            # setup an empty src for an img is indeed an error we will get the missingCloud.png for:
-            thatWordCloudPngList = []
-            
-            # we will not bother looking for excluded programs such as Jazz Blues etc:
+          # 0.9.14: Filtering a filename off a glob list to determine if file exist... please... stop!
+          # # regexp = re.compile(".*%s year=%s week=%s.*title=%s.*Day=%s" %(STATION, yearNumber, weekNumber, title, Day))
+          # # regexp = re.compile(".*%s.%s" %(imgFileStem, imgExt))
+          
+          # # 1. Is it in the list we build at the beginning?
+          # thatWordCloudImgList = list(filter(regexp.match, imgList))
+          # # 2. Was it generated at some point?
+          # #    Remember, we process every startTime in reversedHHMMList, so we may have already generated it
+          # if len(thatWordCloudImgList) == 0:
+            # # thisImgPath = '%s/%s year=%s week=%s title=%s Day=%s*.png' %(outputFolder, STATION, yearNumber, weekNumber, title, Day)
+            # thisImgPath = '%s/%s*.%s' %(outputFolder, imgFileStem, imgExt)
+            # thatWordCloudImgList = glob.glob(thisImgPath, recursive=False)
+          
+          if force or not is_file(imgFilePath):
+            thatWordCloudImgList = []
+          else:
+            thatWordCloudImgList = [imgBasename]
+          
+          # now we can be certain that we need to generate the wordCloud or not
+          if not thatWordCloudImgList:
+            # excluded programs such as Jazz Blues etc:
             if not any(word in title for word in listTitleWords2Exclude):
-              records = getChunks(getTextDict, True, progress)
+              records = getChunks(gettextDict, True, progress)
               # records = [('2023-10-14 01:00:00.000', '2023-10-14 01:30:00.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...'),..]
               # each record is a 30mn chunk of a program
               if len(records) > 0:
-                wordCloudTitle = "KJZZ " + gettext.replace("+", " ")
-                # we only print info if we actually generate the wordCloud as i t takes time:
-                if not noPics: info('Generate wordCloud "%s" ...' %(wordCloudTitle), 1, progress)
-                                  # genWordClouds(records, title, mergeRecords, showPicture, wordCloudDict, outputFolder=outputFolder, dryRun=False, progress="")
-                info('genWordCloudDicts=genWordClouds wordCloudTitle="%s"' %(wordCloudTitle), 3)
-                genWordCloudDicts = genWordClouds(records, wordCloudTitle, True, showPicture, wordCloudDict, os.path.join(outputFolder, str(weekNumber)), not noPics, progress)
+                # wordCloudTitle = STATION + " " + gettext.replace("+", " ")
+                # we only print info if we actually generate the wordCloud as it takes time:
+                if not noPics: info('Generate wordCloud "%s" ...' %(gettextDict), 1, progress)
+                                  # genWordClouds(records, gettextDict, mergeRecords, showPicture, wordCloudDict, outputFolder=outputFolder, dryRun=False, progress="")
+                info('genWordCloudDicts=genWordClouds gettextDict="%s"' %(gettextDict), 3)
+                genWordCloudDicts = genWordClouds(records, gettextDict, True, showPicture, wordCloudDict, outputFolder, not noPics, progress)
                 # we should only have 1 item since we mergeRecords
                 if len(genWordCloudDicts) > 0:
                   classChunkExist = 'class="chunkExist"'
-                  thatWordCloudPngList = [os.path.basename(genWordCloudDicts[0]["outputFileName"])]
+                  thatWordCloudImgList = [os.path.basename(genWordCloudDicts[0]["outputFileName"])]
               # else:
                 # # we do not have any record in the db, no use to show a missing image
-                # thatWordCloudPngList = [voidPic]
+                # thatWordCloudImgList = [voidPic]
             # else:
               # # no use to show a missing image for musical programs
-              # thatWordCloudPngList = [voidPic]
+              # thatWordCloudImgList = [voidPic]
           else:
             # all images are inside the html week's folder
             classChunkExist = 'class="chunkExist"'
-            thatWordCloudPngList = [os.path.basename(thatWordCloudPngList[0])]
+            # 0.9.14: we don't need to do that anymore
+            # thatWordCloudImgList = [os.path.basename(thatWordCloudImgList[0])]
 
-          if len(thatWordCloudPngList) > 0:
-            segmentImg = genHtmlSegmentImg(thatWordCloudPngList[0], classChunkExist)
-            records = getChunks(getTextDict, False, progress)
-            # print(getTextDict)
+          if len(thatWordCloudImgList) > 0:
+            segmentImg = genHtmlSegmentImg(thatWordCloudImgList[0], classChunkExist)
+            records = getChunks(gettextDict, False, progress)
+            # print(gettextDict)
             # print(records)
             # records = [('2023-10-14 01:00:00.000', '2023-10-14 01:30:00.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]'),..]
 
@@ -2087,14 +2128,14 @@ def generateHtml(jsonScheduleFile, outputFolder, yearNumber, weekNumber, byChunk
         # byChunk:
         else:
           if not any(word in title for word in listTitleWords2Exclude):
-            records = getChunks(getTextDict, False, progress)
+            records = getChunks(gettextDict, False, progress)
             # listChunks = [
               # ('01:00', '01:30', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]'),
               # ('01:30', '02:00', 'KJZZ_2023-10-14_Sat_0130-0200_BBC World Service', None),
               # ...
             
-            # if countChunk(getTextDict, progress):
-            # print(getTextDict)
+            # if countChunk(gettextDict, progress):
+            # print(gettextDict)
             # print(records)
             for record in records:
               # Our schedule is by the hour but the db is by chunk of 30mn so we have certainly 2 chunks per hour:
@@ -2153,9 +2194,9 @@ def generateHtml(jsonScheduleFile, outputFolder, yearNumber, weekNumber, byChunk
 # genHtml
 
 
-# buildGetTextDict() will validate the query conditions passed and produce a clean gettextDict
-def buildGetTextDict(gettext, gettextDict=gettextDict):
-  info("%s" %({**locals()}), 3, "", "blue")
+# buildGettextDict() will validate the query conditions passed and produce a clean gettextDict
+def buildGettextDict(gettext, gettextDict=gettextDictBlank):
+  info("%.156s" %({**locals()}), 3, "", "blue")
   
   # gettext = "year=2023+week=41+title=All Things Considered"
   # gettext = "week=41+title=All Things Considered+Day=Fri"
@@ -2170,28 +2211,43 @@ def buildGetTextDict(gettext, gettextDict=gettextDict):
     # chunk name is not in the db, only the exact start time is needed anyway
     gettextDict["start"]  = chunk.start
   else:
-    conditions = re.split(r"[+]",gettext)
+    conditions = re.split(r"[+]", gettext)
     for condition in conditions:
       key = re.split(r"[=]",condition)[0]
-      if key in gettextKeys:
+      if key in validGettextKeys:
         gettextDict[key] = re.split(r"[=]", condition)[1]
       else:
         error("%s is invalid in %s" %(key, condition), 0)
-        info("valid conditions: %s" %(gettextKeys), 0)
+        info("valid conditions: %s" %(validGettextKeys), 0)
         info("example: year=2023+week=41[+title=\"BBC Newshour\"] | date=2023-10-08[+time=HH:MM] | datetime=\"2023-10-08 HH:MM\"", 0)
-        info("example: chunk=\"KJZZ_2023-10-13_Fri_1700-1730_All Things Considered\"", 0)
+        info("example: chunk=\"%s_2023-10-13_Fri_1700-1730_All Things Considered\"" %(STATION), 0)
         exit(9)
     # for
+    if not 'year' in gettextDict.keys():
+      error("year is mandatory in gettext", 9)
   #
+  
   info("gettextDict: %s" %(gettextDict), 3)
   return gettextDict  # gettextDict = {'week': '41', 'title': All Things Considered', 'Day': 'Fri'}
   # gettextDict = {'week': '41', 'title': All Things Considered', 'Day': 'Fri'}
-# buildGetTextDict
+# buildGettextDict
 
+
+def genTitle(gettextDict, separator=" "):
+  if "chunk" in gettextDict:
+    title = gettextDict.chunk
+  else:
+    title  = STATION
+    for key in validTitleKeys:
+      if key in gettextDict.keys():
+        title += "%s%s" %(separator, gettextDict[key])
+  return title
+#
 
 def getValueFromVariableInBatchFile(batfile, variable):
   try:
-    file = open('BiasBuster-whisper_custom.cmd', 'r')
+    # file = open('BiasBuster-whisper_custom.cmd', 'r')
+    file = open(batfile, 'r')
     data = file.read()
     file.close()
     
@@ -2201,7 +2257,15 @@ def getValueFromVariableInBatchFile(batfile, variable):
       return value
   except getopt.error as err:
     # output error, and return with an error code
-    error(err, 3)
+    error("error finding %s from %s: %s" %(variable, batfile, err), 3)
+#
+
+
+def is_file(filePath):
+  try:
+    return os.path.getsize(filePath)
+  except OSError as error:
+    return -1
 #
 
 
@@ -2254,57 +2318,65 @@ def ddebug(*kwargs):
 
 
 def usage(RC=99, usagePart=""):
-  usage          = """ usage: python %s --help
+  usage          = Template(""" usage: python ${program} --help
   Requires at least: --import / --query / --gettext / --listLevel  (add --help for help on those functions only)
   -v, -vv, -vvv                     increase verbosity.
   --silent                          Suppress all messages.
   --dryRun                          Will not generate PICtures, not commit imports, not output or modify anything.
-  --db path\sqlite.db (%s)
-                                    Path to the local SQlite db.""" %(sys.argv[0], localSqlDb)
+  --db path\sqlite.db               Path to the local SQlite db  (*${localSqlDb}).""").safe_substitute(program=sys.argv[0], localSqlDb=localSqlDb)
   
-  usageQuery     = """
-  -q, --query < title | first | last | last10 | byDay | byTitle | chunkLast10 | "select .. from schedule">
-                                    Quick way to see what's in the db."""
+  usageQuery     = Template("""
+  -q, --query <something>           Quick way to see what's in the db.
+              title                 List of unique program titles.
+              countByDay            Counts per day and by program.
+              countByTitle          Counts per program and by day.
+              chunkFirst10          List first 10 chunks in db.
+              chunkLast10           List last 10 chunks in db.
+              first                 Outputs transcripts: first one.
+              last                  Outputs transcripts: last one.
+              last10                Outputs transcripts: last 10.
+              "select .. from schedule"
+                                    Run this sql command.""").safe_substitute()
   
-  usageImport    = """
-  --import < --folder inputFolder | --text "KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text" >
-    -m, --model *%s small medium large...
-                                    Model that you used with whisper, to transcribe the text to import.""" %(model)
+  usageImport    = Template("""
+  --import < --folder inputFolder | --text "${STATION}_2023-10-13_Fri_1700-1730_All Things Considered.text" >
+    -m, --model *${model} small medium large...
+                                    Model that you used with whisper, to transcribe the text to import.""").safe_substitute(STATION=STATION, model=model)
   
-  usageHtml      = """
+  usageHtml      = Template("""
   --html [--byChunk --printOut] <2023|2023/41>
                                     PICture: generate yearly or year/week schedule as an html table.
-                                    Outputs html file: "%s/2023/41/index[-bySegment|byChunk].html"
+                                    Outputs html file: "${outputFolder}/2023/41/index[-bySegment|byChunk].html"
     --byChunk                       Outputs schedule by 30mn chucks, no rowspan, no PICtures.
-    --printOut                      Will output html on the prompt.""" %(outputFolder)
+    --printOut                      Will output html on the prompt.""").safe_substitute(outputFolder=outputFolder)
   
-  usageGettext   = """
+  usageGettext   = Template("""
   -g, --gettext < selector=value : chunk= | date= | datetime= | year= | week= | Day= | time= | title= >
                     Outputs all text from the selector:
-                    chunk="KJZZ_YYYY-mm-DD_Ddd_HHMM-HHMM_Title" (run "python %s -q chunkLast10" to get an idea.
+                    chunk="${STATION}_YYYY-mm-DD_Ddd_HHMM-HHMM_Title" (run "python ${program} -q chunkLast10" to get an idea.
                     date=2023-10-08[+time=HH:MM]
                     datetime="2023-10-08 HH:MM"
                     year=2023
                     week=42 (iso week with Mon first)
                     Day=Fri (Ddd)
-                    title="title of the show", see https://kjzz.org/kjzz-print-schedule
-                          example:  chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered"
+                    title="title of the show", see ${STATION}ScheduleUrl
+                          example:  chunk="${STATION}_2023-10-13_Fri_1700-1730_All Things Considered"
                                     Will get text from that chunk of programming only. Chunks are 30mn long.
                           example:  year=2023+week=41+Day=Fri+title="All Things Considered"
                                     Same as above but will get text from the entire program for Friday week 41 of 2023.
                           example:  year=2023+title="All Things Considered"
-                                    Same as above but will get text from a single program for the entire year.""" %(sys.argv[0])
-  usageGettext  += """
-    -p, --pretty                    Convert \ to carriage returns and convert json output to text.
+                                    Same as above but will get text from a single program for the entire year.""").safe_substitute(STATION=STATION, program=sys.argv[0], stationScheduleUrl=stationScheduleUrl)
+  usageGettext  += Template("""
+    -p, --pretty                    Convert \\n to carriage returns and convert json output to text.
                                     Ignored when outputing pictures.
    *--printOut                      Will output selected text on the prompt (default if no other option passed).
     --noMerge                       Do not merge 30mn chunks of the same title within the same timeframe.
-    --output *./%-18s  Folder where to output PICtures.
-                                    Will be %s/YYYY/W/ when gettext has year=YYYY+week=W"
+    --output *./${outputFolder18}  Folder where to output PICtures.
+                                    Will be ${outputFolder}/YYYY/W/ when gettext has year=YYYY+week=W"
     --show                          Opens the PICtures upon generation.
     --rebuildThumbnails <year|year/week>
                                     Will regenerate thumbnails only, if word clouds exists.
-    --imgExt <*png|jpg|webp|avif>   Use this format instead of %s.
+    --imgExt <*png|jpg|webp|avif>   Use this format instead of ${imgExt}.
     --noPngquant                    Disable pngquant compression (only for png, indeed).
     --imgQuality <*50>              0-100 compression quality.
     --noPics                        Will not generate PICtures.
@@ -2316,7 +2388,7 @@ def usage(RC=99, usagePart=""):
       --graphs *bar,*pie,line         What graph(s) you want. Ignored with --noMerge: a heatMap (per chunk) will be generated instead.
     --wordCloud                     PICture: generate word cloud from gettext output. Will not output any text.
       --stopLevel  0 1 2 *3           Add various levels of stopwords.
-        --listLevel <0[,1,..]>          to show the stopWords in which level(s).""" %(outputFolder, outputFolder, imgExt)
+        --listLevel <0[,1,..]>          to show the stopWords in which level(s).""").safe_substitute(outputFolder=outputFolder, outputFolder18="%-18s" %(outputFolder), imgExt=imgExt)
   for key, item in wordCloudDict.items():
     if item["input"]: usageGettext += ("      --%s *%s  %s" %(key, item["value"], item["usage"]))+os.linesep
   
@@ -2362,8 +2434,11 @@ try:
   # exit()
   
   # checking critical arguments
-  if arguments[0][0] in ("-h", "--help"):
+  if not arguments:
     usage(0)
+  elif arguments[0][0] in ("-h", "--help"):
+    usage(0)
+  
   for currentArgument, currentValue in arguments:
     if currentArgument in ("-v", "--verbose"):
       if not silent: verbose += 1
@@ -2392,12 +2467,14 @@ try:
         sqlQuery = sqlLastText
       elif currentValue in ("first"):
         sqlQuery = sqlFirstText
-      elif currentValue in ("Day","byDay"):
+      elif currentValue in ("Day","countByDay"):
         sqlQuery = sqlCountsByDay
       elif currentValue in ("title"):
         sqlQuery = sqlTitles
-      elif currentValue in ("byTitle"):
+      elif currentValue in ("countByTitle"):
         sqlQuery = sqlCountsByTitle
+      elif currentValue in ("chunkFirst10"):
+        sqlQuery = sqlListChunksFirst10
       elif currentValue in ("chunkLast10","chunksLast10"):
         sqlQuery = sqlListChunksLast10
       else:
@@ -2651,7 +2728,7 @@ if importChunks:
     db_load(inputFiles, localSqlDb, conn, model, True)
     
     # finally we will also print a summary:
-    info("python KJZZ-db.py -q title", 2)
+    info("python %s -q title" %(localSqlDb), 2)
     if verbose >2: sqlQuery = sqlCountsByTitle
   else:
     error('No files found to import', 7)
@@ -2693,11 +2770,7 @@ if gettext:
   #   gettextDict = {'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
   # gettext = "year=2023+week=43+title=Classic Jazz with Chazz Rayburn+Day=Mon"
   #   gettextDict = {'year': '2023', 'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
-  gettextDict = buildGetTextDict(gettext)
-  if not "chunk" in gettextDict:
-    wordCloudTitle = "KJZZ " + gettext.replace("+", " ")
-  else:
-    wordCloudTitle = gettextDict.chunk
+  gettextDict = buildGettextDict(gettext, gettextDictBlank)
   
   records = getChunks(gettextDict, True, progress)
   # records = (('2023-10-14 01:00.000', '2023-10-14 01:30.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...'),..)
@@ -2707,15 +2780,19 @@ if gettext:
     ################## wordCloud
     # first we check if week number was passed in the gettext to infer outputFolder
     # ddebug bug: YYYY is missing in outputFolder
-    if "week" in gettextDict: outputFolder = os.path.join(outputFolder, str(gettextDict['week']))
+    if "week" in gettextDict:
+      outputFolder = os.path.join(outputFolder, str(gettextDict['year']), str(gettextDict['week']))
+    
     # then we check if a wordCloud is requested:
     if wordCloud:
-      genWordCloudDicts = genWordClouds(records, wordCloudTitle, mergeRecords, showPicture, wordCloudDict, outputFolder, dryRun)
+      fileName = genTitle(gettextDict, "-")
+      if force or not is_file(os.path.getsize(os.path.join(outputFolder, "%s.%s" %(fileName, imgExt)))):
+        genWordCloudDicts = genWordClouds(records, gettextDict, mergeRecords, showPicture, wordCloudDict, outputFolder, dryRun)
 
     ################## misInformation
     # then we check if misInformation is requested:
     elif misInformation:
-      genMisinfoDicts = genMisInformation(records, mergeRecords, wordCloudTitle, graphs, showPicture, dryRun)
+      genMisinfoDicts = genMisInformation(records, mergeRecords, gettextDict, graphs, showPicture, dryRun)
 
       # now for not mergeRecords, we update the database with those 4 values as text, for each chunk:
       # ddebug(genMisinfoDicts)
