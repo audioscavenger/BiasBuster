@@ -16,12 +16,19 @@
 
 # https://www.kjzz.org/schedule#weekly
 
-# python KJZZ-db.py -i -f kjzz\44
+# python KJZZ-db.py -i --folder kjzz\2023\40 --model distil-large-v3
+# python KJZZ-db.py -i --folder kjzz\2023\40 --model distil-large-v3 --force
+# python KJZZ-db.py -i --text "kjzz\2023\40\KJZZ_2023-10-08_Sun_2300-2330_BBC World Service.text" --model distil-large-v3
 
 # python KJZZ-db.py -q title
 # python KJZZ-db.py -q chunkFirst10
 # python KJZZ-db.py -q chunkLast10 -p
 # python KJZZ-db.py -q "select count(*) from schedule" -p
+
+# generate AVIF wordCloud for 1 segment:
+# python KJZZ-db.py -g year=2023+Day=Sun+week=42+title="Freakonomics" --wordCloud --stopLevel 3 -vv --imgExt avif --force
+# regenerate 1 thumbnail only for that segment:
+# python KJZZ-db.py -g year=2023+Day=Sun+week=42+title="Freakonomics" --wordCloud --stopLevel 3 -vv --imgExt avif --rebuildThumbnails 2023/42
 
 # python KJZZ-db.py -g chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v --wordCloud
 # python KJZZ-db.py -g title="BBC Newshour" -v --wordCloud
@@ -63,12 +70,15 @@
 # egrep -i "diversity|equity|inclusion" *text
 
 
-# pip install wordcloud pngquant numpy pillow pillow-avif-plugin pillow-jxl-plugin jxlpy
+# pip install wordcloud pngquant numpy pillow pillow-avif-plugin pillow-jxl-plugin jxlpy PySide2
 
-import getopt, sys, os, re, regex, io, inspect, string, copy
+import getopt, sys, os, re, regex, io, string, copy
 import glob, time, datetime, json, urllib, random, sqlite3
+import inspect, traceback
+from inspect import currentframe, getframeinfo
 from dateutil import parser
 from pathlib import Path
+# https://docs.python.org/3/library/collections.html#counter-objects
 from collections import Counter
 from string import Template
 
@@ -98,6 +108,7 @@ station = 'kjzz'
 titleDataDefault = "BiasBuster: %s" %(STATION)
 stationScheduleUrl = 'https://kjzz.org/kjzz-print-schedule'
 
+chunk = None
 importChunks = False
 inputFolder = None
 inputFiles = []
@@ -126,7 +137,7 @@ mergeRecords = True
 removeStopwords = True
 showPicture = False
 inputStopWords = []
-inputExt = 'text'
+chunkInputExt = 'text'
 outputFolder = Path("./%s" %(station))
 dataFolder = Path("./data")
 thesaurusFolder = Path("./data/SimpleWordlists")
@@ -151,16 +162,28 @@ force = False
 noPics = False
 avif_supported = False
 jxl_supported = False
-save_metadata = False
-imgExt = 'png'
-imgExtValids = ['png','jpg','jpeg','webp','avif','jxl']
-usePngquant = True
-useJpeg = False
-imgQuality = 60
-
-thumbnailQuality = 50
-thumbnailPrefix = "thumbnail-"
 rebuildThumbnail = False
+
+imgSettingsDict = {
+  'imgExt': 'webp',
+  'imgExtValids': ['eps', 'jpeg', 'jpg', 'pdf', 'pgf', 'png', 'ps', 'raw', 'rgba', 'svgz', 'tif', 'tiff', 'webp', 'avif', 'jxl'],
+  'PILImageNeeded': ['avif', 'jxl'],
+  'noTransparency': ['jpg', 'jpeg'],
+  'cannotRead': ['svg'],
+  'save_metadata': False,
+  'optimize_image': True,
+  'usePngquant': True,
+  'imgQuality': {
+    'default': 60,
+    'png': 90,
+    'jpeg': 60,
+    'jpg': 60,
+    'webp': 50,
+    'avif': 50,
+    'jxl': 50,
+  },
+  'thumbnailPrefix': "thumbnail-",
+}
 
 missingPic = "../../lib/assets/missingPic.png"
 missingCloud = "../../lib/assets/missingCloud.png"
@@ -324,13 +347,13 @@ sqlCountsByTitle = """ SELECT title, Day, count(title)
 # https://www.sqlshack.com/sql-convert-date-functions-and-formats/
 # python KJZZ-db.py -q chunkLast10 -p
 # %w 		day of week 0-6 with Sunday==0 but we want Mon Tue etc
-sqlListChunksFirst10 = Template(""" SELECT '${STATION}_' || strftime('%Y-%m-%d_%w_%H%M-',start) || strftime('%H%M_',stop) || title
+sqlListChunksFirst10 = Template(""" SELECT '${STATION}_' || strftime('%Y-%m-%d_%w_%H%M-',start) || strftime('%H%M_',stop) || title as chunk
           from schedule 
           ORDER BY start ASC
           LIMIT 10
           """).safe_substitute(STATION=STATION)
 
-sqlListChunksLast10 = Template(""" SELECT '${STATION}_' || strftime('%Y-%m-%d_%w_%H%M-',start) || strftime('%H%M_',stop) || title
+sqlListChunksLast10 = Template(""" SELECT '${STATION}_' || strftime('%Y-%m-%d_%w_%H%M-',start) || strftime('%H%M_',stop) || title as chunk
           from schedule 
           ORDER BY start DESC
           LIMIT 10
@@ -375,8 +398,14 @@ class TimeDict:
 
 class Chunk:
   def __init__(self, inputFile, model=model, loadText=True, progress=""):
-    self.inputFile = Path(inputFile)
-    info("Chunk inputFile: %s" %(self.inputFile), 3)
+    # inputFile could also be a chunkName or gettext: chunk=KJZZ_2023-10-13_Fri_1700-1730_All Things Considered
+    if inputFile.lower().find('chunk=') == 0:
+      preSplit = re.split(r"[=]", inputFile)
+      # self.stem       = preSplit[1]
+      self.inputFile  = self.stem
+    else:
+      self.inputFile = Path(inputFile)
+      info("Chunk inputFile: %s" %(self.inputFile), 3)
     self.model = model
     self.dirname = os.path.dirname(self.inputFile)
     info("Chunk dirname: %s" %(self.dirname), 3)
@@ -385,9 +414,12 @@ class Chunk:
     self.stem = Path(self.basename).stem
     info("Chunk stem: %s" %(self.stem), 3)
     self.ext = Path(self.basename).suffix
+    
+    # actual validation of chunkName:
     self.split = re.split(r"[_-]", self.stem) # ['KJZZ', '2023', '10', '09', 'Mon', '1330', '1400', 'BBC Newshour']
     if len(self.split) != 8:
       raise ValueError("Chunk: invalid name: %s" % (self.inputFile))
+      return None
     
     self.YYYY     = int(self.split[1])
     self.MM       = int(self.split[2])
@@ -406,12 +438,13 @@ class Chunk:
     info("Chunk title: %s" %(self.title), 3)
     
     if str(self.stem) == str(self.inputFile):
-      # We passed a Chunk instead of a file, so we need to rebuild the actual path
+      # We passed a Chunk instead of a file, so we need to rebuild the actual paths
       self.dirname    = Path(os.path.join(outputFolder,str(self.YYYY),str(self.week)))
-      self.ext        = inputExt
-      self.basename   = "%s.%s" %(self.inputFile, inputExt)
-      self.inputFile  = Path(os.path.join(self.dirname,self.basename))
+      self.ext        = chunkInputExt
+      self.basename   = "%s.%s" %(self.inputFile, chunkInputExt)
+      self.inputFile  = Path(os.path.join(self.dirname, self.basename))
       info("Chunk inputFile rebuild: %s" %(self.inputFile), 3)
+    
     # generally for 30mn chunks, text files are 25k on average
     if os.path.isfile(self.inputFile):
       self.size = os.path.getsize(self.inputFile)
@@ -480,10 +513,10 @@ def db_init(localSqlDb):
   try:
     cur.execute(queryScheduleTable)
     info("queryScheduleTable %s: success" %(localSqlDb), 1)
-  except Exception as error:
+  except Exception as e:
     # sqlite3.OperationalError: table schedule already exists
-    if not str(error).find("already exists"):
-      info("queryScheduleTable %s: %s" %(localSqlDb, error), 1)
+    if not str(e).find("already exists"):
+      info("queryScheduleTable %s: %s" %(localSqlDb, e), 1)
     else:
       records = cursor(localSqlDb, conn, """SELECT count(start) from schedule""")
       info("%s chunks found in schedule %s" %(records[0][0], localSqlDb), 1)
@@ -500,9 +533,9 @@ def db_init(localSqlDb):
   try:
     cur.execute(queryStatsTable)
     info("queryStatsTable %s: success" %(localSqlDb), 1)
-  except Exception as error:
-    if not str(error).find("already exists"):
-      info("queryStatsTable %s: %s" %(localSqlDb, error), 1)
+  except Exception as e:
+    if not str(e).find("already exists"):
+      info("queryStatsTable %s: %s" %(localSqlDb, e), 1)
     else:
       records = cursor(localSqlDb, conn, """SELECT count(*) from statistics""")
       info("%s lines found in statistics %s" %(records[0][0], localSqlDb), 1)
@@ -540,6 +573,7 @@ def db_update(table, column, value, textConditions, localSqlDb, conn, commit, pr
 
 def db_load(inputFiles, localSqlDb, conn, model, commit, progress=""):
   info("%.156s" %({**locals()}), 3, "", "blue")
+  global chunk
   
   importedFiles = []
   if inputFiles:
@@ -550,30 +584,34 @@ def db_load(inputFiles, localSqlDb, conn, model, commit, progress=""):
   # tentative to use BEGIN+COMMIT to speed up loading at the expense of memory
   # sqlLoad = """ BEGIN; """
   
+  read = 0
+  skipped = 0
   with Progress() as progress:
     task = progress.add_task("Loading inputFiles", total=len(inputFiles))
     # KJZZ_2023-10-08_Sun_2300-2330_BBC World Service.text
     for inputFile in inputFiles:
-      info('Chunk init:     "%s"' % (inputFile), 3, progress)
+      info('Chunk discovered: %s"' % (inputFile), 2, progress)
       try:
-        # first we do not read the file:
+        # first we do not read the file as it's time consuming:
+        # print(inputFile, model, False, progress)
         chunk = Chunk(inputFile, model, False, progress)
         # time.sleep(0.2)
-      except Exception as error:
-        error('Chunk error:    "%s": %s' % (chunk.basename, error), 11)
+      except Exception as e:
+        error('Chunk error:    "%s": %s' % (chunk.basename, e), 11)
       
       # check if exist in db:
       sqlCheck = """ SELECT * from schedule where start = ?; """
       records = cursor(localSqlDb, conn, sqlCheck, (chunk.start,), progress)
       # exit()
       if len(records) == 0 or force:
-        # recreate chunk and actually read the file:
+        # read the chunk file this time:
         try:
           chunk = Chunk(inputFile, model, True, progress)
-          info('Chunk read:     "%s" [%.1fk]' % (chunk.basename, chunk.size/1024), 3, progress)
+          info('Chunk read:      "%s" [%.1fk]' % (chunk.basename, chunk.size/1024), 2, progress)
+          read+=1
           # time.sleep(0.2)
-        except Exception as error:
-          error('Chunk error:    "%s": %s' % (chunk.basename, error), 11)
+        except Exception as e:
+          error('Chunk error:     "%s": %s' % (chunk.basename, e), 11)
         
         # load Chunk in db:
         if len(records) == 0:
@@ -585,16 +623,19 @@ def db_load(inputFiles, localSqlDb, conn, model, commit, progress=""):
           records = cursor(localSqlDb, conn, sqlUpdate, (chunk.text, chunk.model), progress)
         
         importedFiles += [inputFile]
-        info('Chunk imported: "%s" [%.1fk]' % (chunk.basename, chunk.size/1024), 2, progress)
+        info('Chunk imported:  "%s" [%.1fk]' % (chunk.basename, chunk.size/1024), 1, progress)
       else:
-        info('Chunk exist:    "%s"' % (chunk.basename), 2, progress)
+        info('Chunk exist:     "%s"' % (chunk.basename), 2, progress)
+        skipped+=1
       progress.advance(task)
   
   # BEGIN+COMMIT cannot work like this unfortunately: You can only execute one statement at a time.
   # records = cursor(localSqlDb, conn, sqlLoad, None, progress)
   
   if commit and not dryRun: conn.commit()
-  info("Done loading %s/%s files" %(len(importedFiles), len(inputFiles)), 1, progress)
+  info("Done:            read %s imported %s skipped %s total=%s files" %(read, len(importedFiles), skipped, len(inputFiles)), 1, progress)
+  
+  return importedFiles
 #
 
 
@@ -615,9 +656,9 @@ def cursor(localSqlDb, conn, sql, data=None, progress=""):
       cur.execute(sql)
     records = cur.fetchall()
     info("%s records" %(len(records)), 4, progress)
-  except Exception as error:
+  except Exception as e:
+    error("%s" %(e))
     error("cur.execute(%s) ..." %(sql))
-    error("%s" %(error))
   return records
 #
 
@@ -734,7 +775,7 @@ def getChunks(gettextDict, withText=False, progress=""):
   sqlListChunks = Template(""" SELECT 
           start
         , stop
-        , '${STATION}_' || strftime('%%Y-%%m-%%d_',start) || Day || strftime('_%%H%%M-',start) || strftime('%%H%%M_',stop) || title
+        , '${STATION}_' || strftime('%Y-%m-%d_',start) || Day || strftime('_%H%M-',start) || strftime('%H%M_',stop) || title as chunk
         , misInfo
         ${selectText}
           from schedule 
@@ -810,13 +851,16 @@ def genWordCloud(text, gettextDict, removeStopwords=True, level=0, wordCloudDict
   
   # wordCloudTitle = "KJZZ year=2023 week=43 title=BBC World Service Day=Sat"
   wordCloudTitle  = genTitle(gettextDict)
-  fileName        = genTitle(gettextDict, "-")
+  outputFileName  = genTitle(gettextDict, "-")
+  outputBasename = "%s.%s" %(outputFileName, imgSettingsDict['imgExt'])
   info("Now generating: %s" %(wordCloudTitle), 2, progress)
   
   import numpy as np
   import pandas as pd
   import matplotlib
   # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
+  # UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+  # Solution: pip install PySide2
   if not showPicture: matplotlib.use('Agg')
   import matplotlib.pyplot as plt
   import matplotlib.dates as mdates
@@ -828,8 +872,9 @@ def genWordCloud(text, gettextDict, removeStopwords=True, level=0, wordCloudDict
   # print(STOPWORDS)
 
   genWordCloudDict = {
-    "fileName": fileName, 
-    "outputFile": "", 
+    "outputFileName": outputFileName, 
+    "outputBasename": outputBasename, 
+    "outputFilePath": "", 
     "cleanWordsList": [], 
     "level": level, 
     "numWords": 0, 
@@ -858,9 +903,6 @@ def genWordCloud(text, gettextDict, removeStopwords=True, level=0, wordCloudDict
     wordCloudDict["relative_scaling"]["value"], 
   )
   # genWordCloudDict["fileName"] = genWordCloudDict["wordCloudTitle"].replace(": ", "=").replace(":", "")
-  genWordCloudDict["outputFileName"] = ""
-  genWordCloudDict["outputFile"] = ""
-  if dryRun: return genWordCloudDict
 
   if removeStopwords:
     stopwordsDict = loadStopWordsDict()
@@ -872,11 +914,16 @@ def genWordCloud(text, gettextDict, removeStopwords=True, level=0, wordCloudDict
     # print(len(STOPWORDS))
     # print(len(stopWords))
     # print(stopWords)
-    # WordCloud can remove stopWords by itself just fine, but we do it just have a count
+    # WordCloud can remove stopWords by itself just fine, but we do it ourselves too, so we can show the counts
     info("most 10 common words before: \n%s" % (Counter(genWordCloudDict["wordsList"]).most_common(10)), 2, progress)
     genWordCloudDict["cleanWordsList"] = [word for word in re.split("\W+",text) if word.lower() not in genWordCloudDict["stopWords"]]
+    
+    # pre-cleanup of phone numbers etc:
+    genWordCloudDict["cleanWordsList"] = removeIntegers(genWordCloudDict["cleanWordsList"])
+    
     info("most 10 common words after: \n%s" % (Counter(genWordCloudDict["cleanWordsList"]).most_common(10)), 2, progress)
     genWordCloudDict["top100tuples"] = Counter(genWordCloudDict["cleanWordsList"]).most_common(100)
+    
     info("%s words - %s stopWords (%s words removed) == %s total words" %(genWordCloudDict["numWords"], len(genWordCloudDict["stopWords"]), genWordCloudDict["numWords"] - len(genWordCloudDict["cleanWordsList"]), len(genWordCloudDict["cleanWordsList"])), 2, progress)
     info("stopWords = %s" %(str(genWordCloudDict["stopWords"])), 4, progress)
   else:
@@ -993,16 +1040,13 @@ def genWordCloud(text, gettextDict, removeStopwords=True, level=0, wordCloudDict
   # image = wordcloud.to_image()
   # image.show()
   
-  # always save BEFORE show
-  if genWordCloudDict["fileName"]:
-    genWordCloudDict["outputFile"] = saveImage(outputFolder, genWordCloudDict["fileName"], plt, imgExt, imgQuality, usePngquant, False, progress)
-  if genWordCloudDict["outputFile"]:
-    genWordCloudDict["outputFileName"] = os.path.basename(genWordCloudDict["outputFile"])
-    genWordCloudDict["stem"] = Path(genWordCloudDict["outputFile"]).stem
-    genWordCloudDict["outputThumbnailFile"] = saveThumbnail(genWordCloudDict["outputFile"], outputFolder, thumbnailPrefix + genWordCloudDict["stem"], imgExt, imgQuality, usePngquant)
-
-  if showPicture: plt.show()
+  if not dryRun and not noPics:
+    genWordCloudDict["outputFilePath"] = saveImage(outputFolder, genWordCloudDict["outputFileName"], plt, progress)
+    if genWordCloudDict["outputFilePath"]:
+      if showPicture: plt.show()
+      genWordCloudDict["outputThumbnailFilePath"] = saveThumbnail(outputFolder, genWordCloudDict["outputFilePath"], imgSettingsDict['thumbnailPrefix'] + genWordCloudDict["outputFileName"], progress)
   plt.close()
+  
   return genWordCloudDict
 # genWordCloud
 
@@ -1024,7 +1068,7 @@ def loadStopWordsDict():
   # TODO: what do we do with stopWords.Wordlist-Adjectives-All.txt? it also contains words, not just adjectives
   stopWordsFileNames = ['dummy', 'stopWords.1.txt', 'stopWords.kjzz.txt', 'stopWords.ranks.nl.uniq.txt']
   for index, stopWordsFileName in enumerate(stopWordsFileNames):
-    info("index=%s, stopWordsFileName=%s" %(index, stopWordsFileName), 2)
+    info("index=%s, stopWordsFileName=%s" %(index, stopWordsFileName), 3)
     stopWordsFile = os.path.join(dataFolder, stopWordsFileName)
     if os.path.isfile(stopWordsFile):
       stopwordsDict[index] = set()
@@ -1336,6 +1380,8 @@ def graph_line(X, Y, title="", fileName="", progress=""):
   import pandas as pd
   import matplotlib
   # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
+  # UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+  # Solution: pip install PySide2
   if not showPicture: matplotlib.use('Agg')
   import matplotlib.pyplot as plt
   import matplotlib.dates as mdates
@@ -1350,7 +1396,7 @@ def graph_line(X, Y, title="", fileName="", progress=""):
   plt.xlabel('date')
 
   # always save BEFORE show
-  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, False, progress)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, progress)
 
   if showPicture: plt.show()
   plt.close()
@@ -1366,6 +1412,8 @@ def graph_bar(X, Y, title="", fileName="", progress=""):
   import pandas as pd
   import matplotlib
   # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
+  # UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+  # Solution: pip install PySide2
   if not showPicture: matplotlib.use('Agg')
   import matplotlib.pyplot as plt
   import matplotlib.dates as mdates
@@ -1380,7 +1428,7 @@ def graph_bar(X, Y, title="", fileName="", progress=""):
   plt.xlabel('date')
 
   # always save BEFORE show
-  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, False, progress)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, progress)
 
   if showPicture: plt.show()
   plt.close()
@@ -1396,6 +1444,8 @@ def graph_pie(X, Y, title="", fileName="", progress=""):
   import pandas as pd
   import matplotlib
   # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
+  # UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+  # Solution: pip install PySide2
   if not showPicture: matplotlib.use('Agg')
   import matplotlib.pyplot as plt
   import matplotlib.dates as mdates
@@ -1418,7 +1468,7 @@ def graph_pie(X, Y, title="", fileName="", progress=""):
        # )
        
   # always save BEFORE show
-  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, False, progress)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, progress)
 
   if showPicture: plt.show()
   plt.close()
@@ -1433,6 +1483,8 @@ def graph_heatMapTestHighlight(progress=""):
   import pandas as pd
   import matplotlib
   # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
+  # UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+  # Solution: pip install PySide2
   if not showPicture: matplotlib.use('Agg')
   import matplotlib.pyplot as plt
   import matplotlib.dates as mdates
@@ -1454,7 +1506,7 @@ def graph_heatMapTestHighlight(progress=""):
   ax.tick_params(length=0)
 
   # always save BEFORE show
-  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, False, progress)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, progress)
 
   if showPicture: plt.show()
   plt.close()
@@ -1470,6 +1522,8 @@ def graph_heatMap(arrays, Xlabels, Ylabels, graphTitle="", fileName="", showPict
   import pandas as pd
   import matplotlib
   # https://stackoverflow.com/questions/27147300/matplotlib-tcl-asyncdelete-async-handler-deleted-by-the-wrong-thread
+  # UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+  # Solution: pip install PySide2
   if not showPicture: matplotlib.use('Agg')
   import matplotlib.pyplot as plt
   import matplotlib.dates as mdates
@@ -1555,7 +1609,7 @@ def graph_heatMap(arrays, Xlabels, Ylabels, graphTitle="", fileName="", showPict
   fig.tight_layout()
 
   # always save BEFORE show
-  if fileName: outputFile = saveImage(outputFolder, fileName, plt, imgExt, imgQuality, usePngquant, False, progress)
+  if fileName: outputFile = saveImage(outputFolder, fileName, plt, progress)
 
   if showPicture: plt.show()
   plt.close()
@@ -1563,28 +1617,102 @@ def graph_heatMap(arrays, Xlabels, Ylabels, graphTitle="", fileName="", showPict
 # graph_heatMap
 
 
-def saveImage(outputFolder, stem, img, output_ext=imgExt, quality=imgQuality, usePngquant=usePngquant, save_metadata=False, progress=""):
+# TODO: genMetadataEXIF() which exif to use for what?
+def genMetadataEXIF(img, prompt, extra_pnginfo=None):
+  metadata = {}
+  if prompt is not None:
+    metadata["prompt"] = prompt
+  if extra_pnginfo is not None:
+    metadata.update(extra_pnginfo)
+  
+  ## For Comfy to load an image, it need a PNG tag at the root: Prompt={prompt}
+  ## For AVIF WebP Jpeg JXL, it's only Exif that's available... and UserComment is the best choice.
+
+  ## This method gives good results, as long as you save the prompt/workflow in 2 separate Exif tags
+  ## Otherwise, [ExifTool] will issue Warning: Invalid EXIF text encoding for UserComment
+  #   entryOffset 10
+  #   tag 37510
+  #   type 2
+  #   numValues 17699
+  #   valueOffset 26
+  ## Also when Comfy pnginfo.js reads it, all the quotes are escaped, making the prompt invalid
+  ## exif type is PIL.Image.Exif
+  exif = img.getexif()
+  dump = json.dumps(metadata)
+  # print(f"dump={dump}")   {"prompt": { .. }, "workflow": { .. }}
+  # exif[ExifTags.Base.UserComment] = dump
+  
+  ## It seems better to separate the two
+  # 0x010d: DocumentName      Parameters (SD)
+  # 0x010e: ImageDescription  Workflow
+  # 0x010f: Make              Prompt
+  # 0x9286: UserComment       cancelled
+  # both prompt and workflow must be in IFD close together of that can cause problems for the parseIFD function on import
+  # https://exiftool.org/TagNames/EXIF.html
+  # exif[0x9286] = "Prompt: " + json.dumps(metadata['prompt'])     # UserComment
+  exif[0x010f] = "Prompt: " + json.dumps(metadata['prompt'])     # Make
+  exif[0x010e] = "Workflow: " + json.dumps(metadata['workflow']) # ImageDescription
+  
+  # exif[ExifTags.Base.UserComment] = piexif.helper.UserComment.dump(json.dumps(metadata), encoding="unicode")  # type 4
+  # exif[ExifTags.Base.UserComment] = piexif.helper.UserComment.dump(json.dumps(metadata), encoding="jis")      # type 1
+  # exif[ExifTags.Base.UserComment] = piexif.helper.UserComment.dump(json.dumps(metadata), encoding="ascii")    # type 1
+  exif_dat = exif.tobytes()
+  
+  # https://piexif.readthedocs.io/en/latest/functions.html#load
+
+  # Both options exif_dict methods below result in type 4 data, read by parseExifData > parseIFD > readInt in pnginfo.js -> not processed
+  #   entryOffset 10
+  #   tag 34665
+  #   type 4
+  #   numValues 1
+  #   valueOffset 26
+  # Also, piexif.dump(exif_dict) already is a bytes object.
+  # Also, 34665 if the correct tag for IFD according to https://pillow.readthedocs.io/en/stable/reference/ExifTags.html
+  # from PIL.ExifTags import IFD
+  # IFD.Exif.value -> 34665
+
+  # https://stackoverflow.com/questions/61626067/python-add-arbitrary-exif-data-to-image-usercomment-field
+  # exif_ifd = {piexif.ExifIFD.UserComment: json.dumps(metadata).encode()}
+  # exif_dict = {"0th":{}, "Exif":exif_ifd, "GPS":{}, "1st":{}, "thumbnail":None}
+  # exif_dat = piexif.dump(exif_dict)
+
+  # https://stackoverflow.com/questions/8586940/writing-complex-custom-metadata-on-images-through-python
+  # This seems like the right encoding, exiftool returns no error
+  # exif_dict = {"0th":{}, "Exif":{}, "GPS":{}, "1st":{}, "thumbnail":None}
+  # exif_dict["Exif"][piexif.ExifIFD.UserComment] = piexif.helper.UserComment.dump(json.dumps(metadata), encoding="unicode")
+  # exif_dict["Exif"][piexif.ExifIFD.UserComment] = piexif.helper.UserComment.dump(json.dumps(metadata), encoding="ascii")
+  # exif_dict["Exif"][piexif.ExifIFD.UserComment] = piexif.helper.UserComment.dump(json.dumps(metadata), encoding="jis")
+  # exif_dat = piexif.dump(exif_dict)
+
+  return exif_dat
+
+# def saveImage(outputFolder, stem, img, output_ext=imgExt, quality=imgQuality, usePngquant=usePngquant, save_metadata=False, progress=""):
+def saveImage(outputFolder, stem, img, progress=""):
   info("%.156s" %({**locals()}), 3, "", "blue")
   
-  outputFileName = "%s.%s" %(stem, output_ext)
-  outputFile = os.path.join(outputFolder, outputFileName)
-  # output_ext = Path(image_path).suffix
   metadata = None
   kwargs = dict()
+  output_ext = imgSettingsDict['imgExt']
+  quality = imgSettingsDict['imgQuality']['default']
+  if output_ext in imgSettingsDict['imgQuality'].keys(): quality = imgSettingsDict['imgQuality'][output_ext]
+  usePngquant = imgSettingsDict['usePngquant']
+  optimize_image = imgSettingsDict['optimize_image']
+  save_metadata = imgSettingsDict['save_metadata']
   
-  info('image to save: "%s"' %(outputFile), 4, progress)
+  outputBasename = "%s.%s" %(stem, output_ext)
+  outputFilePath = os.path.join(outputFolder, outputBasename)
   
   # TODO: see if convert_hdr_to_8bit=False make a change
   # https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html
   if output_ext in ['avif', 'webp', 'jxl']:
-    if save_metadata: kwargs["exif"] = self.genMetadataEXIF(img, prompt, extra_pnginfo)
+    # if save_metadata: kwargs["exif"] = genMetadataEXIF(img, prompt, extra_pnginfo)
     if quality == 100:
       kwargs["lossless"] = True
     else:
       kwargs["quality"] = quality
-    kwargs["optimize"] = self.optimize_image
+    kwargs["optimize"] = optimize_image
   if output_ext in ['j2k', 'jp2', 'jpc', 'jpf', 'jpx', 'j2c']:
-    if save_metadata: kwargs["exif"] = self.genMetadataEXIF(img, prompt, extra_pnginfo)
+    # if save_metadata: kwargs["exif"] = genMetadataEXIF(img, prompt, extra_pnginfo)
     if quality < 100:
       kwargs["irreversible"] = True
       # there is no such thing as compression level in JPEG2000. Read https://comprimato.com/blog/2017/06/22/bitrate-control-quality-layers-jpeg2000/
@@ -1592,18 +1720,18 @@ def saveImage(outputFolder, stem, img, output_ext=imgExt, quality=imgQuality, us
       # kwargs["quality_layers"] = [0,1,2] no refence online. i tried all values from 0 to 100 and no change in filesize
     else:
       kwargs["quality"] = quality
-    kwargs["optimize"] = self.optimize_image
+    kwargs["optimize"] = optimize_image
   elif output_ext in ['jpg', 'jpeg']:
-    if save_metadata: kwargs["exif"] = self.genMetadataEXIF(img, prompt, extra_pnginfo)
+    # if save_metadata: kwargs["exif"] = genMetadataEXIF(img, prompt, extra_pnginfo)
     # https://stackoverflow.com/questions/19303621/why-is-the-quality-of-jpeg-images-produced-by-pil-so-poor
     kwargs["subsampling"] = 0
     kwargs["quality"] = quality
-    kwargs["optimize"] = self.optimize_image
+    kwargs["optimize"] = optimize_image
   elif output_ext in ['tiff']:
     # tiff: no quality
-    kwargs["optimize"] = self.optimize_image
+    kwargs["optimize"] = optimize_image
   elif output_ext in ['png', 'gif']:
-    if save_metadata: kwargs["pnginfo"] = self.genMetadataPng(img, prompt, extra_pnginfo)
+    if save_metadata: kwargs["pnginfo"] = genMetadataPng(img, prompt, extra_pnginfo)
   
     # png/gif: no quality, rather we convert quality to compression level in the 0-9 range
     old_min = 0
@@ -1615,44 +1743,63 @@ def saveImage(outputFolder, stem, img, output_ext=imgExt, quality=imgQuality, us
     
     kwargs["compress_level"] = png_compress_level
     # BUG: PIL will compress at level 9 when PNG optimize_image = True
-    # kwargs["optimize"] = self.optimize_image
+    # BUG: PIL will take forever to compress with optimize_image = True
+    # kwargs["optimize"] = optimize_image
   # elif output_ext in ['bmp']:
     # nothing to add
   
+  startTime = time.time()
+  info('image to save: "%s"' %(outputFilePath), 3, progress)
+  if not isinstance(img, Image.Image) and output_ext in imgSettingsDict['PILImageNeeded']:
+    # img is actually a plt. we cannot save it into AVIF. Also it does not have a canvas
+    buffer = io.BytesIO()
+    img.savefig(buffer, bbox_inches='tight')
+    buffer.seek(0)
+    img = PIL.Image.open(buffer)
+    # img = PIL.Image.frombytes('RGB', img.canvas.get_width_height(),img.canvas.tostring_rgb())
+  
   if isinstance(img, Image.Image):
     # img is a PIL Image
-    if output_ext in ['jpg', 'jpeg']:
+    if output_ext in imgSettingsDict['noTransparency']:
       # remove transparency:
       if img.mode != 'RGB': img = img.convert('RGB')
     try:
-      img.save(outputFile, **kwargs)
-    except Exception as error:
+      img.save(outputFilePath, **kwargs)
+    except Exception as e:
       # traceback.print_exc()
-      error("error saving %s: %s" %(outputFile, error), 1)
+      error("error saving %s: %s" %(outputFilePath, e), 1)
   else:
+    info('--------------------> img is actually a plt', 3)
     # img is actually a plt
     try:
-      img.savefig(outputFile, 
+      # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.savefig.html
+      # TypeError: FigureCanvasSVG.print_svg() got an unexpected keyword argument 'pil_kwargs'
+      img.savefig(outputFilePath, 
+                  format=output_ext,
+                  metadata=metadata,
                   bbox_inches='tight', 
                   pil_kwargs=kwargs, 
                   )
-    except Exception as error:
+    except Exception as e:
       # traceback.print_exc()
-      error("error saving %s: %s" %(outputFile, error), 1)
+      error("error saving %s: %s" %(outputFilePath, e), 1)
     
   
-  info('image saved: "%s" [%.0fk]' %(outputFile, os.path.getsize(outputFile)/1024), 1, progress)
-  optimizePng(outputFile, output_ext, usePngquant=usePngquant)
+  msLapse = (time.time() - startTime) * 1000
+  info('image saved:   "%s" [%.0fk] (%.0fms)' %(outputFilePath, os.path.getsize(outputFilePath)/1024, msLapse), 2, progress)
+  if output_ext == 'png': optimizePng(outputFilePath, output_ext, usePngquant)
   
-  return outputFile
+  return outputFilePath
 # saveImage
 
 
-def saveThumbnail(inputFile, outputFolder, stem, output_ext=imgExt, quality=imgQuality, usePngquant=usePngquant, save_metadata=False, progress=""):
+# def saveThumbnail(outputFolder, inputFile, stem, output_ext=imgExt, quality=imgQuality, usePngquant=usePngquant, save_metadata=False, progress=""):
+def saveThumbnail(outputFolder, inputFile, stem, progress=""):
   info("%.156s" %({**locals()}), 3, "", "blue")
   
-  thumbnailFileName = "%s.%s" %(stem, output_ext)
-  thumbnailFile = os.path.join(outputFolder, thumbnailFileName)
+  ext = os.path.splitext(inputFile)[1][1:]
+  if ext in imgSettingsDict['cannotRead']:
+    return None
   
   # I would love this to work instead of reloading the file we just produced:
   # img = Image.frombytes('RGB', fig.canvas.get_width_height(), fig.canvas.tostring_rgb())
@@ -1660,15 +1807,15 @@ def saveThumbnail(inputFile, outputFolder, stem, output_ext=imgExt, quality=imgQ
   img.thumbnail((256, 256), Image.Resampling.LANCZOS)   # looks okay
   # img = img.resize((256,256), Image.LANCZOS)          # formerly ANTIALIAS, does not look good at all
   
-  saveImage(outputFolder, stem, img, output_ext, quality, usePngquant, False, save_metadata, progress)
+  thumbnailFilePath = saveImage(outputFolder, stem, img, progress)
   
-  info('thumbnail saved: "%s" [%.0fk]' %(thumbnailFile, os.path.getsize(thumbnailFile)/1024), 2, progress)
-  return thumbnailFile
+  # info('thumbnail saved: "%s" [%.0fk]' %(thumbnailFilePath, os.path.getsize(thumbnailFilePath)/1024), 2, progress)
+  return thumbnailFilePath
 # saveThumbnail
 
 
 
-def optimizePng(outputFile, output_ext, usePngquant=usePngquant):
+def optimizePng(outputFile, output_ext, usePngquant=imgSettingsDict['usePngquant']):
   info("%.156s" %({**locals()}), 3, "", "blue")
   
   if output_ext in ['png'] and usePngquant:
@@ -1707,18 +1854,18 @@ def getPrevKey(HHMMList, key):
     return None
 
 
-def rebuildThumbnails(inputFolder, outputFolder, imgExt, dryRun=False, progress=""):
+def rebuildThumbnails(inputFolder, outputFolder, dryRun=False, progress=""):
   info("%.156s" %({**locals()}), 3, "", "blue")
   
   # no need to provide --force, thumbnails should always be rebuild and that's what this function does
-  imgPath = os.path.normpath('%s/%s*.%s' %(inputFolder, STATION, imgExt))
-  imgList = glob.glob(imgPath, recursive=False)
-  # print(imgList)
+  imgPath = os.path.normpath('%s/%s*.%s' %(inputFolder, STATION, imgSettingsDict['imgExt']))
+  imgFilePathList = glob.glob(imgPath, recursive=False)
+  # print(imgFilePathList)
 
   with Progress() as progress:
-    task = progress.add_task("Thumbnail gen", total=len(imgList))
-    for img in imgList:
-      outputThumbnailFile = saveThumbnail(img, outputFolder, thumbnailPrefix + Path(img).stem, imgExt, imgQuality, usePngquant)
+    task = progress.add_task("Thumbnail gen", total=len(imgFilePathList))
+    for imgFilePath in imgFilePathList:
+      outputThumbnailFilePath = saveThumbnail(outputFolder, imgFilePath, imgSettingsDict['thumbnailPrefix'] + Path(imgFilePath).stem, progress)
       progress.advance(task)
   
 # rebuildThumbnails
@@ -1855,7 +2002,7 @@ def genHtmlFooter():
 
 
 def genHtmlSegmentImg(imgFileName, classChunkExist):
-  thumbnailFileName = "%s%s" %(thumbnailPrefix, imgFileName)
+  thumbnailFileName = "%s%s" %(imgSettingsDict['thumbnailPrefix'], imgFileName)
 
   # removed onerror, too slow: onerror="this.src='../../lib/assets/missingCloud.png';" 
   dictTemplate = dict(imgFileName=imgFileName, thumbnailFileName=thumbnailFileName, classChunkExist=classChunkExist)
@@ -2028,7 +2175,7 @@ def generateHtml(jsonScheduleFile, outputFolder, yearNumber, weekNumber, byChunk
         gettext = "year=%s+week=%s+Day=%s+title=%s" %(yearNumber, weekNumber, Day, title)
         gettextDict = buildGettextDict(gettext, gettextDictBlank)
         imgFileStem = genTitle(gettextDict, "-")
-        imgBasename = "%s.%s" %(imgFileStem, imgExt)
+        imgBasename = "%s.%s" %(imgFileStem, imgSettingsDict['imgExt'])
         imgFilePath = os.path.join(outputFolder, imgBasename)
 
         # without +1, jsonSchedule[reversedHHMMList[key+1]] will error out with IndexError: list index out of range
@@ -2043,7 +2190,7 @@ def generateHtml(jsonScheduleFile, outputFolder, yearNumber, weekNumber, byChunk
           
           # 0.9.14: Filtering a filename off a glob list to determine if file exist... please... stop!
           # # regexp = re.compile(".*%s year=%s week=%s.*title=%s.*Day=%s" %(STATION, yearNumber, weekNumber, title, Day))
-          # # regexp = re.compile(".*%s.%s" %(imgFileStem, imgExt))
+          # # regexp = re.compile(".*%s.%s" %(imgFileStem, imgSettingsDict['imgExt']))
           
           # # 1. Is it in the list we build at the beginning?
           # thatWordCloudImgList = list(filter(regexp.match, imgList))
@@ -2051,7 +2198,7 @@ def generateHtml(jsonScheduleFile, outputFolder, yearNumber, weekNumber, byChunk
           # #    Remember, we process every startTime in reversedHHMMList, so we may have already generated it
           # if len(thatWordCloudImgList) == 0:
             # # thisImgPath = '%s/%s year=%s week=%s title=%s Day=%s*.png' %(outputFolder, STATION, yearNumber, weekNumber, title, Day)
-            # thisImgPath = '%s/%s*.%s' %(outputFolder, imgFileStem, imgExt)
+            # thisImgPath = '%s/%s*.%s' %(outputFolder, imgFileStem, imgSettingsDict['imgExt'])
             # thatWordCloudImgList = glob.glob(thisImgPath, recursive=False)
           
           if force or not is_file(imgFilePath):
@@ -2202,14 +2349,13 @@ def buildGettextDict(gettext, gettextDict=gettextDictBlank):
   # gettext = "week=41+title=All Things Considered+Day=Fri"
   # gettext = "chunk=KJZZ_2023-10-13_Fri_1700-1730_All Things Considered"
   
-  if gettext.find("chunk=") > -1:
-    chunkName = re.split(r"[=]",gettext)[1]
-    # KJZZ_2023-10-13_Fri_1700-1730_All Things Considered
-    # we already defined a class that will gently split the name for us
-    # python KJZZ-db.py --gettext chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered" -v
-    chunk = Chunk(chunkName)
+  global chunk
+  chunk = Chunk(gettext)
+  if chunk is not None:
     # chunk name is not in the db, only the exact start time is needed anyway
-    gettextDict["start"]  = chunk.start
+    gettextDict["chunk"]  = chunk.stem    # KJZZ_2023-10-13_Fri_1700-1730_All Things Considered
+    gettextDict["start"]  = chunk.start   # 2023-10-13 17:00:00.000
+    # print(chunk.dirname)                # kjzz\2023\41
   else:
     conditions = re.split(r"[+]", gettext)
     for condition in conditions:
@@ -2234,8 +2380,9 @@ def buildGettextDict(gettext, gettextDict=gettextDictBlank):
 
 
 def genTitle(gettextDict, separator=" "):
+  # print(gettextDict)
   if "chunk" in gettextDict:
-    title = gettextDict.chunk
+    title = gettextDict['chunk']
   else:
     title  = STATION
     for key in validTitleKeys:
@@ -2262,54 +2409,64 @@ def getValueFromVariableInBatchFile(batfile, variable):
 
 
 def is_file(filePath):
+  info("%.156s" %({**locals()}), 3, "", "blue")
   try:
     return os.path.getsize(filePath)
   except OSError as error:
-    return -1
+    return 0
+#
+
+
+def removeIntegers(mylist):
+  # getting index out of range for some reason:
+  # is_integer = lambda s: s.isdigit() or (s[0] == '-' and s[1:].isdigit())
+  # return filter(is_integer, mylist)
+  
+  return [item for item in mylist if not item.isdigit()]
 #
 
 
 def error(message, RC=1, progress=""):
   stack = ''
-  errorPattern = "error  : %-30s[red]%s%s [/]"
+  errorPattern = f"%-4s error  : %-30s[red]%s%s [/]"
   for i in reversed(range(1, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
   if progress:
-    progress.console.print(errorPattern %(stack, " ", message))
+    progress.console.print(errorPattern %(currentframe().f_back.f_lineno, stack, " ", message))
   else:
-    print (errorPattern %(stack, " ", message), file=sys.stderr)
+    print (errorPattern %(currentframe().f_back.f_lineno, stack, " ", message), file=sys.stderr)
   if RC: exit(RC)
 #
 
 def warning(message, RC=0, progress=""):
   stack = ''
-  warningPattern = "warning: %-30s[yellow]%s%s [/]"
+  warningPattern = f"%-4s warning: %-30s[yellow]%s%s [/]"
   for i in reversed(range(1, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
   if progress:
-    progress.console.print(warningPattern %(stack, " ", message))
+    progress.console.print(warningPattern %(currentframe().f_back.f_lineno, stack, " ", message))
   else:
-    print (warningPattern %(stack, " ", message), file=sys.stderr)
+    print (warningPattern %(currentframe().f_back.f_lineno, stack, " ", message), file=sys.stderr)
   if RC: exit(RC)
 #
 
 def info(message, verbosity=0, progress="", color="white"):
   stack = ''
-  infoPattern = "info   : %s[white]%s%s[/]"
+  infoPattern = f"%-4s info   : %s[white]%s%s[/]"
   if verbosity >1:
     for i in reversed(range(1, len(inspect.stack())-1)): stack += "%s: " %(inspect.stack()[i][3])
-    infoPattern = f"info   : %-30s[white]%s%s[/]"
+    infoPattern = f"%-4s info   : %-30s[white]%s%s[/]"
     if verbosity >2:
-      infoPattern = f"debug  : %-30s[white]%s%s[/]"
+      infoPattern = f"%-4s debug  : %-30s[white]%s%s[/]"
     if verbosity >3:
-      infoPattern = f"debug  : %-30s[magenta]%s%s[/]"
+      infoPattern = f"%-4s debug  : %-30s[magenta]%s%s[/]"
     if color != 'white':
-      infoPattern = f"debug  : [magenta]%-30s["+color+"]%s%s[/]"
+      infoPattern = f"%-4s debug  : [magenta]%-30s["+color+"]%s%s[/]"
     
   # if verbose >= verbosity: print ("info   : %-30s[white]%s%s[/]" %(stack, " ", message), file=sys.stderr)
   if verbose >= verbosity:
     if progress:
-      progress.console.print(infoPattern %(stack, " ", message))
+      progress.console.print(infoPattern %(currentframe().f_back.f_lineno, stack, " ", message))
     else:
-      print (infoPattern %(stack, " ", message), file=sys.stderr)
+      print (infoPattern %(currentframe().f_back.f_lineno, stack, " ", message), file=sys.stderr)
 #
 
 def ddebug(*kwargs):
@@ -2340,11 +2497,12 @@ def usage(RC=99, usagePart=""):
   
   usageImport    = Template("""
   --import < --folder inputFolder | --text "${STATION}_2023-10-13_Fri_1700-1730_All Things Considered.text" >
+                                    Existing chunks in db can be overwritten with --force
     -m, --model *${model} small medium large...
                                     Model that you used with whisper, to transcribe the text to import.""").safe_substitute(STATION=STATION, model=model)
   
   usageHtml      = Template("""
-  --html [--byChunk --printOut] <2023|2023/41>
+  --html <2023|2023/41> [--byChunk --printOut]
                                     PICture: generate yearly or year/week schedule as an html table.
                                     Outputs html file: "${outputFolder}/2023/41/index[-bySegment|byChunk].html"
     --byChunk                       Outputs schedule by 30mn chucks, no rowspan, no PICtures.
@@ -2376,9 +2534,10 @@ def usage(RC=99, usagePart=""):
     --show                          Opens the PICtures upon generation.
     --rebuildThumbnails <year|year/week>
                                     Will regenerate thumbnails only, if word clouds exists.
-    --imgExt <*png|jpg|webp|avif>   Use this format instead of ${imgExt}.
+    --imgExt <*webp|png|avif|jpg|webp|avif|>
+                                    Use this format instead of ${imgExt}.
     --noPngquant                    Disable pngquant compression (only for png, indeed).
-    --imgQuality <*50>              0-100 compression quality.
+    --imgQuality <*${imgQuality}>              0-100 compression quality (varies between formats).
     --noPics                        Will not generate PICtures.
     --force                         Will overwrite existing PICtures.
 
@@ -2388,7 +2547,8 @@ def usage(RC=99, usagePart=""):
       --graphs *bar,*pie,line         What graph(s) you want. Ignored with --noMerge: a heatMap (per chunk) will be generated instead.
     --wordCloud                     PICture: generate word cloud from gettext output. Will not output any text.
       --stopLevel  0 1 2 *3           Add various levels of stopwords.
-        --listLevel <0[,1,..]>          to show the stopWords in which level(s).""").safe_substitute(outputFolder=outputFolder, outputFolder18="%-18s" %(outputFolder), imgExt=imgExt)
+        --listLevel <0[,1,..]>          to show the stopWords in which level(s).\n""").safe_substitute(outputFolder=outputFolder, outputFolder18="%-18s" %(outputFolder), imgExt=imgSettingsDict['imgExt'], imgQuality=imgSettingsDict['imgQuality']['default'])
+  
   for key, item in wordCloudDict.items():
     if item["input"]: usageGettext += ("      --%s *%s  %s" %(key, item["value"], item["usage"]))+os.linesep
   
@@ -2537,14 +2697,13 @@ try:
     elif currentArgument in ("--imgExt"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
       ext = str(currentValue).lower()
-      if ext in imgExtValids:
-        imgExt = ext
-        if imgExt not in ['png']: usePngquant = False
+      if ext in imgSettingsDict['imgExtValids']:
+        imgSettingsDict['imgExt'] = ext
       else:
-        warning("imgExt takes only %s, defaulting to %s" %(imgExtValids, imgExt), 0)
+        warning("imgExt takes only %s, defaulting to %s" %(imgSettingsDict['imgExtValids'], imgSettingsDict['imgExt']), 0)
     elif currentArgument in ("--imgQuality"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, currentValue), 2)
-      imgQuality = int(currentValue)
+      imgSettingsDict['imgQuality'] = int(currentValue)
     elif currentArgument in ("--printOut"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       printOut = True
@@ -2574,7 +2733,7 @@ try:
       misInformation = False
     elif currentArgument in ("--noPngquant"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, False), 2)
-      usePngquant = False
+      imgSettingsDict['usePngquant'] = False
     elif currentArgument in ("--misInformation"):
       info(("[bright_black]%-20s:[/] %s") % (currentArgumentClean, True), 2)
       wordCloud = False
@@ -2653,9 +2812,10 @@ if rebuildThumbnail or wordCloud or misInformation:
     jxl_supported = True
 
   # PIL must be loaded after pillow plugins
+  import PIL
   from PIL import Image, ExifTags
   
-  if imgExt in ['png'] and usePngquant:
+  if imgSettingsDict['imgExt'] in ['png'] and imgSettingsDict['usePngquant']:
     import pngquant
 
 
@@ -2771,23 +2931,32 @@ if gettext:
   # gettext = "year=2023+week=43+title=Classic Jazz with Chazz Rayburn+Day=Mon"
   #   gettextDict = {'year': '2023', 'week': '43', 'title': 'Classic Jazz with Chazz Rayburn', 'Day': 'Mon'}
   gettextDict = buildGettextDict(gettext, gettextDictBlank)
+  # print(gettextDict)    # {'chunk': 'KJZZ_2023-10-13_Fri_1700-1730_All Things Considered', 'start': '2023-10-13 17:00:00.000'}
   
   records = getChunks(gettextDict, True, progress)
-  # records = (('2023-10-14 01:00.000', '2023-10-14 01:30.000', 'KJZZ_2023-10-14_Sat_0100-0130_BBC World Service', '[0.7, 0.4, 0.4, 2.9]', 'text...'),..)
+  # print(records)
+  # records = (('2023-10-13 17:00:00.000', '2023-10-13 17:30:00.000', 'KJZZ_2023-10-13_Fri_1700-1730_All Things Considered', '[0.9, 0.6, 0.4, 2.3]', 'Blah...'),..)
   
   if len(records) > 0:
 
     ################## wordCloud
-    # first we check if week number was passed in the gettext to infer outputFolder
-    # ddebug bug: YYYY is missing in outputFolder
+    # first we check if week number was passed in the gettext to generate outputFolder. Year must be present we check that earlier
     if "week" in gettextDict:
       outputFolder = os.path.join(outputFolder, str(gettextDict['year']), str(gettextDict['week']))
+    elif "chunk" in gettextDict:
+      outputFolder = chunk.dirname
     
     # then we check if a wordCloud is requested:
     if wordCloud:
-      fileName = genTitle(gettextDict, "-")
-      if force or not is_file(os.path.getsize(os.path.join(outputFolder, "%s.%s" %(fileName, imgExt)))):
+      imgFileName = genTitle(gettextDict, "-")
+      imgFilePath = os.path.join(outputFolder, "%s.%s" %(imgFileName, imgSettingsDict['imgExt']))
+      if force or not is_file(imgFilePath):
         genWordCloudDicts = genWordClouds(records, gettextDict, mergeRecords, showPicture, wordCloudDict, outputFolder, dryRun)
+      elif showPicture:
+        from PIL import Image
+        img = Image.open(imgFilePath)
+        img.show()
+        
 
     ################## misInformation
     # then we check if misInformation is requested:

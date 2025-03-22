@@ -207,10 +207,18 @@ KJZZ-db.py needs at least `--import / --query / --gettext / --listLevel`.
   -v, -vv, -vvv                     increase verbosity.
   --silent                          Suppress all messages.
   --dryRun                          Will not generate PICtures, not commit imports, not output or modify anything.
-  --db path\sqlite.db (kjzz.db)
-                                    Path to the local SQlite db.
-  -q, --query < title | first | last | last10 | byDay | byTitle | chunkLast10 | "select .. from schedule">
-                                    Quick way to see what's in the db.
+  --db path\sqlite.db               Path to the local SQlite db  (*kjzz.db).
+  -q, --query <something>           Quick way to see what's in the db.
+              title                 List of unique program titles.
+              countByDay            Counts per day and by program.
+              countByTitle          Counts per program and by day.
+              chunkFirst10          List first 10 chunks in db.
+              chunkLast10           List last 10 chunks in db.
+              first                 Outputs transcripts: first one.
+              last                  Outputs transcripts: last one.
+              last10                Outputs transcripts: last 10.
+              "select .. from schedule"
+                                    Run this sql command.
   --import < --folder inputFolder | --text "KJZZ_2023-10-13_Fri_1700-1730_All Things Considered.text" >
     -m, --model *distil-large-v3 small medium large...
                                     Model that you used with whisper, to transcribe the text to import.
@@ -227,14 +235,14 @@ KJZZ-db.py needs at least `--import / --query / --gettext / --listLevel`.
                     year=2023
                     week=42 (iso week with Mon first)
                     Day=Fri (Ddd)
-                    title="title of the show", see https://kjzz.org/kjzz-print-schedule
+                    title="title of the show", see KJZZScheduleUrl
                           example:  chunk="KJZZ_2023-10-13_Fri_1700-1730_All Things Considered"
                                     Will get text from that chunk of programming only. Chunks are 30mn long.
                           example:  year=2023+week=41+Day=Fri+title="All Things Considered"
                                     Same as above but will get text from the entire program for Friday week 41 of 2023.
                           example:  year=2023+title="All Things Considered"
                                     Same as above but will get text from a single program for the entire year.
-    -p, --pretty                    Convert \ to carriage returns and convert json output to text.
+    -p, --pretty                    Convert \n to carriage returns and convert json output to text.
                                     Ignored when outputing pictures.
    *--printOut                      Will output selected text on the prompt (default if no other option passed).
     --noMerge                       Do not merge 30mn chunks of the same title within the same timeframe.
@@ -242,10 +250,11 @@ KJZZ-db.py needs at least `--import / --query / --gettext / --listLevel`.
                                     Will be kjzz/YYYY/W/ when gettext has year=YYYY+week=W"
     --show                          Opens the PICtures upon generation.
     --rebuildThumbnails <year|year/week>
-                                    Will (re)generate only PICtures thumbnails for that year or week, off existing PICtures.
-    --imgExt <*png|jpg|webp|avif>   Use this format instead of png.
+                                    Will regenerate thumbnails only, if word clouds exists.
+    --imgExt <*webp|png|avif|jpg|webp|avif|>
+                                    Use this format instead of webp.
     --noPngquant                    Disable pngquant compression (only for png, indeed).
-    --imgQuality <*50>              0-100 compression quality.
+    --imgQuality <*60>              0-100 compression quality (varies between formats).
     --noPics                        Will not generate PICtures.
     --force                         Will overwrite existing PICtures.
 
@@ -255,7 +264,8 @@ KJZZ-db.py needs at least `--import / --query / --gettext / --listLevel`.
       --graphs *bar,*pie,line         What graph(s) you want. Ignored with --noMerge: a heatMap (per chunk) will be generated instead.
     --wordCloud                     PICture: generate word cloud from gettext output. Will not output any text.
       --stopLevel  0 1 2 *3           Add various levels of stopwords.
-        --listLevel <0[,1,..]>          to show the stopWords in which level(s).      --max_words *1000  int (default=1000)
+        --listLevel <0[,1,..]>          to show the stopWords in which level(s).
+      --max_words *1000  int (default=1000)
                                       The maximum number of words in the Cloud.
       --width *2000  int (default=2000)
                                       Width of the canvas.
@@ -557,14 +567,16 @@ The loop above will have them sorted by Title.
 If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
 
 
+## How many words is too many?
+| 1000 words | 500 words | 50 words | 30 words |
+| --- | --- | --- | --- |
+| ![thumbnail-example-1000w](assets/thumbnail-example-1000w.webp) | ![thumbnail-example-1000w](assets/thumbnail-example-500w.webp) | ![thumbnail-example-1000w](assets/thumbnail-example-50w.webp) | ![thumbnail-example-1000w](assets/thumbnail-example-30w.webp) |
+
+Judge by yourself, I feel like 1000 gives the best visual results, 500 is the worst, and 50 could be okay but for thumbnails only.
 
 # Requirements
 
-## Linux
-
-- none
-
-## Windows
+## Python
 
 - Python 3.x:
   - getopt, sys, os, re, regex, io, glob, time, datetime, pathlib, json, urllib, random, sqlite3, collections
@@ -576,6 +588,18 @@ If you want to have them sorted by Day, use `week=42+Day=%d+title=%t`.
   - seaborn
   - wordcloud
   - pngquant
+  - pillow
+  - pillow-avif-plugin
+  - pillow-jxl-plugin
+  - jxlpy
+  - PySide2
+
+## Linux
+
+- none yet. Should be compatible with Linux OS paths but not tested.
+
+## Windows
+
 - Windows software needed:
   - [busybox.exe](https://busybox.net/)
   - [whisper-faster](https://github.com/Purfview/whisper-standalone-win)
@@ -625,7 +649,8 @@ This project is under [GPL-2.0](https://github.com/audioscavenger/BiasBuster/blo
 Scope creep ahead...
 
 - [ ] WIP
-  - [ ] misc
+  - [ ] kjzz.sh
+    - [ ] add option to rename unammed segments.mp3 when schedule was missing. I have 3 months on unnamed files and I can't import them until it's done.
   - [ ] db
     - [ ] add statistics table or more columns for each chunk?
     - [ ] how to store statistics for segments rather then chunks?
@@ -643,6 +668,7 @@ Scope creep ahead...
     - [ ] player handles playlist?
     - [ ] segments have only 1 play button that loads a playlist? how about the texts?
   - [ ] python
+    - [ ] update queries add byYear
     - [ ] change gettext time= to start=|stop= instead, so we can generate same segments as by week+title+Day
     - [ ] rename title to segment or show? they seem to call their programmings "shows"
     - [ ] color wordClouds by bias/misInformation/etc
@@ -654,6 +680,9 @@ Scope creep ahead...
     - [ ] add metadata in EXIF
     - [ ] check if AVIF/WebP would be a better choice then png for word clouds
   - [ ] misc
+    - [ ] revamp the entire database: we want to find patterns based off keywords other than stopWords. There should be table(s) to hold a score or smth for each word
+    - [ ] create a list of unit tests to quickly identify bugs
+    - [ ] should we remove the donation drive stopWords from stopWords.kjzz.txt? After all it represents how much they hammer it
     - [ ] BUG: 0 bytes mp3 will crash the batch completely
     - [ ] BUG: streams sometimes interrupt for reasons. Must find a way to restart the download
     - [ ] integrate AI summarization with **h2ogpt** or **text-generation-webui**, and Summarization model such as *impira_layoutlm-document-qa*
@@ -666,23 +695,28 @@ Scope creep ahead...
     - [ ] include some of the most offensive Hexspeak from https://en.wikipedia.org/wiki/Hexspeak to trigger fools
     - [ ] separate KJZZ into its own table to add other broadcasters
     - [ ] automate mp3 downloads from cloud + process + uploads from/to cloud server
+    - [ ] 
   - [ ] future
     - [ ] dynamic page in PHP or nodeJS/typeScript
-- [x] release 0.9.14 WIP
+- [x] WIP 0.9.14 WIP
+  - [x] Windows part 1
+    - [x] BiasBuster-whisper.cmd now imports even individual mp3 files + python commands calls updated
   - [x] ui
     - [ ] add date picker or at least indicate min and max available
     - [ ] upgrade OpenPlayerJS
     - [ ] fix closed captions not showing up anymore
   - [x] python
+    - [x] info/error/warning now prints line numbers
     - [x] simplified generateHtml()
     - [x] added genTitle and using gettextDict everywhere
     - [x] variabilize station name
     - [ ] test --text if it needs folder path or not
     - [ ] test weekNumber 1 vs 01
     - [ ] detect multiple schedules and load the right one as needed
-    - [ ] should we remove the donation drive stopWords from stopWords.kjzz.txt? After all it represents how much they hammer it
     - [ ] should we include stopWords.ranks.nl by default?
-- [x] release 0.9.13 WIP
+    - [ ] implement save_metadata: which EXIF tags should we use and for what?
+    - [ ] BUG: sunday morning 00-05am appears on sunday evening in the 23:00 schedule...??? why? 
+- [x] WIP 0.9.13 WIP
   - [x] kjzz.sh
     - [x] major bug discovered in isoweek values of %V%G versus %W%U/%Y: we switched to %W as strftime('%W','2025-01-01') gives same values
     - [x] schedules format is KJZZ-schedule.json, KJZZ-schedule-20240101.json, KJZZ-schedule-20240415.json
@@ -704,7 +738,7 @@ Scope creep ahead...
     - [x] add yearNumber navigation
     - [x] rename ui-child / style-child to ui-iframe / style-iframe
     - [x] updated index.html and index_template.html with year navigation
-- [x] release 0.9.12 bugfixes
+- [x] WIP 0.9.12 bugfixes
 - [x] release 0.9.11 iframe
   - [x] ui
     - [x] disabled link checker as this is not production ready
